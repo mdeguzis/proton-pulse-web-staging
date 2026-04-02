@@ -26,8 +26,8 @@ def parse_and_split(file_handle, data_output_path, source_label="?"):
     parser = ijson.items(file_handle, "item")
 
     for report in parser:
-        app_id = report.get("appId")
-        if not app_id or not str(app_id).strip().isdigit():
+        app_id = str(report.get("appId", "")).strip()
+        if not app_id or not app_id.isdigit():
             skipped += 1
             continue
 
