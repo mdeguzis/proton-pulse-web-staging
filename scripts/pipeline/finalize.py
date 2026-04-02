@@ -182,6 +182,22 @@ def generate_coverage_report(index_keys: set, backfilled_keys: set, data_output_
     official_count = sum(1 for _, _, o, _ in rows if o)
     backfill_count = sum(1 for _, _, _, b in rows if b)
 
+    # Build JS data array instead of HTML rows
+    js_rows = []
+    for app_id, title, official, backfill in rows:
+        flags = []
+        if official:
+            flags.append("official")
+        if backfill:
+            flags.append("backfill")
+        if not title:
+            flags.append("missing-title")
+        if not app_id.isdigit():
+            flags.append("bad-appid")
+        # Escape for JS string
+        safe_title = title.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+        js_rows.append(f'["{app_id}","{safe_title}",{1 if official else 0},{1 if backfill else 0},"{" ".join(flags)}"]')
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -201,90 +217,106 @@ a {{ color: #06c; }}
 #filter {{ padding: 6px; width: 300px; }}
 .toggle {{ padding: 6px 14px; border: 2px solid #335; border-radius: 4px; background: #fff; color: #335; cursor: pointer; font-weight: bold; }}
 .toggle.active {{ background: #335; color: #fff; }}
+.pager {{ margin: 1em 0; display: flex; gap: 8px; align-items: center; }}
+.pager button {{ padding: 4px 12px; }}
 </style>
 </head>
 <body>
 <h1>Coverage Report</h1>
 <p>{len(rows)} apps &middot; {official_count} official &middot; {backfill_count} backfill &middot; Generated: {now}</p>
 <div class="filters">
-<input id="filter" placeholder="Filter by App ID or title\u2026" oninput="applyFilters()">
+<input id="filter" placeholder="Filter by App ID or title\u2026" oninput="onFilter()">
 <button class="toggle active" data-src="all" onclick="toggleSrc('all')">All</button>
 <button class="toggle" data-src="official" onclick="toggleSrc('official')">Official only</button>
 <button class="toggle" data-src="backfill" onclick="toggleSrc('backfill')">Backfill only</button>
 <button class="toggle" data-src="missing-title" onclick="toggleSrc('missing-title')">Missing title</button>
 <button class="toggle" data-src="bad-appid" onclick="toggleSrc('bad-appid')">Bad App ID</button>
 </div>
+<div class="pager">
+<button onclick="goPage(-1)">&larr; Prev</button>
+<span id="pageInfo"></span>
+<button onclick="goPage(1)">Next &rarr;</button>
+</div>
 <table id="coverage">
 <thead><tr>
-<th onclick="sortTable(0)">App ID</th>
-<th onclick="sortTable(1)">Title (ProtonDB)</th>
-<th onclick="sortTable(2)">Official</th>
-<th onclick="sortTable(3)">Backfill</th>
+<th onclick="doSort(0)">App ID</th>
+<th onclick="doSort(1)">Title (ProtonDB)</th>
+<th onclick="doSort(2)">Official</th>
+<th onclick="doSort(3)">Backfill</th>
 <th>Index</th>
 </tr></thead>
-<tbody>
-"""
-    for app_id, title, official, backfill in rows:
-        o = '<span class="yes">yes</span>' if official else '<span class="no">no</span>'
-        b = '<span class="yes">yes</span>' if backfill else '<span class="no">no</span>'
-        link = f'data/{app_id}/latest.json'
-        flags = []
-        if official:
-            flags.append("official")
-        if backfill:
-            flags.append("backfill")
-        if not title:
-            flags.append("missing-title")
-        if not app_id.isdigit():
-            flags.append("bad-appid")
-        html += f'<tr data-src="{" ".join(flags)}">'
-        steam_url = f"https://store.steampowered.com/app/{app_id}" if app_id.isdigit() else ""
-        protondb_url = f"https://www.protondb.com/app/{app_id}" if app_id.isdigit() else ""
-        app_cell = f'<a href="{steam_url}">{app_id}</a>' if steam_url else app_id
-        title_cell = f'<a href="{protondb_url}">{title}</a>' if protondb_url and title else (title or "")
-        html += f'<td>{app_cell}</td><td>{title_cell}</td><td>{o}</td><td>{b}</td>'
-        html += f'<td><a href="data/{app_id}/">index</a></td></tr>\n'
-
-    html += """</tbody></table>
+<tbody id="tbody"></tbody>
+</table>
+<div class="pager">
+<button onclick="goPage(-1)">&larr; Prev</button>
+<span id="pageInfo2"></span>
+<button onclick="goPage(1)">Next &rarr;</button>
+</div>
 <script>
-let activeSrc = new Set(["all"]);
-let sortDir = [1,1,1,1];
+const DATA=[
+{",".join(js_rows)}
+];
+const PAGE=300;
+let filtered=DATA.slice();
+let page=0;
+let activeSrc=new Set(["all"]);
+let sortCol=-1,sortAsc=1;
+let filterTimer=null;
 
-function toggleSrc(src) {
-  if (src === "all") {
-    activeSrc.clear();
-    activeSrc.add("all");
-  } else {
-    activeSrc.delete("all");
-    if (activeSrc.has(src)) activeSrc.delete(src); else activeSrc.add(src);
-    if (activeSrc.size === 0) activeSrc.add("all");
-  }
-  document.querySelectorAll(".toggle").forEach(b => b.classList.toggle("active", activeSrc.has(b.dataset.src)));
-  applyFilters();
-}
-
-function applyFilters() {
-  const q = document.getElementById("filter").value.toLowerCase();
-  const all = activeSrc.has("all");
-  document.querySelectorAll("#coverage tbody tr").forEach(r => {
-    const src = r.dataset.src;
-    const srcOk = all || [...activeSrc].some(s => src.includes(s));
-    const textOk = !q || (r.cells[0].textContent + " " + r.cells[1].textContent).toLowerCase().includes(q);
-    r.style.display = srcOk && textOk ? "" : "none";
-  });
-}
-
-function sortTable(col) {
-  const tb = document.querySelector("#coverage tbody");
-  const rows = Array.from(tb.rows);
-  sortDir[col] *= -1;
-  rows.sort((a, b) => {
-    let av = a.cells[col].textContent, bv = b.cells[col].textContent;
-    if (col === 0) return sortDir[col] * (parseInt(av) - parseInt(bv));
-    return sortDir[col] * av.localeCompare(bv);
-  });
-  rows.forEach(r => tb.appendChild(r));
-}
+function toggleSrc(s){{
+  if(s==="all"){{activeSrc.clear();activeSrc.add("all")}}
+  else{{activeSrc.delete("all");activeSrc.has(s)?activeSrc.delete(s):activeSrc.add(s);if(!activeSrc.size)activeSrc.add("all")}}
+  document.querySelectorAll(".toggle").forEach(b=>b.classList.toggle("active",activeSrc.has(b.dataset.src)));
+  apply();
+}}
+function onFilter(){{clearTimeout(filterTimer);filterTimer=setTimeout(apply,200)}}
+function apply(){{
+  const q=document.getElementById("filter").value.toLowerCase();
+  const all=activeSrc.has("all");
+  filtered=DATA.filter(r=>{{
+    if(!all&&![...activeSrc].some(s=>r[4].includes(s)))return false;
+    if(q&&!(r[0]+" "+r[1]).toLowerCase().includes(q))return false;
+    return true;
+  }});
+  if(sortCol>=0)doSortFiltered();
+  page=0;render();
+}}
+function doSort(c){{
+  if(sortCol===c)sortAsc*=-1;else{{sortCol=c;sortAsc=1}}
+  doSortFiltered();page=0;render();
+}}
+function doSortFiltered(){{
+  const c=sortCol,d=sortAsc;
+  filtered.sort((a,b)=>{{
+    if(c===0)return d*(parseInt(a[0]||"0")-parseInt(b[0]||"0"));
+    if(c===2||c===3)return d*(b[c]-a[c]);
+    return d*String(a[c]).localeCompare(String(b[c]));
+  }});
+}}
+function goPage(d){{
+  const max=Math.max(0,Math.ceil(filtered.length/PAGE)-1);
+  page=Math.max(0,Math.min(max,page+d));render();
+}}
+function render(){{
+  const tb=document.getElementById("tbody");
+  const start=page*PAGE,slice=filtered.slice(start,start+PAGE);
+  const total=filtered.length,pages=Math.ceil(total/PAGE)||1;
+  const info=`${{start+1}}\u2013${{Math.min(start+PAGE,total)}} of ${{total}} (${{page+1}}/${{pages}})`;
+  document.getElementById("pageInfo").textContent=info;
+  document.getElementById("pageInfo2").textContent=info;
+  const h=[];
+  for(const r of slice){{
+    const id=r[0],t=r[1],o=r[2],b=r[3];
+    const isNum=/^\\d+$/.test(id);
+    const ac=isNum?`<a href="https://store.steampowered.com/app/${{id}}">${{id}}</a>`:id;
+    const tc=isNum&&t?`<a href="https://www.protondb.com/app/${{id}}">${{t}}</a>`:(t||"");
+    const oc=o?'<span class="yes">yes</span>':'<span class="no">no</span>';
+    const bc=b?'<span class="yes">yes</span>':'<span class="no">no</span>';
+    h.push(`<tr><td>${{ac}}</td><td>${{tc}}</td><td>${{oc}}</td><td>${{bc}}</td><td><a href="data/${{id}}/">index</a></td></tr>`);
+  }}
+  tb.innerHTML=h.join("");
+}}
+apply();
 </script>
 </body></html>
 """
