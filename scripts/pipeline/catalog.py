@@ -16,7 +16,9 @@ STEAM_APP_LIST_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
 STEAM_APP_LIST_PAGE_SIZE = 50_000
 STEAM_CATALOG_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
 PROTONDB_SIGNAL_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
-PROTONDB_PROBE_CACHE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+PROTONDB_PROBE_CACHE_MAX_AGE_DAYS_DEFAULT = 90
+PROTONDB_PROBE_CACHE_MAX_AGE_DAYS_ENV = "PROTONDB_PROBE_CACHE_MAX_AGE_DAYS"
+PROTONDB_PROBE_CACHE_MAX_AGE_SECONDS = PROTONDB_PROBE_CACHE_MAX_AGE_DAYS_DEFAULT * 24 * 60 * 60
 PROTONDB_COMPATIBILITY_REPORT_URL = "https://www.protondb.com/data/compatibility_report_with_games.json"
 PROTONDB_SUMMARY_URL = "https://www.protondb.com/api/v1/reports/summaries/{app_id}.json"
 PROTONDB_PROBE_LIMIT_ENV = "PROTONDB_PROBE_LIMIT"
@@ -86,6 +88,18 @@ def get_protondb_probe_backfill_limit(env: dict[str, str] | None = None, default
     except ValueError:
         return default
     return max(0, value)
+
+
+def get_protondb_probe_cache_max_age_seconds(env: dict[str, str] | None = None, default_days: int = PROTONDB_PROBE_CACHE_MAX_AGE_DAYS_DEFAULT) -> int:
+    merged_env = {}
+    merged_env.update(load_dotenv())
+    merged_env.update(env if env is not None else os.environ)
+    raw = str(merged_env.get(PROTONDB_PROBE_CACHE_MAX_AGE_DAYS_ENV, default_days)).strip()
+    try:
+        days = int(raw)
+    except ValueError:
+        return default_days * 24 * 60 * 60
+    return max(1, days) * 24 * 60 * 60
 
 
 def get_protondb_probe_log_every(env: dict[str, str] | None = None, default: int = PROTONDB_PROBE_LOG_EVERY) -> int:
@@ -425,12 +439,26 @@ def _is_tracked_protondb_summary(payload: dict) -> bool:
     return bool(confidence or tier)
 
 
+def _format_duration(seconds: float) -> str:
+    s = int(seconds)
+    if s < 60:
+        return f"{s}s"
+    m, s = divmod(s, 60)
+    if m < 60:
+        return f"{m}m {s}s"
+    h, m = divmod(m, 60)
+    return f"{h}h {m}m"
+
+
 def probe_protondb_app_ids(
     candidate_app_ids: list[str],
     existing_cache: dict[str, dict] | None = None,
     fetch_json_impl=fetch_json,
     limit: int = 0,
     log_every: int = PROTONDB_PROBE_LOG_EVERY,
+    cache_path: Path = DEFAULT_PROTONDB_PROBE_CACHE_PATH,
+    flush_every: int | None = None,
+    write_cache_impl=write_protondb_probe_cache,
 ) -> tuple[dict[str, dict], dict[str, str]]:
     cache = dict(existing_cache or {})
     tracked_catalog: dict[str, str] = {
@@ -452,6 +480,7 @@ def probe_protondb_app_ids(
     started = time.time()
     new_hits = 0
     failed = 0
+    flush_interval = max(1, flush_every or log_every)
 
     for index, app_id in enumerate(uncached, start=1):
         tracked = False
@@ -479,15 +508,21 @@ def probe_protondb_app_ids(
             tracked_catalog[app_id] = title
             new_hits += 1
 
+        should_flush = index % flush_interval == 0 or index == total
+        if should_flush:
+            write_cache_impl(cache, cache_path=cache_path)
+
         if index % log_every == 0 or index == total:
             elapsed = time.time() - started
             rate = index / elapsed if elapsed > 0 else 0.0
             remaining = total - index
             eta_seconds = remaining / rate if rate > 0 else 0.0
+            eta_human = _format_duration(eta_seconds)
+            elapsed_human = _format_duration(elapsed)
             log(
                 f"[protondb-probe] {index:,}/{total:,} checked "
                 f"({new_hits:,} tracked hits, {failed:,} hard failures, "
-                f"{elapsed:.1f}s elapsed, {rate:.1f} apps/s, eta {eta_seconds:.1f}s)"
+                f"{elapsed_human} elapsed, {rate:.1f} apps/s, eta {eta_human})"
             )
 
     log(

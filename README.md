@@ -86,6 +86,11 @@ or:
 git submodule update --init --recursive
 ```
 
+The GitHub Actions probe pass is chunked into resumable cache-backed checkpoints.
+Each chunk saves `.cache/protondb-summary-probe-cache.json` under a fresh cache key
+so an interrupted multi-hour run can resume from the latest completed chunk rather
+than restarting the whole probe sweep.
+
 ## Storage strategy
 
 The `gh-pages` branch is an orphan with a single commit — it is force-pushed

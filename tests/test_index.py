@@ -11,6 +11,7 @@ from scripts.pipeline.catalog import (
     fetch_steam_game_catalog,
     fetch_protondb_signal_catalog,
     fetch_protondb_summary,
+    get_protondb_probe_cache_max_age_seconds,
     get_steam_api_key,
     get_protondb_probe_limit,
     get_protondb_probe_log_every,
@@ -120,6 +121,11 @@ def test_get_steam_api_key_reads_env_value():
 def test_get_protondb_probe_limit_reads_env_value():
     assert get_protondb_probe_limit({"PROTONDB_PROBE_LIMIT": "250"}) == 250
     assert get_protondb_probe_limit({"PROTONDB_PROBE_LIMIT": "bad"}) == 0
+
+
+def test_get_protondb_probe_cache_max_age_seconds_reads_env_days():
+    assert get_protondb_probe_cache_max_age_seconds({"PROTONDB_PROBE_CACHE_MAX_AGE_DAYS": "7"}) == 604800
+    assert get_protondb_probe_cache_max_age_seconds({"PROTONDB_PROBE_CACHE_MAX_AGE_DAYS": "bad"}) == 90 * 24 * 60 * 60
 
 
 def test_get_steam_api_key_returns_none_when_no_env_or_dotenv(tmp_path, monkeypatch):
@@ -323,6 +329,35 @@ def test_probe_protondb_app_ids_uses_limit():
     assert len(calls) == 2
     assert set(cache.keys()) == {"10", "20"}
     assert set(tracked.keys()) == {"10", "20"}
+
+
+def test_probe_protondb_app_ids_flushes_cache_periodically(tmp_path):
+    writes = []
+
+    def fake_fetch(_url: str):
+        return {"tier": "gold", "total": 1, "title": "Tracked"}
+
+    def fake_write_cache(cache: dict[str, dict], cache_path: Path):
+        writes.append((cache_path, set(cache.keys())))
+
+    cache_path = tmp_path / "probe-cache.json"
+    cache, tracked = probe_protondb_app_ids(
+        ["10", "20", "30"],
+        existing_cache={},
+        fetch_json_impl=fake_fetch,
+        limit=10,
+        log_every=10,
+        cache_path=cache_path,
+        flush_every=2,
+        write_cache_impl=fake_write_cache,
+    )
+
+    assert len(writes) == 2
+    assert writes[0][0] == cache_path
+    assert writes[0][1] == {"10", "20"}
+    assert writes[1][1] == {"10", "20", "30"}
+    assert set(cache.keys()) == {"10", "20", "30"}
+    assert set(tracked.keys()) == {"10", "20", "30"}
 
 
 def test_probe_protondb_app_ids_keeps_going_after_generic_failure():

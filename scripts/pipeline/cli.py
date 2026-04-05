@@ -7,7 +7,7 @@ from urllib.error import URLError
 from .backfill import run_backfill, run_probe_backfill
 from .catalog import get_steam_api_key, load_steam_game_catalog
 from .common import clone_repo, log, set_debug
-from .finalize import finalize_output
+from .finalize import finalize_output, update_protondb_probe_cache
 from .process import process_reports
 
 
@@ -40,7 +40,15 @@ def build_parser():
     add_shared_output_arg(backfill_parser)
 
     finalize_parser = subparsers.add_parser("finalize", help="Generate latest/index files and print final summary")
+    finalize_parser.add_argument(
+        "--skip-probe",
+        action="store_true",
+        help="Use cached ProtonDB probe results without performing another active probe pass",
+    )
     add_shared_output_arg(finalize_parser)
+
+    probe_parser = subparsers.add_parser("probe", help="Probe ProtonDB summaries and update the probe cache")
+    add_shared_output_arg(probe_parser)
 
     probe_backfill_parser = subparsers.add_parser("probe-backfill", help="Backfill data for apps discovered by the ProtonDB probe")
     add_shared_output_arg(probe_backfill_parser)
@@ -88,7 +96,11 @@ def main():
         return
 
     if command == "finalize":
-        finalize_output(args.output_dir)
+        finalize_output(args.output_dir, skip_probe=getattr(args, "skip_probe", False))
+        return
+
+    if command == "probe":
+        update_protondb_probe_cache(args.output_dir)
         return
 
     if command == "probe-backfill":
