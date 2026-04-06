@@ -264,7 +264,7 @@ def backfill_missing_apps(
 
     if not missing_targets:
         log("[backfill] No missing app IDs require live backfill", debug=True)
-        return set()
+        return set(), set()
 
     log(f"[backfill] Resolving {len(missing_targets)} missing app(s) via live ProtonDB detailed data")
     counts = fetch_json_impl(LIVE_COUNTS_URL)
