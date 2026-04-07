@@ -460,8 +460,21 @@ def run_backfill(output_dir, target_app_ids: list[str] | None = None, force: boo
 
 
 def _find_no_title_app_ids(data_output_path: Path) -> list[str]:
-    """Find indexed apps whose latest reports all have empty titles."""
-    app_ids = []
+    """Find apps with missing titles: both on-disk apps with empty titles
+    and catalog-only apps (Steam/ProtonDB) that have no title and no data."""
+    import os
+
+    from .catalog import (
+        get_steam_api_key,
+        load_protondb_signal_catalog,
+        load_steam_game_catalog,
+        read_protondb_probe_cache,
+    )
+    from .finalize import probe_cache_to_catalog
+
+    app_ids: set[str] = set()
+
+    # 1) On-disk apps with empty titles in latest.json
     for app_dir in sorted(data_output_path.iterdir(), key=lambda p: p.name):
         if not app_dir.is_dir() or not app_dir.name.isdigit():
             continue
@@ -473,10 +486,40 @@ def _find_no_title_app_ids(data_output_path: Path) -> list[str]:
             if isinstance(reports, list) and reports:
                 title = (reports[0].get("title") or "").strip()
                 if not title:
-                    app_ids.append(app_dir.name)
+                    app_ids.add(app_dir.name)
         except Exception:
-            app_ids.append(app_dir.name)
-    return app_ids
+            app_ids.add(app_dir.name)
+
+    on_disk_count = len(app_ids)
+
+    # 2) Catalog-only apps with no title and no data directory
+    catalog_titles: dict[str, str] = {}
+    try:
+        signal = load_protondb_signal_catalog()
+        catalog_titles.update(signal)
+    except Exception:
+        pass
+    probe_cache = read_protondb_probe_cache()
+    catalog_titles.update(probe_cache_to_catalog(probe_cache))
+    steam_api_key = get_steam_api_key(os.environ)
+    if steam_api_key:
+        try:
+            steam = load_steam_game_catalog(steam_api_key)
+            catalog_titles.update(steam)
+        except Exception:
+            pass
+
+    for cid, title in catalog_titles.items():
+        if not cid.isdigit():
+            continue
+        if (data_output_path / cid).is_dir():
+            continue  # already handled above
+        if not (title or "").strip():
+            app_ids.add(cid)
+
+    catalog_count = len(app_ids) - on_disk_count
+    log(f"[no-titles] {on_disk_count} on-disk + {catalog_count} catalog-only = {len(app_ids)} total")
+    return sorted(app_ids, key=lambda a: int(a))
 
 
 def _find_bad_app_id_entries(data_output_path: Path) -> list[str]:
@@ -585,10 +628,21 @@ def run_coverage_backfill(output_dir: str, issue_type: str, limit: int = 0, allo
     _log_app_id_batches("[coverage-backfill] Selected app IDs", app_ids)
 
     if issue_type == "no-titles":
-        # Title-only fix: resolve from Steam and patch existing on-disk reports
-        # directly, instead of going through the full backfill pipeline which
-        # requires a successful ProtonDB live fetch before resolving titles.
-        patched_keys = _patch_titles_on_disk(data_output_path, app_ids)
+        # Split into apps with existing data (patch titles) vs no data (live backfill)
+        on_disk = [a for a in app_ids if (data_output_path / a).is_dir()]
+        no_data = [a for a in app_ids if not (data_output_path / a).is_dir()]
+        log(f"[no-titles] {len(on_disk)} on-disk (patch), {len(no_data)} no-data (backfill)")
+
+        # Patch titles on existing on-disk reports
+        patched_keys = _patch_titles_on_disk(data_output_path, on_disk) if on_disk else set()
+
+        # Attempt live backfill for catalog-only apps with no data
+        if no_data:
+            backfilled_keys, no_data_ids = backfill_missing_apps(
+                data_output_path, target_app_ids=no_data, force=True,
+            )
+            patched_keys.update(backfilled_keys)
+
         if patched_keys:
             state = read_pipeline_state(output_path)
             merged_backfilled = set(state["backfilled_keys"])

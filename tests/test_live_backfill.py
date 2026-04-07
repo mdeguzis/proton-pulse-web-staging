@@ -3,6 +3,7 @@ import json
 import pytest
 
 import scripts.pipeline.backfill as backfill_module
+import scripts.pipeline.catalog as catalog_module
 import scripts.pipeline.finalize as finalize_module
 from scripts.pipeline.backfill import (
     backfill_missing_apps,
@@ -389,7 +390,15 @@ def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, 
     assert 'href="data/2561580/latest.json"' in html
 
 
+def _mock_empty_catalogs(monkeypatch):
+    """Mock catalog functions to return empty so _find_no_title_app_ids only finds on-disk apps."""
+    monkeypatch.setattr(catalog_module, "load_protondb_signal_catalog", lambda **kw: {})
+    monkeypatch.setattr(catalog_module, "read_protondb_probe_cache", lambda **kw: {})
+    monkeypatch.setattr(catalog_module, "get_steam_api_key", lambda *a, **kw: None)
+
+
 def test_run_coverage_backfill_no_titles_patches_existing_reports(tmp_path, monkeypatch):
+    _mock_empty_catalogs(monkeypatch)
     data_dir = tmp_path / "data"
     app_dir = data_dir / "2561580"
     app_dir.mkdir(parents=True)
@@ -409,6 +418,7 @@ def test_run_coverage_backfill_no_titles_patches_existing_reports(tmp_path, monk
 
 
 def test_run_coverage_backfill_logs_candidate_and_selected_app_ids(tmp_path, monkeypatch):
+    _mock_empty_catalogs(monkeypatch)
     data_dir = tmp_path / "data"
     for app_id in ("2561580", "730", "570"):
         app_dir = data_dir / app_id
@@ -426,8 +436,8 @@ def test_run_coverage_backfill_logs_candidate_and_selected_app_ids(tmp_path, mon
 
     run_coverage_backfill(str(tmp_path), issue_type="no-titles", limit=2)
 
-    assert any(msg == "[coverage-backfill] Candidate app IDs (1-3/3): 2561580,570,730" for msg in logs)
-    assert any(msg == "[coverage-backfill] Selected app IDs (1-2/2): 2561580,570" for msg in logs)
+    assert any(msg == "[coverage-backfill] Candidate app IDs (1-3/3): 570,730,2561580" for msg in logs)
+    assert any(msg == "[coverage-backfill] Selected app IDs (1-2/2): 570,730" for msg in logs)
 
 
 def test_run_coverage_backfill_requires_positive_limit_by_default(tmp_path):
@@ -442,6 +452,7 @@ def test_run_coverage_backfill_requires_positive_limit_by_default(tmp_path):
 
 
 def test_run_coverage_backfill_can_explicitly_allow_unbounded(tmp_path, monkeypatch):
+    _mock_empty_catalogs(monkeypatch)
     data_dir = tmp_path / "data"
     app_dir = data_dir / "2561580"
     app_dir.mkdir(parents=True)
