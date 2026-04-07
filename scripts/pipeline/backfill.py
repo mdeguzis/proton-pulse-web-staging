@@ -518,6 +518,39 @@ def _log_app_id_batches(prefix: str, app_ids: list[str], batch_size: int = 100) 
         log(f"{prefix} ({start + 1}-{end}/{total}): {batch}")
 
 
+def _patch_titles_on_disk(data_output_path: Path, app_ids: list[str]) -> set[tuple[str, str]]:
+    """Resolve Steam titles and patch all on-disk year files for the given app IDs.
+
+    Returns the set of (app_id, year) keys that were updated so the caller can
+    record them as backfilled.
+    """
+    patched_keys: set[tuple[str, str]] = set()
+    for app_id in app_ids:
+        title, source = fetch_steam_title_with_source(app_id)
+        if not title:
+            log(f"[no-titles] Could not resolve title for {app_id}: source={source}")
+            continue
+        log(f"[no-titles] {app_id}: {title!r} via {source}")
+        app_dir = data_output_path / app_id
+        for year_file in app_dir.glob("*.json"):
+            if year_file.stem in ("index", "latest", "votes"):
+                continue
+            try:
+                reports = json.loads(year_file.read_text())
+            except Exception:
+                continue
+            changed = False
+            for report in reports:
+                if not (report.get("title") or "").strip():
+                    report["title"] = title
+                    changed = True
+            if changed:
+                year_file.write_text(json.dumps(reports, indent=2))
+                patched_keys.add((app_id, year_file.stem))
+    log(f"[no-titles] Patched {len(patched_keys)} year file(s) across {len({k[0] for k in patched_keys})} app(s)")
+    return patched_keys
+
+
 def run_coverage_backfill(output_dir: str, issue_type: str, limit: int = 0, allow_unbounded: bool = False) -> None:
     output_path = Path(output_dir)
     data_output_path = output_path / "data"
@@ -551,8 +584,21 @@ def run_coverage_backfill(output_dir: str, issue_type: str, limit: int = 0, allo
 
     _log_app_id_batches("[coverage-backfill] Selected app IDs", app_ids)
 
-    # no-titles needs force=True because these apps already have data dirs,
-    # they just need re-fetching to pick up Steam titles
-    needs_force = issue_type == "no-titles"
-    run_backfill(output_dir, target_app_ids=app_ids, force=needs_force)
+    if issue_type == "no-titles":
+        # Title-only fix: resolve from Steam and patch existing on-disk reports
+        # directly, instead of going through the full backfill pipeline which
+        # requires a successful ProtonDB live fetch before resolving titles.
+        patched_keys = _patch_titles_on_disk(data_output_path, app_ids)
+        if patched_keys:
+            state = read_pipeline_state(output_path)
+            merged_backfilled = set(state["backfilled_keys"])
+            merged_backfilled.update(patched_keys)
+            merged_index = set(state["index_keys"])
+            merged_index.update(patched_keys)
+            write_pipeline_state(
+                output_path, state["parsed_count"],
+                merged_index, merged_backfilled,
+            )
+    else:
+        run_backfill(output_dir, target_app_ids=app_ids, force=False)
     log(f"[coverage-backfill] Done ({issue_type})")

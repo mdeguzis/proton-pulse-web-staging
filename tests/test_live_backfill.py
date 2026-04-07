@@ -389,23 +389,23 @@ def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, 
     assert 'href="data/2561580/latest.json"' in html
 
 
-def test_run_coverage_backfill_no_titles_does_not_crash_when_targets_already_exist(tmp_path, monkeypatch):
+def test_run_coverage_backfill_no_titles_patches_existing_reports(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     app_dir = data_dir / "2561580"
     app_dir.mkdir(parents=True)
+    (app_dir / "2024.json").write_text(json.dumps([{"title": "", "timestamp": 1763251200}]))
     (app_dir / "latest.json").write_text(json.dumps([{"title": "", "timestamp": 1763251200}]))
-    write_pipeline_state(tmp_path, parsed_count=0, index_keys=set())
+    write_pipeline_state(tmp_path, parsed_count=0, index_keys={("2561580", "2024")})
 
-    calls = []
+    monkeypatch.setattr(
+        backfill_module, "fetch_steam_title_with_source",
+        lambda app_id: ("Horizon Zero Dawn™ Remastered", "steam-store"),
+    )
 
-    def fake_run_backfill(output_dir, target_app_ids=None, force=False):
-        calls.append((output_dir, target_app_ids, force))
+    run_coverage_backfill(str(tmp_path), issue_type="no-titles", limit=1)
 
-    monkeypatch.setattr(backfill_module, "run_backfill", fake_run_backfill)
-
-    run_coverage_backfill(tmp_path, issue_type="no-titles", limit=1)
-
-    assert calls == [(tmp_path, ["2561580"], True)]
+    patched = json.loads((app_dir / "2024.json").read_text())
+    assert patched[0]["title"] == "Horizon Zero Dawn™ Remastered"
 
 
 def test_run_coverage_backfill_logs_candidate_and_selected_app_ids(tmp_path, monkeypatch):
@@ -419,9 +419,12 @@ def test_run_coverage_backfill_logs_candidate_and_selected_app_ids(tmp_path, mon
     logs = []
 
     monkeypatch.setattr(backfill_module, "log", lambda msg, debug=False: logs.append(msg))
-    monkeypatch.setattr(backfill_module, "run_backfill", lambda output_dir, target_app_ids=None, force=False: None)
+    monkeypatch.setattr(
+        backfill_module, "fetch_steam_title_with_source",
+        lambda app_id: ("", "steam-store-error"),
+    )
 
-    run_coverage_backfill(tmp_path, issue_type="no-titles", limit=2)
+    run_coverage_backfill(str(tmp_path), issue_type="no-titles", limit=2)
 
     assert any(msg == "[coverage-backfill] Candidate app IDs (1-3/3): 2561580,570,730" for msg in logs)
     assert any(msg == "[coverage-backfill] Selected app IDs (1-2/2): 2561580,570" for msg in logs)
@@ -442,16 +445,16 @@ def test_run_coverage_backfill_can_explicitly_allow_unbounded(tmp_path, monkeypa
     data_dir = tmp_path / "data"
     app_dir = data_dir / "2561580"
     app_dir.mkdir(parents=True)
+    (app_dir / "2024.json").write_text(json.dumps([{"title": "", "timestamp": 1763251200}]))
     (app_dir / "latest.json").write_text(json.dumps([{"title": "", "timestamp": 1763251200}]))
-    write_pipeline_state(tmp_path, parsed_count=0, index_keys=set())
+    write_pipeline_state(tmp_path, parsed_count=0, index_keys={("2561580", "2024")})
 
-    calls = []
+    monkeypatch.setattr(
+        backfill_module, "fetch_steam_title_with_source",
+        lambda app_id: ("Test Game", "steam-store"),
+    )
 
-    def fake_run_backfill(output_dir, target_app_ids=None, force=False):
-        calls.append((output_dir, target_app_ids, force))
+    run_coverage_backfill(str(tmp_path), issue_type="no-titles", limit=0, allow_unbounded=True)
 
-    monkeypatch.setattr(backfill_module, "run_backfill", fake_run_backfill)
-
-    run_coverage_backfill(tmp_path, issue_type="no-titles", limit=0, allow_unbounded=True)
-
-    assert calls == [(tmp_path, ["2561580"], True)]
+    patched = json.loads((app_dir / "2024.json").read_text())
+    assert patched[0]["title"] == "Test Game"
