@@ -2,7 +2,7 @@
 
 UV_CACHE_DIR ?= /tmp/uv-cache
 
-.PHONY: help setup test test-py init-submodules fetch-steam-catalog
+.PHONY: help setup test test-py init-submodules fetch-steam-catalog backup-supabase supabase-login install-docker
 
 help:
 	@echo "Usage: make <target>"
@@ -12,6 +12,9 @@ help:
 	@echo "  test     Run the test suite with uv"
 	@echo "  test-py  Run the Python test suite with uv"
 	@echo "  fetch-steam-catalog  Fetch and cache Steam app IDs using STEAM_API_KEY"
+	@echo "  backup-supabase  Create a logical Supabase backup via Supabase CLI"
+	@echo "  supabase-login  Log in to the Supabase CLI via npx"
+	@echo "  install-docker  Install Docker Engine via the local helper script"
 
 init-submodules:
 	git submodule update --init --recursive
@@ -26,3 +29,12 @@ test-py:
 
 fetch-steam-catalog: setup
 	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run python scripts/split_reports.py steam-catalog
+
+backup-supabase:
+	bash scripts/backup_supabase.sh --linked
+
+supabase-login:
+	npx --yes supabase login
+
+install-docker:
+	sudo bash scripts/install_docker.sh

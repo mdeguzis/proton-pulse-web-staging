@@ -58,6 +58,38 @@ detailed report data exists. Those games can be added to
 
 Go to **Actions → Update ProtonDB Data → Run workflow**.
 
+## Supabase backups
+
+This repo includes a helper for creating downloadable logical Supabase backups
+with the Supabase CLI, following the documented `db dump` flow for `roles`,
+`schema`, and `data` exports.
+
+```bash
+cd proton-pulse-data
+SUPABASE_DB_URL='postgresql://postgres.[ref]:[password]@aws-0-us-east-1.pooler.supabase.com:6543/postgres' \
+  make backup-supabase
+```
+
+Or, if this repo is already linked to a Supabase project locally:
+
+```bash
+cd proton-pulse-data
+bash scripts/backup_supabase.sh --linked
+```
+
+Outputs are written to `backups/supabase/<timestamp>/` plus a matching
+`.tar.gz` archive, and are ignored by git. You can override the location or
+name with:
+
+```bash
+SUPABASE_BACKUP_DIR=artifacts/supabase
+SUPABASE_BACKUP_LABEL=nightly
+```
+
+This is intended to be easy to lift into GitHub Actions later by supplying
+`SUPABASE_DB_URL` from repository secrets and uploading the generated archive
+as a workflow artifact.
+
 ## Steam catalog coverage
 
 The coverage report can optionally expand to the full Steam game catalog when

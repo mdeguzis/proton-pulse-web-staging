@@ -1,5 +1,6 @@
 # Build artifacts / generated data
 data/
+backups/
 *.tar.gz
 *.zip
 
