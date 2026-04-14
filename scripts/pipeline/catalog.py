@@ -34,6 +34,10 @@ VENDOR_SCRAPER_PATH = (
     Path(__file__).resolve().parents[2] / "vendor" / "Steam-Games-Scraper" / "SteamGamesScraper.py"
 )
 
+# In-memory singletons to avoid re-reading disk cache multiple times per run
+_steam_catalog_memo: dict[str, str] | None = None
+_signal_catalog_memo: dict[str, str] | None = None
+
 
 def _strip_wrapping_quotes(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
@@ -312,14 +316,20 @@ def load_steam_game_catalog(
     max_results: int = STEAM_APP_LIST_PAGE_SIZE,
     scraper_module=None,
 ) -> dict[str, str]:
+    global _steam_catalog_memo
+    if _steam_catalog_memo is not None:
+        return _steam_catalog_memo
+
     cached = read_cached_steam_game_catalog(cache_path=cache_path)
     if cached is not None:
+        _steam_catalog_memo = cached
         return cached
 
     log("[steam-catalog] Cache miss; refreshing Steam app catalog from network")
     catalog = fetch_steam_game_catalog(api_key, max_results=max_results, scraper_module=scraper_module)
     write_cached_steam_game_catalog(catalog, cache_path=cache_path)
     log(f"[steam-catalog] Cached {len(catalog):,} app IDs at {cache_path}")
+    _steam_catalog_memo = catalog
     return catalog
 
 
@@ -365,12 +375,18 @@ def load_protondb_signal_catalog(
     fetch_json_impl=fetch_json,
     cache_path: Path = DEFAULT_PROTONDB_SIGNAL_CACHE_PATH,
 ) -> dict[str, str]:
+    global _signal_catalog_memo
+    if _signal_catalog_memo is not None:
+        return _signal_catalog_memo
+
     cached = read_cached_protondb_signal_catalog(cache_path=cache_path)
     if cached is not None:
+        _signal_catalog_memo = cached
         return cached
 
     catalog = fetch_protondb_signal_catalog(fetch_json_impl=fetch_json_impl)
     write_cached_protondb_signal_catalog(catalog, cache_path=cache_path)
+    _signal_catalog_memo = catalog
     return catalog
 
 
