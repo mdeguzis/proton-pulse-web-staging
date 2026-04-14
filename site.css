@@ -1,5 +1,5 @@
 /* ---------------------------------------------
-   Proton Pulse - shared design system
+   Proton Pulse – shared design system
    --------------------------------------------- */
 
 :root {
@@ -19,6 +19,8 @@
   --bronze:  #b07040;
   --red:     #c85050;
   --mono:    "SF Mono", "Consolas", "Liberation Mono", monospace;
+  --sidebar-w: 260px;
+  --topnav-h: 48px;
 }
 
 *, *::before, *::after {
@@ -26,6 +28,8 @@
   margin: 0;
   padding: 0;
 }
+
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
@@ -45,7 +49,297 @@ code {
   padding: 1px 5px;
 }
 
-/* -- Top navigation bar -- */
+/* ============================================================
+   LAYOUT: sidebar + topbar shell
+   ============================================================ */
+
+/* -- Top bar (always visible, slim) -- */
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  height: var(--topnav-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  font-size: 1.1rem;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color .15s, border-color .15s;
+}
+.topbar-toggle:hover { color: var(--text); border-color: var(--accent); }
+
+.hamburger,
+.hamburger::before,
+.hamburger::after {
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: currentColor;
+  position: relative;
+}
+.hamburger::before,
+.hamburger::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 16px;
+}
+.hamburger::before { top: -5px; }
+.hamburger::after  { top:  5px; }
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--strong);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+.topbar-brand img { width: 22px; height: 22px; object-fit: contain; }
+.topbar-brand:hover { text-decoration: none; color: var(--strong); }
+
+.topbar-spacer { flex: 1; }
+
+.topbar-link {
+  font-size: 0.78rem;
+  color: var(--muted);
+  transition: color .12s;
+}
+.topbar-link:hover { color: var(--text); text-decoration: none; }
+
+/* -- Sidebar -- */
+
+.sidebar-nav {
+  position: fixed;
+  top: var(--topnav-h);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  z-index: 150;
+  background: var(--s1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-section:last-child { border-bottom: none; }
+
+.sidebar-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  user-select: none;
+}
+
+.sidebar-links {
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  margin: 0 -8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border-left: 2px solid transparent;
+  transition: color .1s, background .1s, border-color .1s;
+}
+.sidebar-links a:hover {
+  color: var(--text);
+  background: var(--s2);
+  text-decoration: none;
+}
+.sidebar-links a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(74, 159, 208, 0.06);
+}
+.sidebar-links a .nav-icon {
+  width: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.sidebar-note {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.sidebar-note strong { color: var(--text); font-weight: 600; }
+
+.sidebar-brand-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+}
+.sidebar-brand-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s3);
+  border: 1px solid var(--border2);
+}
+.sidebar-brand-icon img { width: 24px; height: 24px; object-fit: contain; }
+.sidebar-brand-copy h2 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--strong);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.sidebar-brand-copy p {
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 1px;
+}
+
+/* -- Main content area -- */
+
+.main-content {
+  margin-left: var(--sidebar-w);
+  margin-top: var(--topnav-h);
+  min-height: calc(100vh - var(--topnav-h));
+  display: flex;
+  flex-direction: column;
+}
+
+.main-inner {
+  flex: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+}
+
+/* -- Overlay for mobile sidebar -- */
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: rgba(0,0,0,0.5);
+}
+.sidebar-overlay.open { display: block; }
+
+/* -- Footer -- */
+
+.sitefooter {
+  border-top: 1px solid var(--border);
+  padding: 16px 28px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.sitefooter a { color: var(--muted); }
+.sitefooter a:hover { color: var(--text); text-decoration: underline; }
+
+/* ============================================================
+   SHARED UTILITIES
+   ============================================================ */
+
+.section-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.eyebrow {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* -- Tier badge colors -- */
+.tier-platinum { background: #b4c7dc; color: #0a0c10; }
+.tier-gold     { background: #c8a050; color: #0a0c10; }
+.tier-silver   { background: #8fa0b0; color: #0a0c10; }
+.tier-bronze   { background: #b07040; color: #0a0c10; }
+.tier-borked   { background: #c85050; color: #fff; }
+.tier-pending  { background: #3a4a5a; color: var(--muted); }
+
+/* ============================================================
+   RESPONSIVE – sidebar collapse
+   ============================================================ */
+
+@media (max-width: 860px) {
+  .topbar-toggle { display: flex; }
+
+  .sidebar-nav {
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: none;
+  }
+  .sidebar-nav.open {
+    transform: translateX(0);
+    box-shadow: 6px 0 24px rgba(0,0,0,0.4);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .main-inner {
+    padding: 20px 16px 40px;
+  }
+
+  /* hide desktop-only topbar links */
+  .topbar-desktop-only { display: none; }
+}
+
+@media (min-width: 861px) {
+  /* sidebar always open on desktop */
+  .sidebar-nav { transform: translateX(0); }
+  .sidebar-overlay { display: none !important; }
+  .topbar { left: var(--sidebar-w); }
+}
+
+/* ============================================================
+   LEGACY compat – keep old topnav / topnav-* classes working
+   for pages that haven't been migrated yet
+   ============================================================ */
 
 .topnav {
   display: flex;
@@ -105,42 +399,14 @@ code {
   border-bottom-color: var(--accent);
 }
 
-/* -- Footer -- */
-
-.sitefooter {
-  border-top: 1px solid var(--border);
-  padding: 20px 24px;
-  font-size: 0.77rem;
-  color: var(--muted);
+.nav-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  background: rgba(0,0,0,0.45);
 }
-.sitefooter a { color: var(--muted); }
-.sitefooter a:hover { color: var(--text); text-decoration: underline; }
-
-/* -- Shared utilities -- */
-
-.section-label {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-
-.eyebrow {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-/* -- Tier badge colors (shared) -- */
-.tier-platinum { background: #b4c7dc; color: #0a0c10; }
-.tier-gold     { background: #c8a050; color: #0a0c10; }
-.tier-silver   { background: #8fa0b0; color: #0a0c10; }
-.tier-bronze   { background: #b07040; color: #0a0c10; }
-.tier-borked   { background: #c85050; color: #fff; }
-.tier-pending  { background: #3a4a5a; color: var(--muted); }
+.nav-overlay.open { display: block; }
 
 @media (max-width: 900px) {
   .topnav { padding: 0 16px; }
@@ -173,14 +439,6 @@ code {
   .topnav-brand-text { display: none; }
   .topnav-brand { margin-right: auto; gap: 0; }
   .topnav-brand img { width: 28px; height: 28px; }
-  .nav-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 98;
-    background: rgba(0,0,0,0.45);
-  }
-  .nav-overlay.open { display: block; }
   .sidebar-nav-block { display: none; }
   .sidebar-about-block { display: none; }
 }
