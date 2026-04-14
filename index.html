@@ -4,112 +4,121 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proton Pulse</title>
-<meta name="description" content="ProtonDB community compatibility reports for Steam games  - searchable, filterable, and updated daily.">
+<meta name="description" content="ProtonDB community compatibility reports for Steam games - searchable, filterable, and updated daily.">
 <meta name="color-scheme" content="dark">
 <link rel="stylesheet" href="site.css">
 <style>
-/*  Index page styles  */
-
-.page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 52px 24px 64px;
-}
-
-/* hero */
+/* ---- Hero ---- */
 .hero {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding-bottom: 40px;
-  margin-bottom: 40px;
+  text-align: center;
+  padding: 80px 24px 64px;
+  background: linear-gradient(180deg, var(--s2) 0%, var(--bg) 100%);
   border-bottom: 1px solid var(--border);
 }
 .hero-logo {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
+  width: 88px; height: 88px;
+  margin: 0 auto 24px;
   background: var(--s1);
-  border: 1px solid var(--border2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border: 2px solid var(--border2);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
 }
-.hero-logo img { width: 48px; height: 48px; object-fit: contain; }
-.hero-copy h1 {
-  font-size: 2rem;
-  font-weight: 800;
+.hero-logo img { width: 56px; height: 56px; object-fit: contain; }
+.hero h1 {
+  font-size: 2.6rem; font-weight: 800;
   color: var(--strong);
   letter-spacing: -0.04em;
-  margin-bottom: 8px;
   line-height: 1.1;
+  margin-bottom: 14px;
 }
-.hero-copy p {
-  font-size: 0.93rem;
-  color: var(--muted);
-  line-height: 1.55;
-  max-width: 500px;
+.hero p {
+  font-size: 1rem; color: var(--muted);
+  max-width: 520px; margin: 0 auto 32px;
+  line-height: 1.6;
 }
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 0.88rem; font-weight: 600;
+  text-decoration: none;
+  transition: background .15s, transform .1s;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #5bb0e0; }
+.btn-secondary { background: var(--s3); color: var(--text); border: 1px solid var(--border2); }
+.btn-secondary:hover { background: var(--border); }
 
-/* portal list */
-.portal-list {
-  border: 1px solid var(--border);
+/* ---- Feature cards ---- */
+.features {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 56px 24px 64px;
+}
+.features-heading {
+  font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--muted);
+  margin-bottom: 20px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+}
+.card {
   background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex; flex-direction: column;
+  transition: border-color .15s, transform .15s;
 }
-.portal-item {
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  border-left: 3px solid transparent;
-  transition: background .1s, border-left-color .1s;
-}
-.portal-item:last-child { border-bottom: none; }
-.portal-item:hover {
-  background: var(--s2);
-  border-left-color: var(--accent);
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
   text-decoration: none;
 }
-.portal-item-type {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  width: 52px;
-  flex-shrink: 0;
-  padding-top: 2px;
+.card-icon {
+  font-size: 1.5rem;
+  margin-bottom: 12px;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--s3);
+  border-radius: 8px;
 }
-.portal-item-main { flex: 1; min-width: 0; }
-.portal-item-name {
-  font-size: 0.93rem;
-  font-weight: 700;
+.card-title {
+  font-size: 0.95rem; font-weight: 700;
   color: var(--strong);
-  margin-bottom: 3px;
+  margin-bottom: 6px;
 }
-.portal-item-desc {
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.4;
+.card-desc {
+  font-size: 0.82rem; color: var(--muted);
+  line-height: 1.5; flex: 1;
 }
-.portal-item-arrow { font-size: 0.8rem; color: var(--border2); flex-shrink: 0; }
+.card-tag {
+  margin-top: 14px;
+  font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent);
+}
 
-/* footer width constraint */
-.sitefooter { max-width: 860px; margin: 0 auto; }
+/* ---- Footer ---- */
+.sitefooter { max-width: 960px; margin: 0 auto; }
 
+/* ---- Responsive ---- */
 @media (max-width: 600px) {
-  .hero { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .hero-copy h1 { font-size: 1.6rem; }
-  .portal-item-type { display: none; }
-  .portal-item { gap: 12px; }
+  .hero { padding: 56px 20px 48px; }
+  .hero h1 { font-size: 1.8rem; }
+  .hero p { font-size: 0.9rem; }
+  .features { padding: 40px 16px 48px; }
+  .card-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 
 <nav class="topnav">
-  <button class="topnav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('topnav-links').classList.toggle('open');document.getElementById('nav-overlay').classList.toggle('open')">&#9776;</button>
   <a class="topnav-brand" href="index.html">
     <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">
     <span class="topnav-brand-text">Proton Pulse</span>
@@ -122,64 +131,59 @@
     <a href="https://github.com/mdeguzis/decky-proton-pulse">Decky Plugin</a>
     <a href="https://github.com/mdeguzis/proton-pulse-data">GitHub</a>
   </div>
+  <button class="topnav-toggle" aria-label="Toggle navigation" id="nav-toggle">&#9776;</button>
 </nav>
-<div id="nav-overlay" class="nav-overlay" onclick="document.getElementById('topnav-links').classList.remove('open');this.classList.remove('open')"></div>
+<div id="nav-overlay" class="nav-overlay"></div>
 
-<div class="page">
-  <div class="hero">
-    <div class="hero-logo">
-      <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="Proton Pulse logo">
-    </div>
-    <div class="hero-copy">
-      <h1>Proton Pulse</h1>
-      <p>ProtonDB community compatibility reports for Steam games  - searchable, filterable, and updated daily. A data source for the Decky Loader plugin and direct web browsing.</p>
-    </div>
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-logo">
+    <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="Proton Pulse logo">
   </div>
+  <h1>Proton Pulse</h1>
+  <p>ProtonDB community compatibility reports for Steam games &mdash; searchable, filterable, and updated daily.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="app.html">&#x1F50D; Search Games</a>
+    <a class="btn btn-secondary" href="https://github.com/mdeguzis/decky-proton-pulse">&#x1F3AE; Decky Plugin</a>
+  </div>
+</section>
 
-  <p class="section-label">Portal</p>
-  <nav class="portal-list">
-    <a class="portal-item" href="app.html">
-      <span class="portal-item-type">Search</span>
-      <span class="portal-item-main">
-        <div class="portal-item-name">Game Reports</div>
-        <div class="portal-item-desc">Look up any Steam game's Proton compatibility reports, hardware configs, and community ratings.</div>
-      </span>
-      <span class="portal-item-arrow">></span>
+<!-- Feature cards -->
+<section class="features">
+  <p class="features-heading">Explore</p>
+  <div class="card-grid">
+    <a class="card" href="app.html">
+      <div class="card-icon">&#x1F50E;</div>
+      <div class="card-title">Game Reports</div>
+      <div class="card-desc">Look up any Steam game's Proton compatibility reports, hardware configs, and community ratings.</div>
+      <div class="card-tag">Search</div>
     </a>
-    <a class="portal-item" href="data-index.html">
-      <span class="portal-item-type">Browse</span>
-      <span class="portal-item-main">
-        <div class="portal-item-name">Data Index</div>
-        <div class="portal-item-desc">Full list of tracked games with raw JSON report data accessible by app ID.</div>
-      </span>
-      <span class="portal-item-arrow">></span>
+    <a class="card" href="data-index.html">
+      <div class="card-icon">&#x1F4CA;</div>
+      <div class="card-title">Data Index</div>
+      <div class="card-desc">Full list of tracked games with raw JSON report data accessible by app ID.</div>
+      <div class="card-tag">Browse</div>
     </a>
-    <a class="portal-item" href="coverage.html">
-      <span class="portal-item-type">Stats</span>
-      <span class="portal-item-main">
-        <div class="portal-item-name">Coverage Report</div>
-        <div class="portal-item-desc">How much of the Steam catalog has ProtonDB report data in this mirror.</div>
-      </span>
-      <span class="portal-item-arrow">></span>
+    <a class="card" href="coverage.html">
+      <div class="card-icon">&#x1F4C8;</div>
+      <div class="card-title">Coverage Report</div>
+      <div class="card-desc">How much of the Steam catalog has ProtonDB report data in this mirror.</div>
+      <div class="card-tag">Stats</div>
     </a>
-    <a class="portal-item" href="https://github.com/mdeguzis/decky-proton-pulse">
-      <span class="portal-item-type">Plugin</span>
-      <span class="portal-item-main">
-        <div class="portal-item-name">Decky Loader Plugin</div>
-        <div class="portal-item-desc">Steam Deck plugin to see Proton compatibility reports in-game via Decky Loader.</div>
-      </span>
-      <span class="portal-item-arrow">></span>
+    <a class="card" href="https://github.com/mdeguzis/decky-proton-pulse">
+      <div class="card-icon">&#x1F3AE;</div>
+      <div class="card-title">Decky Loader Plugin</div>
+      <div class="card-desc">Steam Deck plugin to see Proton compatibility reports in-game via Decky Loader.</div>
+      <div class="card-tag">Plugin</div>
     </a>
-    <a class="portal-item" href="https://github.com/mdeguzis/proton-pulse-data">
-      <span class="portal-item-type">Source</span>
-      <span class="portal-item-main">
-        <div class="portal-item-name">Data Repository</div>
-        <div class="portal-item-desc">GitHub repository for this data mirror  - API endpoints, update schedule, and source code.</div>
-      </span>
-      <span class="portal-item-arrow">></span>
+    <a class="card" href="https://github.com/mdeguzis/proton-pulse-data">
+      <div class="card-icon">&#x1F4BB;</div>
+      <div class="card-title">Data Repository</div>
+      <div class="card-desc">GitHub repository for this data mirror &mdash; API endpoints, update schedule, and source code.</div>
+      <div class="card-tag">Source</div>
     </a>
-  </nav>
-</div>
+  </div>
+</section>
 
 <footer class="sitefooter">
   Built on <a href="https://www.protondb.com/" target="_blank" rel="noopener">ProtonDB</a> community data &middot;
@@ -187,5 +191,19 @@
   Updated daily via GitHub Actions
 </footer>
 
+<script>
+(function(){
+  var toggle = document.getElementById('nav-toggle');
+  var links = document.getElementById('topnav-links');
+  var overlay = document.getElementById('nav-overlay');
+  function close(){ links.classList.remove('open'); overlay.classList.remove('open'); }
+  toggle.addEventListener('click', function(){
+    links.classList.toggle('open');
+    overlay.classList.toggle('open');
+  });
+  overlay.addEventListener('click', close);
+  links.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+})();
+</script>
 </body>
 </html>

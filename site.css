@@ -143,6 +143,7 @@ code {
 .tier-pending  { background: #3a4a5a; color: var(--muted); }
 
 @media (max-width: 900px) {
+  .topnav { padding: 0 16px; }
   .topnav-toggle { display: flex !important; align-items: center; }
   .topnav-links {
     display: none !important;
@@ -150,7 +151,7 @@ code {
     position: fixed;
     top: 50px;
     left: 0;
-    width: 240px;
+    width: 260px;
     bottom: 0;
     background: var(--s1);
     border-right: 2px solid var(--border);
@@ -158,8 +159,10 @@ code {
     height: auto;
     overflow-y: auto;
     box-shadow: 4px 0 16px rgba(0,0,0,0.4);
+    transform: translateX(-100%);
+    transition: transform .2s ease;
   }
-  .topnav-links.open { display: flex !important; }
+  .topnav-links.open { display: flex !important; transform: translateX(0); }
   .topnav-links a {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
@@ -167,7 +170,6 @@ code {
     font-size: 0.9rem;
   }
   .topnav-links a:last-child { border-bottom: none; }
-  /* icon-only brand on mobile — hide the text label */
   .topnav-brand-text { display: none; }
   .topnav-brand { margin-right: auto; gap: 0; }
   .topnav-brand img { width: 28px; height: 28px; }
@@ -179,7 +181,6 @@ code {
     background: rgba(0,0,0,0.45);
   }
   .nav-overlay.open { display: block; }
-  /* hide sidebar nav/about blocks that duplicate the hamburger menu */
   .sidebar-nav-block { display: none; }
   .sidebar-about-block { display: none; }
 }
