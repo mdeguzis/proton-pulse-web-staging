@@ -142,10 +142,10 @@ code {
 .tier-borked   { background: #c85050; color: #fff; }
 .tier-pending  { background: #3a4a5a; color: var(--muted); }
 
-@media (max-width: 768px) {
-  .topnav-toggle { display: flex; align-items: center; }
+@media (max-width: 900px) {
+  .topnav-toggle { display: flex !important; align-items: center; }
   .topnav-links {
-    display: none;
+    display: none !important;
     flex-direction: column;
     position: fixed;
     top: 50px;
@@ -159,7 +159,7 @@ code {
     overflow-y: auto;
     box-shadow: 4px 0 16px rgba(0,0,0,0.4);
   }
-  .topnav-links.open { display: flex; }
+  .topnav-links.open { display: flex !important; }
   .topnav-links a {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
@@ -167,7 +167,10 @@ code {
     font-size: 0.9rem;
   }
   .topnav-links a:last-child { border-bottom: none; }
-  .topnav-brand { margin-right: auto; }
+  /* icon-only brand on mobile — hide the text label */
+  .topnav-brand-text { display: none; }
+  .topnav-brand { margin-right: auto; gap: 0; }
+  .topnav-brand img { width: 28px; height: 28px; }
   .nav-overlay {
     display: none;
     position: fixed;
