@@ -383,6 +383,8 @@
 
 /* report cards */
 .cards { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); }
+a.card { display: flex; color: inherit; }
+a.card:hover { text-decoration: none; }
 .card {
   display: flex;
   gap: 14px;
@@ -608,8 +610,56 @@ route();
 async function route() {
   const r = getRoute();
   if (r.page === 'app') await renderGamePage(r.appId);
-  else document.getElementById('content').innerHTML =
-    '<div class="state-box">Search for a game or navigate to <code>#/app/{appId}</code></div>';
+  else await renderHomePage();
+}
+
+async function renderHomePage() {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="state-box">Loading Proton Pulse configs...</div>';
+  try {
+    const r = await fetch(
+      `${SB_URL}/user_proton_configs?select=app_id,app_name,config,updated_at&order=updated_at.desc`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    const rows = r.ok ? await r.json() : [];
+    if (!rows.length) {
+      el.innerHTML = `
+        <div class="state-box">
+          No Proton Pulse configs yet.<br>
+          Search for a game above, or <a href="https://github.com/mdeguzis/decky-proton-pulse" target="_blank" rel="noopener">install the Decky Plugin</a> to submit configs.
+        </div>`;
+      return;
+    }
+    el.innerHTML = `
+      <p class="section-label" style="margin-bottom:10px">Recent Proton Pulse Configs</p>
+      <div class="cards" style="border:1px solid var(--border)">
+        ${rows.map(row => {
+          const cfg = row.config || {};
+          const name = row.app_name || cfg.appName || `App ${row.app_id}`;
+          const proton = cfg.protonVersion || '—';
+          const profile = cfg.profileName || '';
+          const d = Math.round((Date.now() / 1000 - new Date(row.updated_at).getTime() / 1000) / 86400);
+          const age = d < 1 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`;
+          return `
+            <a class="card" href="#/app/${row.app_id}" style="text-decoration:none">
+              <img src="${STEAM_IMG(row.app_id)}" onerror="this.style.display='none'" alt=""
+                   style="width:108px;height:40px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)">
+              <div class="left">
+                <div class="proton">${esc(name)}</div>
+                <div class="hw">${esc(proton)}${profile ? ' &middot; ' + esc(profile) : ''}</div>
+                <div class="age">${age}</div>
+              </div>
+              <div class="right">
+                <span class="source-badge">
+                  <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
+                </span>
+              </div>
+            </a>`;
+        }).join('')}
+      </div>`;
+  } catch {
+    el.innerHTML = '<div class="state-box">Search for a game above or navigate to <code>#/app/{appId}</code></div>';
+  }
 }
 
 // -- Data fetching ------------------------------------
