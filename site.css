@@ -1,0 +1,135 @@
+/* ---------------------------------------------
+   Proton Pulse - shared design system
+   --------------------------------------------- */
+
+:root {
+  --bg:      #0a0c10;
+  --s1:      #0e1116;
+  --s2:      #131920;
+  --s3:      #181f2a;
+  --border:  #1e2533;
+  --border2: #2a3548;
+  --text:    #c8d4e0;
+  --muted:   #57697a;
+  --accent:  #4a9fd0;
+  --strong:  #ecf2f8;
+  --green:   #4caf80;
+  --gold:    #c8a050;
+  --silver:  #8fa0b0;
+  --bronze:  #b07040;
+  --red:     #c85050;
+  --mono:    "SF Mono", "Consolas", "Liberation Mono", monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+}
+
+/* -- Top navigation bar -- */
+
+.topnav {
+  display: flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topnav-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: 28px;
+  color: var(--strong);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+.topnav-brand img { width: 22px; height: 22px; object-fit: contain; }
+.topnav-brand:hover { text-decoration: none; color: var(--strong); }
+
+.topnav-links { display: flex; height: 100%; }
+.topnav-links a {
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: color .12s, border-color .12s;
+}
+.topnav-links a:hover {
+  color: var(--text);
+  border-bottom-color: var(--border2);
+  text-decoration: none;
+}
+.topnav-links a.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* -- Footer -- */
+
+.sitefooter {
+  border-top: 1px solid var(--border);
+  padding: 20px 24px;
+  font-size: 0.77rem;
+  color: var(--muted);
+}
+.sitefooter a { color: var(--muted); }
+.sitefooter a:hover { color: var(--text); text-decoration: underline; }
+
+/* -- Shared utilities -- */
+
+.section-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* -- Tier badge colors (shared) -- */
+.tier-platinum { background: #b4c7dc; color: #0a0c10; }
+.tier-gold     { background: #c8a050; color: #0a0c10; }
+.tier-silver   { background: #8fa0b0; color: #0a0c10; }
+.tier-bronze   { background: #b07040; color: #0a0c10; }
+.tier-borked   { background: #c85050; color: #fff; }
+.tier-pending  { background: #3a4a5a; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .topnav-links { display: none; }
+}
