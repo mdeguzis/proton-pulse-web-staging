@@ -84,7 +84,6 @@ async function submitReport(appId, title, form) {
     confidence_score: null,
     source: 'user',
     vram_mb: form.vramMb.value ? Number(form.vramMb.value) : null,
-    cpu_cores: form.cpuCores.value ? Number(form.cpuCores.value) : null,
     display_resolution: form.displayRes.value || null,
     steam_deck_model: form.deckModel.value || null,
   };
@@ -98,7 +97,13 @@ async function submitReport(appId, title, form) {
     },
     body: JSON.stringify(body),
   });
-  return r.ok;
+  if (r.ok) return { ok: true };
+  try {
+    const err = await r.json();
+    return { ok: false, error: err.message || err.hint || `HTTP ${r.status}` };
+  } catch {
+    return { ok: false, error: `HTTP ${r.status}` };
+  }
 }
 
 async function populateSubmitForm(el) {
@@ -114,13 +119,23 @@ async function populateSubmitForm(el) {
     <h3 style="margin:0 0 12px">Submit a Pulse Report</h3>
     <form id="submit-report-form" autocomplete="off">
       <div class="sf-row"><label>Rating *</label><select name="rating" required>${opts(ratings,true)}</select></div>
-      <div class="sf-row"><label>Proton Version *</label><input name="protonVersion" required placeholder="e.g. Proton 9.0-4 or GE-Proton9-7"></div>
+      <div class="sf-row"><label>Proton Version *</label>
+        <input name="protonVersion" list="proton-versions" required placeholder="e.g. Proton 9.0-4 or GE-Proton9-7">
+        <datalist id="proton-versions">
+          ${['Proton 9.0-4','Proton 9.0-3','Proton 9.0-2','Proton 9.0-1',
+             'Proton 8.0-5','Proton 8.0-4','Proton 8.0-3','Proton 8.0-2',
+             'Proton 7.0-6','Proton Experimental',
+             'GE-Proton9-7','GE-Proton9-6','GE-Proton9-5','GE-Proton9-4',
+             'GE-Proton8-25','GE-Proton8-24',
+             'Proton-9.0-4'].map(v => '<option value="'+v+'">').join('')}
+        </datalist>
+        <span class="sf-hint" id="proton-hint" style="display:none;color:#c87840;font-size:0.7rem;white-space:nowrap">Format: Proton X.Y-Z or GE-ProtonX-Y</span>
+      </div>
       <div class="sf-row"><label>GPU *</label><input name="gpu" required placeholder="e.g. NVIDIA GeForce RTX 4070"></div>
       <div class="sf-row"><label>GPU Vendor *</label><select name="gpuVendor" required>${opts(gpuVendors,true)}</select></div>
       <div class="sf-row"><label>GPU Driver</label><input name="gpuDriver" placeholder="e.g. Mesa 24.1.0 or 555.42.02"></div>
       <div class="sf-row"><label>CPU *</label><input name="cpu" required placeholder="e.g. AMD Ryzen 7 5800X3D"></div>
-      <div class="sf-row"><label>CPU Cores</label><input name="cpuCores" type="number" placeholder="e.g. 8"></div>
-      <div class="sf-row"><label>RAM *</label><input name="ram" required placeholder="e.g. 16 GB" pattern="\\d+ GB"></div>
+      <div class="sf-row"><label>RAM *</label><input name="ram" required placeholder="e.g. 16 GB" pattern="\\d+ GB" title="Format: number followed by GB, e.g. 16 GB"></div>
       <div class="sf-row"><label>VRAM (MB)</label><input name="vramMb" type="number" placeholder="e.g. 8192"></div>
       <div class="sf-row"><label>OS *</label><select name="os" required>${opts(osList,false)}</select><input name="osVersion" placeholder="Version (e.g. 24.04)" style="max-width:120px"></div>
       <div class="sf-row"><label>Kernel</label><input name="kernel" placeholder="e.g. 6.8.0"></div>
@@ -388,7 +403,7 @@ async function fetchSupabase(appId) {
 async function fetchNativeReports(appId) {
   try {
     const r = await fetch(
-      `${SB_URL}/user_configs?app_id=eq.${appId}&select=client_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,ram,os,kernel,proton_version,rating,duration,notes,vram_mb,cpu_cores,display_resolution,steam_deck_model,created_at&order=created_at.desc`,
+      `${SB_URL}/user_configs?app_id=eq.${appId}&select=client_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,ram,os,kernel,proton_version,rating,duration,notes,vram_mb,display_resolution,steam_deck_model,created_at&order=created_at.desc`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (!r.ok) return [];
@@ -414,7 +429,6 @@ async function fetchNativeReports(appId) {
       duration:          row.duration || '',
       notes:             row.notes || '',
       vramMb:            row.vram_mb ?? null,
-      cpuCores:          row.cpu_cores ?? null,
       displayResolution: row.display_resolution ?? null,
       steamDeckModel:    row.steam_deck_model ?? null,
       timestamp:         Math.floor(new Date(row.created_at).getTime() / 1000),
@@ -702,7 +716,6 @@ function renderCard(r, votes) {
         <div class="row"><span class="label">GPU Driver</span><span>${na(esc(r.gpuDriver))}</span></div>
         <div class="row"><span class="label">Kernel</span><span>${na(esc(r.kernel))}</span></div>
         <div class="row"><span class="label">Duration</span><span>${na(esc(r.duration))}</span></div>
-        ${r.cpuCores ? `<div class="row"><span class="label">CPU Cores</span><span>${r.cpuCores}</span></div>` : ''}
         ${r.displayResolution ? `<div class="row"><span class="label">Resolution</span><span>${esc(r.displayResolution)}</span></div>` : ''}
         ${r.steamDeckModel ? `<div class="row"><span class="label">Steam Deck</span><span>${esc(r.steamDeckModel.toUpperCase())}</span></div>` : ''}
         ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span>${esc(r.launchOptions)}</span></div>` : ''}
@@ -812,8 +825,8 @@ async function renderGamePage(appId) {
             &nbsp;/&nbsp; <strong>${configs.length}</strong> Pulse config${configs.length !== 1 ? 's' : ''}
           </div>
         </div>
-        <span class="tier-badge" style="background:${rc};color:${rt}">${tier}</span>
         <button class="info-btn" id="rating-info-btn" title="What does this rating mean?"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="11" fill="#3b82f6"/><text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" fill="#fff" font-family="serif">i</text></svg></button>
+        <span class="tier-badge" style="background:${rc};color:${rt}">${tier}</span>
         <button class="submit-report-btn" id="submit-report-btn">Submit Report</button>
         <div class="info-tooltip" id="rating-info-tip">
           <div class="info-tooltip-inner" id="rating-info-content">Loading...</div>
@@ -942,14 +955,22 @@ async function renderGamePage(appId) {
       panel?.classList.toggle('open');
       if (panel?.classList.contains('open')) {
         await populateSubmitForm(el);
+        const protonInput = el.querySelector('input[name="protonVersion"]');
+        const protonHint = el.querySelector('#proton-hint');
+        if (protonInput && protonHint) {
+          protonInput.addEventListener('input', () => {
+            const v = protonInput.value;
+            protonHint.style.display = v && !/^(Proton |GE-Proton|Proton-)\d/.test(v) ? '' : 'none';
+          });
+        }
         el.querySelector('#submit-report-form')?.addEventListener('submit', async (e) => {
           e.preventDefault();
           const status = el.querySelector('#submit-status');
           status.textContent = 'Submitting...';
-          const ok = await submitReport(appId, title, e.target);
-          status.textContent = ok ? 'Submitted!' : 'Error - try again';
-          status.style.color = ok ? 'var(--green)' : 'var(--red)';
-          if (ok) setTimeout(() => { panel.classList.remove('open'); render(); }, 1500);
+          const result = await submitReport(appId, title, e.target);
+          status.textContent = result.ok ? 'Submitted!' : (result.error || 'Unknown error');
+          status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+          if (result.ok) setTimeout(() => { panel.classList.remove('open'); render(); }, 1500);
         });
       }
     });
