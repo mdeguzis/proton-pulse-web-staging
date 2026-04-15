@@ -990,9 +990,11 @@ function estimateScore(r) {
 function renderPulseSearchResult(row) {
   const age = daysAgo(Math.floor(new Date(row.updatedAt).getTime() / 1000));
   const isProtonDb = (row.source || '').toLowerCase() === 'protondb';
+  const alsoInIndex = !isProtonDb && (searchIndex || []).some(([id]) => String(id) === String(row.appId));
   const sourceBadge = isProtonDb
     ? '<span class="source-badge protondb">ProtonDB</span>'
-    : '<span class="source-badge pulse"><img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse</span>';
+    : '<span class="source-badge pulse"><img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse</span>'
+      + (alsoInIndex ? ' <span class="source-badge protondb">ProtonDB</span>' : '');
   return `
     <a class="search-result-card" href="#/app/${row.appId}">
       <img src="${STEAM_IMG(row.appId)}" onerror="this.style.display='none'" alt="">
