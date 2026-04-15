@@ -1076,10 +1076,8 @@ function renderConfigCard(c) {
     <div class="config-card">
       <div class="config-head">
         <div class="config-name">${esc(c.profileName)}</div>
-        <span class="source-badge ${isProtonDb ? 'protondb' : 'pulse'}">
-          ${isProtonDb
-            ? 'ProtonDB'
-            : '<img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse'}
+        <span class="source-badge pulse">
+          <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
         </span>
       </div>
       <div class="config-row">
