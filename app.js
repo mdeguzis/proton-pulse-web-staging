@@ -868,8 +868,8 @@ async function renderGamePage(appId) {
           </div>`;
       })() : `
         <div class="configs-empty">
-          No Proton Pulse configs for this game yet --
-          <a href="https://github.com/mdeguzis/decky-proton-pulse" target="_blank" rel="noopener">add one via the Decky Plugin</a>.
+          No Proton Pulse configs for this game yet —
+          submit a report above or <a href="https://github.com/mdeguzis/decky-proton-pulse" target="_blank" rel="noopener">add one via the Decky Plugin</a>.
         </div>`}
 
       <div class="reports-section-head">
