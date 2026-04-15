@@ -363,7 +363,9 @@ def backfill_missing_apps(
         log(f"[backfill] Force mode: processing all {len(missing_targets)} target(s)")
     else:
         existing_app_ids = {
-            path.name for path in data_output_path.iterdir() if path.is_dir()
+            path.name
+            for path in data_output_path.iterdir()
+            if _app_dir_has_report_data(path)
         }
         already_present = sum(
             1 for target in configured_targets if target.app_id in existing_app_ids
@@ -481,6 +483,16 @@ def _target_app_id_sort_key(target: BackfillTarget) -> int:
 def _string_app_id_sort_key(app_id: str) -> int:
     """Sort app ID strings numerically."""
     return int(app_id)
+
+
+def _app_dir_has_report_data(app_dir: Path) -> bool:
+    """Treat metadata-only app dirs as still eligible for live backfill."""
+    if not app_dir.is_dir():
+        return False
+    for json_file in app_dir.glob("*.json"):
+        if json_file.stem != "metadata":
+            return True
+    return False
 
 
 def _log_backfill_summary(

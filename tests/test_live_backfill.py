@@ -193,7 +193,7 @@ def test_backfill_missing_apps_logs_unresolved_title_source(tmp_path, monkeypatc
         "official_dump": False,
         "protondb_live": True,
     }
-    assert any(msg == "[backfill] Title unresolved for 2561580: source=steam-store-unsuccessful" for msg in logs)
+    assert any("Title unresolved for 2561580: source=steam-store-unsuccessful" in msg for msg in logs)
 
 
 def test_find_no_protondb_data_app_ids_falls_back_to_protondb_presence_catalogs(tmp_path, monkeypatch):
@@ -338,10 +338,11 @@ def test_backfill_missing_apps_uses_manifest_report_url_override_first(tmp_path)
     ]
 
 
-def test_backfill_missing_apps_skips_existing_app_directory(tmp_path):
+def test_backfill_missing_apps_skips_existing_app_with_report_data(tmp_path):
     data_dir = tmp_path / "data"
     existing_app_dir = data_dir / "2561580"
     existing_app_dir.mkdir(parents=True)
+    (existing_app_dir / "2025.json").write_text("[]")
     manifest = tmp_path / "live_backfill_app_ids.json"
     manifest.write_text(json.dumps(["2561580"]))
 
@@ -358,6 +359,58 @@ def test_backfill_missing_apps_skips_existing_app_directory(tmp_path):
     assert written_keys == set()
     assert no_data_ids == set()
     assert fetched_urls == []
+
+
+def test_backfill_missing_apps_backfills_metadata_only_directory(tmp_path):
+    data_dir = tmp_path / "data"
+    existing_app_dir = data_dir / "976730"
+    existing_app_dir.mkdir(parents=True)
+    update_app_metadata(data_dir, "976730", official_dump=True)
+    manifest = tmp_path / "live_backfill_app_ids.json"
+    manifest.write_text(json.dumps(["976730"]))
+
+    counts_payload = {"reports": 415099, "timestamp": 1775051127}
+    expected_hash = compute_live_report_hash(976730, counts_payload["reports"], counts_payload["timestamp"], "any")
+    expected_url = f"https://www.protondb.com/data/reports/all-devices/app/{expected_hash}.json"
+
+    live_payload = {
+        "reports": [
+            {
+                "timestamp": 1763251200,
+                "responses": {
+                    "verdict": "yes",
+                    "triedOob": "yes",
+                    "protonVersion": "10.0-3",
+                    "notes": {"concludingNotes": "Runs great."},
+                },
+                "device": {"inferred": {"steam": {"gpu": "NVIDIA GeForce RTX 3080"}}},
+                "contributor": {"steam": {"playtimeLinux": 1200}},
+            }
+        ]
+    }
+
+    fetched_urls = []
+
+    def fake_fetch(url: str):
+        fetched_urls.append(url)
+        if url == "https://www.protondb.com/data/counts.json":
+            return counts_payload
+        if url == expected_url:
+            return live_payload
+        raise AssertionError(f"Unexpected URL fetched: {url}")
+
+    written_keys, no_data_ids = backfill_missing_apps(
+        data_dir, fetch_json_impl=fake_fetch, manifest_path=manifest
+    )
+
+    assert fetched_urls == [
+        "https://www.protondb.com/data/counts.json",
+        expected_url,
+    ]
+    assert written_keys == {("976730", "2025")}
+    assert no_data_ids == set()
+    assert (data_dir / "976730" / "metadata.json").exists()
+    assert (data_dir / "976730" / "2025.json").exists()
 
 
 def test_backfill_missing_apps_logs_summary_with_reason_buckets(tmp_path, monkeypatch):
@@ -423,9 +476,9 @@ def test_backfilled_keys_flow_into_app_index_and_main_index(tmp_path):
     generate_index_html(written_keys, tmp_path)
 
     assert json.loads((data_dir / "2561580" / "index.json").read_text()) == ["2025"]
-    html = (tmp_path / "index.html").read_text()
-    assert "<summary>2561580/</summary>" in html
-    assert 'href="data/2561580/2025.json"' in html
+    html = (tmp_path / "data-index.html").read_text()
+    assert '["2561580","","2561580/",["2025"]]' in html
+    assert 'data/${appId}/${year}.json' in html
 
 
 def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, monkeypatch):
@@ -478,11 +531,10 @@ def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, 
     finalize_output(tmp_path)
 
     assert json.loads((data_dir / "2561580" / "index.json").read_text()) == ["2025"]
-    html = (tmp_path / "index.html").read_text()
-    assert "<summary>730/</summary>" in html
-    assert "<summary>2561580/</summary>" in html
-    assert 'href="data/2561580/2025.json"' in html
-    assert 'href="data/2561580/latest.json"' in html
+    html = (tmp_path / "data-index.html").read_text()
+    assert '["730","","730/",["2024"]]' in html
+    assert '["2561580","","2561580/",["2025"]]' in html
+    assert 'const latestHref=`data/${appId}/latest.json`;' in html
     assert read_app_metadata(data_dir, "2561580")["protondb_live"] is True
 
 
@@ -693,6 +745,17 @@ def test_run_probe_backfill_includes_signal_catalog_apps_not_in_probe_cache(tmp_
         return live_payload
 
     monkeypatch.setattr(backfill_module, "fetch_json", fake_fetch)
+    original_backfill_probe_discoveries = backfill_module.backfill_probe_discoveries
+    monkeypatch.setattr(
+        backfill_module,
+        "backfill_probe_discoveries",
+        lambda data_output_path, probe_catalog, limit=0, fetch_json_impl=backfill_module.fetch_json: original_backfill_probe_discoveries(
+            data_output_path,
+            probe_catalog,
+            limit=limit,
+            fetch_json_impl=fake_fetch,
+        ),
+    )
     monkeypatch.setattr(
         backfill_module,
         "resolve_backfill_title",
