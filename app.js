@@ -1185,9 +1185,9 @@ window.addEventListener('resize', () => {
 
   SupaAuth.onStateChange(({ user }) => {
     if (user) {
-      loginBtn.hidden    = false; // keep hidden by setting display via hidden attr
       loginBtn.hidden    = true;
       userMenu.hidden    = false;
+      dropdown.hidden    = true;
       avatarEl.src       = user.user_metadata?.avatar_url || '';
       avatarEl.alt       = user.user_metadata?.name || user.email || '';
       nameEl.textContent = user.user_metadata?.name || user.email || '';
