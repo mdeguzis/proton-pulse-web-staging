@@ -7,6 +7,10 @@ const SITE_BASE = (() => {
   return parts.length ? `/${parts[0]}` : '';
 })();
 const dataFilesHref = appId => `${SITE_BASE}/data/${appId}/`;
+// Steam app IDs are sequentially assigned and currently top out ~3 million.
+// Non-Steam shortcut IDs are CRC32-derived and can be any 32-bit value.
+// Any ID above 10 million is treated as a non-Steam shortcut.
+const isNonSteamAppId = id => Number(id) > 10_000_000;
 
 const RATING_COLORS = {
   platinum: '#b4c7dc', gold: '#c8a050', silver: '#8fa0b0',
@@ -275,7 +279,7 @@ async function renderHomePage() {
           const d = Math.round((Date.now() / 1000 - new Date(row.updated_at).getTime() / 1000) / 86400);
           const age = d < 1 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`;
           const hwParts = [proton, profile].filter(Boolean);
-          const isNonSteam = cfg.isNonSteam === true;
+          const isNonSteam = cfg.isNonSteam === true || isNonSteamAppId(row.app_id);
           return `
             <a class="card" href="#/app/${row.app_id}" style="text-decoration:none">
               <img src="${STEAM_IMG(row.app_id)}" onerror="this.style.display='none'" alt=""
@@ -387,6 +391,7 @@ async function fetchSupabase(appId) {
     return rows.map(row => {
       const cfg = row.config || {};
       return {
+        appId:         row.app_id,
         clientId:      row.voter_id || cfg.clientId || '',
         profileName:   cfg.profileName   || 'Unnamed Config',
         protonVersion: cfg.protonVersion || '',
@@ -614,7 +619,7 @@ function renderConfigCard(c, idx) {
           <span class="source-badge pulse">
             <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
           </span>
-          ${c.isNonSteam
+          ${(c.isNonSteam || isNonSteamAppId(c.appId))
             ? '<span class="source-badge non-steam-game">Non-Steam</span>'
             : '<span class="source-badge steam-game">Steam</span>'}
         </div>
