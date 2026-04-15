@@ -419,6 +419,7 @@ async function fetchNativeReports(appId) {
       if (!existing || row.created_at > existing.created_at) seen.set(key, row);
     }
     return [...seen.values()].map(row => ({
+      clientId:          row.client_id || '',
       title:             row.title || `App ${row.app_id}`,
       cpu:               row.cpu || '',
       gpu:               row.gpu || '',
@@ -719,7 +720,7 @@ function renderCard(r, votes) {
         <div class="row"><span class="label">Duration</span><span>${na(esc(r.duration))}</span></div>
         ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span>${esc(r.launchOptions)}</span></div>` : ''}
       </div>
-      <div class="card-footer"><button class="cfg-dl-btn" data-report-json='${JSON.stringify(r).replace(/'/g,"&#39;")}' title="Download as JSON">JSON</button></div>
+      <div class="card-footer">${r.clientId && r.clientId === getWebClientId() ? `<button class="cfg-dl-btn delete-report-btn" data-app-id="${r.appId || ''}" style="color:#c85050;border-color:#c85050" title="Delete your report">Delete</button>` : ''}<button class="cfg-dl-btn" data-report-json='${JSON.stringify(r).replace(/'/g,"&#39;")}' title="Download as JSON">JSON</button></div>
     </div>`;
 }
 
@@ -977,6 +978,19 @@ async function renderGamePage(appId) {
         e.stopPropagation();
         if (b.dataset.cfgIdx != null) downloadJson(filteredConfigs()[Number(b.dataset.cfgIdx)], 'pulse-config');
         else if (b.dataset.reportJson) downloadJson(JSON.parse(b.dataset.reportJson), 'report');
+      });
+    });
+    el.querySelectorAll('.delete-report-btn').forEach(b => {
+      b.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Delete your report for this game?')) return;
+        const clientId = getWebClientId();
+        const r = await fetch(`${SB_URL}/user_configs?client_id=eq.${clientId}&app_id=eq.${appId}`, {
+          method: 'DELETE',
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-client-id': clientId },
+        });
+        if (r.ok) { b.textContent = 'Deleted'; setTimeout(render, 1000); }
+        else { b.textContent = 'Failed'; }
       });
     });
   }
