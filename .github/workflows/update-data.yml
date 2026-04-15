@@ -263,8 +263,9 @@ jobs:
           git show main:index.js > index.js 2>/dev/null || true
           git show main:index.css > index.css 2>/dev/null || true
           git show main:site.css > site.css 2>/dev/null || true
-          git show main:scoring-info.json > scoring-info.json 2>/dev/null || true
-          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o form-schema.json
+          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json form-schema.json
           git commit -m "Deploy: $(date +%F)"
           git push origin gh-pages-new:gh-pages --force
 
@@ -298,8 +299,9 @@ jobs:
           cp ../repo/index.js ./index.js
           cp ../repo/index.css ./index.css
           cp ../repo/site.css ./site.css
-          cp ../repo/scoring-info.json ./scoring-info.json
-          git add app.html app.js app.css index.html index.js index.css site.css scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o ./scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o ./form-schema.json
+          git add app.html app.js app.css index.html index.js index.css site.css scoring-info.json form-schema.json
           if git diff --cached --quiet; then
             echo "No shell changes to publish."
             exit 0
@@ -451,8 +453,9 @@ jobs:
           git show main:index.js > index.js 2>/dev/null || true
           git show main:index.css > index.css 2>/dev/null || true
           git show main:site.css > site.css 2>/dev/null || true
-          git show main:scoring-info.json > scoring-info.json 2>/dev/null || true
-          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o form-schema.json
+          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json form-schema.json
           git commit -m "Targeted backfill: ${{ inputs.backfill_app_ids }}"
           git push origin gh-pages-new:gh-pages --force
 
@@ -629,8 +632,9 @@ jobs:
           git show main:index.js > index.js 2>/dev/null || true
           git show main:index.css > index.css 2>/dev/null || true
           git show main:site.css > site.css 2>/dev/null || true
-          git show main:scoring-info.json > scoring-info.json 2>/dev/null || true
-          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o form-schema.json
+          git add data/ data-index.html coverage.html search-index.json app.html app.js app.css index.html index.js index.css site.css scoring-info.json form-schema.json
           git commit -m "Coverage backfill: ${{ inputs.coverage_backfill_issue_type }}"
           git push origin gh-pages-new:gh-pages --force
 
