@@ -116,7 +116,7 @@ async function populateSubmitForm(el) {
   container.innerHTML = `
     <h3 style="margin:0 0 12px">Submit a Pulse Report</h3>
     <form id="submit-report-form" autocomplete="on">
-      <div class="sf-row"><label>Rating *</label><select name="rating" required>${opts(ratings,true)}</select></div>
+      <div class="sf-row"><label>Rating *</label><select name="rating" required><option value="" disabled selected>-- choose one --</option>${opts(ratings,true)}</select></div>
       <div class="sf-row"><label>Proton Version *</label>
         <input name="protonVersion" list="proton-versions" required placeholder="e.g. Proton 9.0-4 or GE-Proton9-7">
         <datalist id="proton-versions">
@@ -125,12 +125,12 @@ async function populateSubmitForm(el) {
         <span class="sf-hint" id="proton-hint" style="display:none;color:#c87840;font-size:0.7rem;white-space:nowrap">Format: Proton X.Y-Z or GE-ProtonX-Y</span>
       </div>
       <div class="sf-row"><label>GPU *</label><input name="gpu" required placeholder="e.g. NVIDIA GeForce RTX 4070"></div>
-      <div class="sf-row"><label>GPU Vendor *</label><select name="gpuVendor" required>${opts(gpuVendors,true)}</select></div>
+      <div class="sf-row"><label>GPU Vendor *</label><select name="gpuVendor" required><option value="" disabled selected>-- choose one --</option>${opts(gpuVendors,true)}</select></div>
       <div class="sf-row"><label>GPU Driver</label><input name="gpuDriver" placeholder="e.g. Mesa 24.1.0 or 555.42.02"></div>
       <div class="sf-row"><label>CPU *</label><input name="cpu" required placeholder="e.g. AMD Ryzen 7 5800X3D"></div>
       <div class="sf-row"><label>RAM *</label><input name="ram" required placeholder="e.g. 16 GB" pattern="\\d+ GB" title="Format: number followed by GB, e.g. 16 GB"></div>
       <div class="sf-row"><label>VRAM (MB)</label><input name="vramMb" type="number" placeholder="e.g. 8192"></div>
-      <div class="sf-row"><label>OS *</label><select name="os" required>${opts(osList,false)}</select><input name="osVersion" placeholder="Version (e.g. 24.04)" style="max-width:120px"></div>
+      <div class="sf-row"><label>OS *</label><select name="os" required><option value="" disabled selected>-- choose one --</option>${opts(osList,false)}</select><input name="osVersion" placeholder="Version (e.g. 24.04)" style="max-width:120px"></div>
       <div class="sf-row"><label>Kernel</label><input name="kernel" placeholder="e.g. 6.8.0"></div>
       <div class="sf-row"><label>Duration</label><input name="duration" placeholder="e.g. severalHours"></div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
