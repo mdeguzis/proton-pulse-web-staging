@@ -29,6 +29,9 @@
   padding: 0;
 }
 
+/* Enforce hidden attribute — CSS display rules can override it otherwise */
+[hidden] { display: none !important; }
+
 html { scroll-behavior: smooth; }
 
 body {
