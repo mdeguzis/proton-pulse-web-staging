@@ -362,7 +362,7 @@ code {
   --steam-btn-shadow: rgba(0, 0, 0, 0.24);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: linear-gradient(180deg, var(--steam-btn-bg-top), var(--steam-btn-bg-bottom));
   border: 1px solid var(--steam-btn-border);
   border-radius: 16px;
@@ -375,8 +375,8 @@ code {
   font-family: inherit;
   letter-spacing: -0.01em;
   line-height: 1;
-  min-height: 46px;
-  padding: 6px 16px 6px 10px;
+  min-height: 52px;
+  padding: 6px 18px 6px 8px;
   cursor: pointer;
   transition: transform .12s, box-shadow .12s, border-color .12s, filter .12s;
   white-space: nowrap;
@@ -402,23 +402,15 @@ code {
 }
 
 .gh-login-btn__badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #ffffff, #e6edf5);
-  color: #182535;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    0 1px 2px rgba(0, 0, 0, 0.18);
   flex-shrink: 0;
 }
 
 .gh-login-btn__icon {
-  width: 18px;
-  height: 18px;
+  width: 40px;
+  height: 40px;
   display: block;
   overflow: visible;
 }
