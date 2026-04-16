@@ -27,9 +27,18 @@ const SupaAuth = (() => {
 
     const accessToken  = params.get('access_token');
     const refreshToken = params.get('refresh_token');
-    if (!accessToken || !refreshToken) return;
+    if (!accessToken || !refreshToken) {
+      console.warn('[SupaAuth] Steam callback hash missing tokens');
+      return;
+    }
 
-    await _sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    console.log('[SupaAuth] Consuming Steam session from URL hash');
+    const { error } = await _sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (error) {
+      console.error('[SupaAuth] setSession error:', error.message);
+    } else {
+      console.log('[SupaAuth] Steam session set successfully');
+    }
     // Clean the tokens out of the URL without a page reload
     history.replaceState(null, '', window.location.pathname + window.location.search);
   }
@@ -48,6 +57,7 @@ const SupaAuth = (() => {
    * with session tokens in the hash.
    */
   function loginWithSteam() {
+    console.log('[SupaAuth] Redirecting to Steam OpenID');
     const params = new URLSearchParams({
       'openid.ns':         'http://specs.openid.net/auth/2.0',
       'openid.mode':       'checkid_setup',
@@ -60,6 +70,7 @@ const SupaAuth = (() => {
   }
 
   async function logout() {
+    console.log('[SupaAuth] Signing out');
     await _sb.auth.signOut();
   }
 
@@ -69,8 +80,12 @@ const SupaAuth = (() => {
    * fn({ session, user })
    */
   function onStateChange(fn) {
-    getSession().then(session => fn({ session, user: session?.user ?? null }));
-    _sb.auth.onAuthStateChange((_event, session) => {
+    getSession().then(session => {
+      console.log('[SupaAuth] Initial state — user:', session?.user?.user_metadata?.name ?? session?.user?.email ?? 'none');
+      fn({ session, user: session?.user ?? null });
+    });
+    _sb.auth.onAuthStateChange((event, session) => {
+      console.log('[SupaAuth] Auth event:', event, '| user:', session?.user?.user_metadata?.name ?? session?.user?.email ?? 'none');
       fn({ session, user: session?.user ?? null });
     });
   }
