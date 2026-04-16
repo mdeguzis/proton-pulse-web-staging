@@ -32,7 +32,7 @@
     continueBtn.classList.add('is-loading');
 
     try {
-      SupaAuth.loginWithSteam();
+      SupaAuth.loginWithSteam(returnTo);
     } catch (error) {
       console.error('[auth] login error:', error);
       continueBtn.disabled = false;

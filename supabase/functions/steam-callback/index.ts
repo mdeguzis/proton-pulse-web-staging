@@ -22,6 +22,7 @@ Deno.serve(async (req: Request) => {
   const params = url.searchParams;
 
   const siteUrl = Deno.env.get("SITE_URL") ?? "https://mdeguzis.github.io/proton-pulse-data";
+  const siteOrigin = new URL(siteUrl).origin;
 
   // ── 1. Verify the OpenID assertion with Steam ────────────────────────────
   const verifyParams = new URLSearchParams(params);
@@ -129,7 +130,18 @@ Deno.serve(async (req: Request) => {
 
   // ── 5. Redirect to site with session tokens in the URL fragment ──────────
   // The client-side JS reads these and calls setSession().
-  const redirectUrl = new URL(siteUrl);
+  const returnToRaw = params.get("returnTo");
+  let redirectUrl = new URL(siteUrl);
+  if (returnToRaw) {
+    try {
+      const parsed = new URL(returnToRaw, siteUrl);
+      if (parsed.origin === siteOrigin) {
+        redirectUrl = parsed;
+      }
+    } catch {
+      // Fall back to SITE_URL if the provided return target is invalid.
+    }
+  }
   redirectUrl.hash = `access_token=${session.access_token}&refresh_token=${session.refresh_token}&type=steam`;
 
   return Response.redirect(redirectUrl.toString(), 302);
