@@ -356,35 +356,37 @@ code {
 }
 
 .gh-login-btn {
-  --steam-btn-bg-top: #233246;
-  --steam-btn-bg-bottom: #1b2636;
-  --steam-btn-border: rgba(255, 255, 255, 0.08);
-  --steam-btn-shadow: rgba(0, 0, 0, 0.28);
+  --steam-btn-bg-top: #21324a;
+  --steam-btn-bg-bottom: #1a2637;
+  --steam-btn-border: #304762;
+  --steam-btn-shadow: rgba(0, 0, 0, 0.24);
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: linear-gradient(180deg, var(--steam-btn-bg-top), var(--steam-btn-bg-bottom));
   border: 1px solid var(--steam-btn-border);
-  border-radius: 14px;
-  color: #f6f8fb;
+  border-radius: 16px;
+  color: #f2f6fb;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 10px 24px var(--steam-btn-shadow);
+    0 8px 18px var(--steam-btn-shadow);
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 700;
   font-family: inherit;
-  letter-spacing: -0.02em;
-  padding: 8px 14px;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  min-height: 46px;
+  padding: 6px 16px 6px 10px;
   cursor: pointer;
   transition: transform .12s, box-shadow .12s, border-color .12s, filter .12s;
   white-space: nowrap;
 }
 .gh-login-btn:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: #3b5879;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 14px 28px rgba(0, 0, 0, 0.34);
-  filter: brightness(1.03);
+    0 12px 24px rgba(0, 0, 0, 0.3);
+  filter: brightness(1.04);
   transform: translateY(-1px);
 }
 
@@ -400,21 +402,23 @@ code {
 }
 
 .gh-login-btn__badge {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(222, 229, 238, 0.9));
-  color: #182433;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: linear-gradient(180deg, #ffffff, #e6edf5);
+  color: #182535;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 1px 2px rgba(0, 0, 0, 0.18);
   flex-shrink: 0;
 }
 
 .gh-login-btn__icon {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
   display: block;
 }
 

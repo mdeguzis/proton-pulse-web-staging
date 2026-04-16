@@ -34,7 +34,8 @@
 }
 .profile-google-btn {
   font-size: 0.95rem;
-  padding: 12px 18px;
+  min-height: 54px;
+  padding: 8px 18px 8px 10px;
 }
 
 /* avatar card */
