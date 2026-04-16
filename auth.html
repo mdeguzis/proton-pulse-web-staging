@@ -22,22 +22,39 @@
     <section class="auth-panel">
       <h2>What happens next</h2>
       <ul class="auth-list">
+        <li>Steam may say you are signing in to <code>ilsgdshkaocrmibwdezk.supabase.co</code>. That is Proton Pulse’s Supabase auth callback.</li>
         <li>Steam will ask you to sign in or confirm the account you already use there.</li>
         <li>After you approve it, Steam sends you back to Proton Pulse already signed in.</li>
         <li>Proton Pulse never receives your Steam password.</li>
       </ul>
     </section>
 
+    <section class="auth-panel auth-panel--preview">
+      <h2>What the Steam page will look like</h2>
+      <div class="auth-preview" aria-hidden="true">
+        <div class="auth-preview__header">
+          <span class="auth-preview__title">Sign into <code>ilsgdshkaocrmibwdezk.supabase.co</code> using your Steam account</span>
+        </div>
+        <div class="auth-preview__body">
+          <div class="auth-preview__callout">Steam and Valve are not affiliated with this site. This is the callback domain used to complete Proton Pulse sign-in.</div>
+          <div class="auth-preview__copy">
+            You will see your Steam account on the left and a short explanation on the right about what profile information is shared back after sign-in.
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="auth-panel auth-panel--warning">
       <h2>How to verify it’s legitimate</h2>
       <p>Check that the next page URL starts with <code>https://steamcommunity.com/</code> before entering anything.</p>
+      <p>It is normal for that Steam page to mention <code>ilsgdshkaocrmibwdezk.supabase.co</code> in the text because that is the service finishing Proton Pulse authentication.</p>
       <p>If you are already signed into Steam in this browser, you may only need to click <strong>Sign In</strong>.</p>
     </section>
 
     <div class="auth-actions">
       <button class="gh-login-btn gh-login-btn--hero" id="continue-login-btn" type="button" title="Continue to Steam sign-in">
         <span class="gh-login-btn__badge" aria-hidden="true">
-          <svg class="gh-login-btn__icon" viewBox="0 0 24 24" focusable="false">
+          <svg class="gh-login-btn__icon" viewBox="-1.5 -1.5 27 27" focusable="false">
             <circle cx="17.4" cy="6.8" r="3.1" fill="none" stroke="currentColor" stroke-width="2.2"/>
             <circle cx="8.2" cy="16.3" r="2.45" fill="none" stroke="currentColor" stroke-width="2.2"/>
             <circle cx="17.4" cy="6.8" r="1.15" fill="currentColor"/>
