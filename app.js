@@ -97,7 +97,7 @@ async function submitReport(appId, title, form) {
     launch_options: form.launchOptions.value,
     enabled_vars: {},
     confidence_score: null,
-    source: getWebSource(),
+    source: form.reportSource?.value || getWebSource(),
     vram_mb: form.vramMb.value ? Number(form.vramMb.value) : null,
   };
   const r = await fetch(`${SB_URL}/user_configs?on_conflict=client_id,app_id`, {
@@ -150,6 +150,16 @@ async function populateSubmitForm(el) {
       <div class="sf-row"><label>Duration</label><input name="duration" placeholder="e.g. severalHours"></div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
       <div class="sf-row"><label>Notes *</label><textarea name="notes" rows="3" required placeholder="How did it run? Any issues or tweaks?"></textarea></div>
+      <div class="sf-row">
+        <label>Submitted from</label>
+        <select name="reportSource">
+          <option value="web-linux"${getWebSource()==='web-linux'?' selected':''}>Linux</option>
+          <option value="web-windows"${getWebSource()==='web-windows'?' selected':''}>Windows</option>
+          <option value="web-macos"${getWebSource()==='web-macos'?' selected':''}>macOS</option>
+          <option value="web-steamdeck"${getWebSource()==='web-steamdeck'?' selected':''}>Steam Deck</option>
+          <option value="web"${getWebSource()==='web'?' selected':''}>Other / Unknown</option>
+        </select>
+      </div>
       <div class="sf-row" style="justify-content:flex-end;gap:8px">
         <span id="submit-status" style="font-size:0.76rem;color:var(--muted)"></span>
         <button type="submit" class="submit-report-btn">Submit</button>
