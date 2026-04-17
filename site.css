@@ -241,6 +241,26 @@ code {
 }
 .sidebar-note strong { color: var(--text); font-weight: 600; }
 
+.sidebar-contact {
+  padding: 12px 16px 16px;
+  margin-top: 4px;
+}
+.sidebar-contact-btn {
+  display: block;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  transition: color .12s, border-color .12s;
+}
+.sidebar-contact-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
 .sidebar-brand-block {
   display: flex;
   align-items: flex-start;
