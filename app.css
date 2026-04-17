@@ -408,6 +408,11 @@
   font-weight: 700;
   color: var(--strong);
 }
+.config-name--unnamed {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400;
+}
 .config-row {
   display: flex;
   align-items: flex-start;

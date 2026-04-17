@@ -414,7 +414,7 @@ async function fetchSupabase(appId) {
       return {
         appId:         row.app_id,
         clientId:      row.voter_id || cfg.clientId || '',
-        profileName:   cfg.profileName   || 'Unnamed Config',
+        profileName:   cfg.profileName || '',
         protonVersion: cfg.protonVersion || '',
         launchOptions: cfg.launchOptions || '',
         enabledVars:   cfg.enabledVars   || {},
@@ -429,6 +429,7 @@ async function fetchSupabase(appId) {
         os:            cfg.os    || null,
         kernel:        cfg.kernel || null,
         isNonSteam:    cfg.isNonSteam === true,
+        pluginVersion: cfg.pluginVersion || null,
       };
     });
   } catch { return []; }
@@ -437,7 +438,7 @@ async function fetchSupabase(appId) {
 async function fetchNativeReports(appId) {
   try {
     const r = await fetch(
-      `${SB_URL}/user_configs?app_id=eq.${appId}&select=client_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,ram,os,kernel,proton_version,rating,duration,notes,vram_mb,created_at&order=created_at.desc`,
+      `${SB_URL}/user_configs?app_id=eq.${appId}&select=id,client_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,ram,os,kernel,proton_version,rating,duration,notes,vram_mb,created_at,source&order=created_at.desc`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (!r.ok) return [];
@@ -450,6 +451,7 @@ async function fetchNativeReports(appId) {
       if (!existing || row.created_at > existing.created_at) seen.set(key, row);
     }
     return [...seen.values()].map(row => ({
+      reportId:          row.id ?? null,
       clientId:          row.client_id || '',
       title:             row.title || `App ${row.app_id}`,
       cpu:               row.cpu || '',
@@ -465,7 +467,7 @@ async function fetchNativeReports(appId) {
       notes:             row.notes || '',
       vramMb:            row.vram_mb ?? null,
       timestamp:         Math.floor(new Date(row.created_at).getTime() / 1000),
-      source:            'proton-pulse',
+      source:            row.source || 'proton-pulse',
     }));
   } catch { return []; }
 }
@@ -631,11 +633,14 @@ function downloadJson(obj, prefix) {
 function renderConfigCard(c, idx) {
   const vars = Object.entries(c.enabledVars || {}).filter(([, v]) => v);
   const isProtonDb = (c.source || '').toLowerCase() === 'protondb';
-  const sourceLabel = isProtonDb ? 'ProtonDB' : 'Proton Pulse';
+  const isPlugin = !isProtonDb && (c.source || '').toLowerCase() !== 'web' && !(c.source || '').startsWith('web-');
+  const sourceLabel = isProtonDb ? 'ProtonDB' : isPlugin ? 'Decky Plugin' : 'Web';
+  const unnamed = !c.profileName;
+  const configId = c.clientId ? c.clientId.slice(0, 12) : null;
   return `
     <div class="config-card">
       <div class="config-head">
-        <div class="config-name">${esc(c.profileName)}</div>
+        <div class="config-name${unnamed ? ' config-name--unnamed' : ''}">${unnamed ? 'Unnamed Config' : esc(c.profileName)}</div>
         <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
           <span class="source-badge pulse">
             <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
@@ -645,7 +650,8 @@ function renderConfigCard(c, idx) {
             : '<span class="source-badge steam-game">Steam</span>'}
         </div>
       </div>
-      ${c.clientId ? `<div class="config-row"><span class="config-lbl">Client ID</span><span class="config-val">${esc(c.clientId)}</span></div>` : ''}
+      ${configId ? `<div class="config-row"><span class="config-lbl">Config ID</span><span class="config-val" style="font-family:monospace;font-size:0.8em;color:var(--muted)" title="${esc(c.clientId)}">#${esc(configId)}&hellip;</span></div>` : ''}
+      ${isPlugin && c.pluginVersion ? `<div class="config-row"><span class="config-lbl">Plugin Version</span><span class="config-val">${esc(c.pluginVersion)}</span></div>` : ''}
       <div class="config-row">
         <span class="config-lbl">Proton</span>
         <span class="config-val">${cfgNa(esc(c.protonVersion))}</span>
@@ -674,7 +680,7 @@ function renderConfigCard(c, idx) {
         </div>
       </div>
       <div class="config-meta">
-        ${utcStamp(c.timestamp)} | Source: ${sourceLabel}
+        ${utcStamp(c.timestamp)} | ${sourceLabel}
         <button class="cfg-dl-btn" data-cfg-idx="${idx}" title="Download as JSON">JSON</button>
         ${c.clientId && c.clientId === getWebClientId()
           ? `<button class="cfg-dl-btn delete-cfg-btn" data-voter-id="${esc(c.clientId)}" data-app-id="${c.appId}" style="color:#c85050;border-color:#c85050" title="Delete your config">Delete</button>`
@@ -772,6 +778,7 @@ function renderCard(r, votes) {
         <div class="row"><span class="label">Duration</span><span>${na(esc(r.duration))}</span></div>
         ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span>${esc(r.launchOptions)}</span></div>` : ''}
       </div>
+      ${r.reportId != null ? `<div class="row"><span class="label">Report ID</span><span style="font-family:monospace;font-size:0.8em;color:var(--muted)">#${r.reportId}</span></div>` : ''}
       <div class="card-footer">${r.clientId && r.clientId === getWebClientId() ? `<button class="cfg-dl-btn delete-report-btn" data-app-id="${r.appId || ''}" style="color:#c85050;border-color:#c85050" title="Delete your report">Delete</button>` : ''}<button class="cfg-dl-btn" data-report-json='${JSON.stringify(r).replace(/'/g,"&#39;")}' title="Download as JSON">JSON</button></div>
     </div>`;
 }
