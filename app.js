@@ -56,6 +56,15 @@ function getWebClientId() {
   return id;
 }
 
+function getWebSource() {
+  const ua = navigator.userAgent || '';
+  if (/SteamGamepad|SteamDeck/.test(ua) || (/Linux/.test(ua) && /Valve/.test(ua))) return 'web-steamdeck';
+  if (/Linux/.test(ua)) return 'web-linux';
+  if (/Windows/.test(ua)) return 'web-windows';
+  if (/Mac/.test(ua)) return 'web-macos';
+  return 'web';
+}
+
 let formSchema      = null;   // loaded from form-schema.json
 
 async function loadFormSchema() {
@@ -88,7 +97,7 @@ async function submitReport(appId, title, form) {
     launch_options: form.launchOptions.value,
     enabled_vars: {},
     confidence_score: null,
-    source: 'web',
+    source: getWebSource(),
     vram_mb: form.vramMb.value ? Number(form.vramMb.value) : null,
   };
   const r = await fetch(`${SB_URL}/user_configs?on_conflict=client_id,app_id`, {
@@ -710,20 +719,24 @@ function trendSummary(reps) {
 function renderCard(r, votes) {
   const v     = votes[reportKey(r)] || { up: 0, down: 0 };
   const score = Math.min(10, Math.max(0, (r.score || estimateScore(r)) / 10)).toFixed(1);
-  const isPP  = r.source === 'proton-pulse';
+  const src = (r.source || '').toLowerCase();
+  const isPP  = src === 'proton-pulse';
+  const isWeb = src.startsWith('web');
+  const WEB_LABELS = { 'web-steamdeck': 'Steam Deck', 'web-linux': 'Linux', 'web-windows': 'Windows', 'web-macos': 'macOS', 'web': 'Web' };
   const rc    = RATING_COLORS[r.rating] || '#3a4a5a';
   const rt    = RATING_TEXT[r.rating]   || '#c8d4e0';
   const na = s => s || '<span style="color:#4a5f70;font-style:italic">Not available</span>';
+  const sourceBadge = isPP
+    ? '<span class="source-badge pulse"><img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse</span>'
+    : isWeb
+      ? `<span class="source-badge web">${WEB_LABELS[src] || 'Web'}</span>`
+      : '<span class="source-badge protondb">ProtonDB</span>';
   return `
     <div class="card">
       <div class="left">
         <div class="card-head">
           <div class="proton">${esc(r.protonVersion || 'Unknown')}</div>
-          <span class="source-badge ${isPP ? 'pulse' : 'protondb'}">
-            ${isPP
-              ? '<img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse'
-              : 'ProtonDB'}
-          </span>
+          ${sourceBadge}
         </div>
         <div class="hw">${esc([r.gpu, r.os].filter(Boolean).join(' / ') || 'Hardware unavailable')}</div>
         <div class="age">${daysAgo(r.timestamp)}</div>

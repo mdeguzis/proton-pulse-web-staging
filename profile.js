@@ -23,6 +23,7 @@
     document.getElementById('profile-uid').textContent         = uid;
     document.getElementById('profile-email-detail').textContent = email;
     document.getElementById('profile-last-signin').textContent  = lastAt;
+    document.getElementById('profile-steam-username').textContent = name || '—';
 
     signedOut.hidden = true;
     signedIn.hidden  = false;

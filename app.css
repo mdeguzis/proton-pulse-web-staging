@@ -619,6 +619,11 @@ a.card:hover { text-decoration: none; }
   border-color: rgba(180,110,40,0.30);
   color: #d4894a;
 }
+.source-badge.web {
+  background: rgba(100,180,100,0.1);
+  border-color: rgba(100,180,100,0.25);
+  color: #7ecf7e;
+}
 
 /* detail expand */
 .card-summary {
