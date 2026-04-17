@@ -431,6 +431,7 @@ async function fetchSupabase(appId) {
         kernel:        cfg.kernel || null,
         isNonSteam:    cfg.isNonSteam === true,
         pluginVersion: cfg.pluginVersion || null,
+        isEdited:      cfg.isEdited === true,
       };
     });
   } catch { return []; }
@@ -635,7 +636,9 @@ function renderConfigCard(c, idx) {
   const vars = Object.entries(c.enabledVars || {}).filter(([, v]) => v);
   const isProtonDb = (c.source || '').toLowerCase() === 'protondb';
   const isPlugin = !isProtonDb && (c.source || '').toLowerCase() !== 'web' && !(c.source || '').startsWith('web-');
-  const sourceLabel = isProtonDb ? 'ProtonDB' : isPlugin ? 'Decky Plugin' : 'Web';
+  const sourceLabel = isProtonDb
+    ? (c.isEdited ? 'ProtonDB (edited)' : 'ProtonDB')
+    : isPlugin ? 'Decky Plugin' : 'Web';
   const unnamed = !c.profileName;
   const configId = c.configId != null ? `#${c.configId}` : (c.clientId ? `#${c.clientId.slice(0, 8)}…` : null);
   return `
@@ -683,7 +686,7 @@ function renderConfigCard(c, idx) {
         </div>
       </div>
       <div class="config-meta">
-        ${utcStamp(c.timestamp)} | ${sourceLabel}
+        ${utcStamp(c.timestamp)} | Source: ${sourceLabel}
         <button class="cfg-dl-btn" data-cfg-idx="${idx}" title="Download as JSON">JSON</button>
         ${c.clientId && c.clientId === getWebClientId()
           ? `<button class="cfg-dl-btn delete-cfg-btn" data-voter-id="${esc(c.clientId)}" data-app-id="${c.appId}" style="color:#c85050;border-color:#c85050" title="Delete your config">Delete</button>`
