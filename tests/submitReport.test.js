@@ -50,6 +50,8 @@ function makeCtx(sessionOverride) {
     fetch: fetchMock,
     localStorage: { getItem: jest.fn(() => 'test-client-id'), setItem: jest.fn() },
     crypto: { randomUUID: jest.fn(() => 'test-uuid') },
+    // empty UA so getWebSource() returns the default 'web' used by tests below
+    navigator: { userAgent: '' },
     addEventListener: noop,
     removeEventListener: noop,
     document: {

@@ -26,10 +26,13 @@ var navigator = { clipboard: { writeText: function(){ return Promise.resolve(); 
 var SUPABASE_URL = ${JSON.stringify(SUPABASE_URL)};
 var SUPABASE_ANON_KEY = ${JSON.stringify(SUPABASE_ANON_KEY)};
 ${PROFILE_SRC}
-ctx.__listUserSystems    = listUserSystems;
-ctx.__setDefaultSystem   = setDefaultSystem;
-ctx.__updateSystemLabel  = updateSystemLabel;
-ctx.__deleteSystem       = deleteSystem;
+ctx.__listUserSystems       = listUserSystems;
+ctx.__setDefaultSystem      = setDefaultSystem;
+ctx.__updateSystemLabel     = updateSystemLabel;
+ctx.__deleteSystem          = deleteSystem;
+ctx.__getSteamIdFromSession = getSteamIdFromSession;
+ctx.__escapeHtml            = escapeHtml;
+ctx.__formatSystemUpdated   = formatSystemUpdated;
 `;
 
 // Baseline fetch result so the init IIFE inside profile.js doesn't blow up
@@ -275,5 +278,112 @@ describe('deleteSystem', () => {
     await expect(
       ctx.__deleteSystem(steamId, deviceId, { access_token: 'tok' })
     ).rejects.toThrow('Delete failed: HTTP 404');
+  });
+});
+
+describe('getSteamIdFromSession', () => {
+  test('returns user_metadata.steam_id when present', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    const id = ctx.__getSteamIdFromSession({
+      user: { user_metadata: { steam_id: '76561198000000001' } },
+    });
+    expect(id).toBe('76561198000000001');
+  });
+
+  test('falls back to provider_id, then sub', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__getSteamIdFromSession({
+      user: { user_metadata: { provider_id: 'prov-123' } },
+    })).toBe('prov-123');
+    expect(ctx.__getSteamIdFromSession({
+      user: { user_metadata: { sub: 'sub-456' } },
+    })).toBe('sub-456');
+  });
+
+  test('returns null when session is nullish or has no steam id fields', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__getSteamIdFromSession(null)).toBeNull();
+    expect(ctx.__getSteamIdFromSession(undefined)).toBeNull();
+    expect(ctx.__getSteamIdFromSession({})).toBeNull();
+    expect(ctx.__getSteamIdFromSession({ user: { user_metadata: {} } })).toBeNull();
+  });
+
+  test('prefers steam_id over provider_id when both are set', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    const id = ctx.__getSteamIdFromSession({
+      user: { user_metadata: { steam_id: 'preferred', provider_id: 'fallback' } },
+    });
+    expect(id).toBe('preferred');
+  });
+});
+
+describe('escapeHtml', () => {
+  test('escapes all five HTML-unsafe characters', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__escapeHtml('<script>alert("x")</script>'))
+      .toBe('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
+    expect(ctx.__escapeHtml("it's & stuff"))
+      .toBe('it&#39;s &amp; stuff');
+  });
+
+  test('handles null, undefined, and empty string as empty output', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__escapeHtml(null)).toBe('');
+    expect(ctx.__escapeHtml(undefined)).toBe('');
+    expect(ctx.__escapeHtml('')).toBe('');
+  });
+
+  test('coerces non-string values via toString', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__escapeHtml(42)).toBe('42');
+    // Object with a custom toString — goes through .toString() on the coerce path
+    const obj = { toString: () => 'hello <b>world</b>' };
+    expect(ctx.__escapeHtml(obj)).toBe('hello &lt;b&gt;world&lt;/b&gt;');
+  });
+
+  test('passes through safe ASCII text unchanged', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__escapeHtml('plain label 123')).toBe('plain label 123');
+  });
+});
+
+describe('formatSystemUpdated', () => {
+  test('formats a valid ISO timestamp as a locale string', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    const out = ctx.__formatSystemUpdated('2026-04-18T12:34:56Z');
+    // Don't pin the exact format (locale-dependent), just verify it parsed
+    // and rendered something that contains "2026"
+    expect(out).toMatch(/2026/);
+    expect(out).not.toBe('Invalid Date');
+  });
+
+  test('falls back to dash when input is null/undefined', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__formatSystemUpdated(null)).toBe('-');
+    expect(ctx.__formatSystemUpdated(undefined)).toBe('-');
+  });
+
+  test('falls back to dash for empty string', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__formatSystemUpdated('')).toBe('-');
+  });
+
+  test('returns the raw string for unparseable truthy input', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    // Date('not-a-date') -> Invalid Date; helper should return the raw value
+    // so the user sees what came back from the DB, not "Invalid Date"
+    expect(ctx.__formatSystemUpdated('not-a-date')).toBe('not-a-date');
   });
 });

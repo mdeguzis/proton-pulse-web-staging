@@ -185,6 +185,30 @@ function inferGpuVendor(gpuString) {
   return '';
 }
 
+// Small helpers pulled out of the page-init IIFE so they can be unit-tested.
+// escapeHtml prevents XSS when we drop user-supplied label/device_id into an
+// innerHTML template. Keep the char set in sync with the five HTML-unsafe chars
+function escapeHtml(s) {
+  return (s || '').toString().replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
+}
+
+// Parse an ISO timestamp and format it in the user's locale. new Date() is
+// lenient (null -> epoch, '' -> Invalid Date, neither throws), so we guard
+// falsy inputs with a dash and fall back to the raw string on unparseable
+// input so the UI never shows "Invalid Date"
+function formatSystemUpdated(ts) {
+  if (!ts) return '-';
+  try {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return ts;
+    return d.toLocaleString();
+  } catch {
+    return ts;
+  }
+}
+
 (async function () {
   const signedIn  = document.getElementById('profile-signed-in');
   const signedOut = document.getElementById('profile-signed-out');
@@ -373,16 +397,6 @@ function inferGpuVendor(gpuString) {
   // Last list of rows we rendered. Used so the default-toggle handler can
   // grab the sysinfo_text off the row it just starred without a re-fetch
   let systemsCache = [];
-
-  function escapeHtml(s) {
-    return (s || '').toString().replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[c]);
-  }
-
-  function formatSystemUpdated(ts) {
-    try { return new Date(ts).toLocaleString(); } catch { return ts || '-'; }
-  }
 
   function renderSystems(rows) {
     systemsCache = rows || [];
