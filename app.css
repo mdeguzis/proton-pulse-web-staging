@@ -587,8 +587,10 @@ a.card:hover { text-decoration: none; }
   flex-direction: column;
   align-items: flex-end;
   gap: 5px;
-  min-width: 80px;
+  min-width: 72px;
+  flex-shrink: 0;
 }
+.card-right-row { display: flex; align-items: center; gap: 5px; }
 .card .rating {
   padding: 3px 8px;
   font-weight: 800;
@@ -924,8 +926,7 @@ a.card:hover { text-decoration: none; }
   }
   .game-header { flex-direction: column; }
   .game-header img { height: auto; width: 100%; max-width: 240px; }
-  .card { flex-direction: column; }
-  .card .right { flex-direction: row; align-items: center; min-width: 0; }
+  .card { flex-direction: row; align-items: flex-start; }
   .card-summary .row { flex-direction: column; gap: 2px; }
   .reports-section-head { flex-direction: column; align-items: flex-start; gap: 8px; }
   .filter-bar { gap: 6px; }
