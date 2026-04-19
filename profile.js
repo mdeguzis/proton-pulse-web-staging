@@ -183,15 +183,11 @@ function parseSteamSystemInfo(text) {
 // on an Intel CPU sometimes shows both "Intel" and "NVIDIA" in the sysinfo).
 // Decide which takes priority.
 function inferGpuVendor(gpuString) {
-  // TODO(you): implement this. ~5-10 lines.
-  // Suggested approach:
-  //   - lowercase the input once
-  //   - check for 'nvidia' / 'geforce' / 'quadro' first (most specific)
-  //   - then 'amd' / 'radeon' / 'rdna'
-  //   - then 'intel' / 'arc' / 'iris' / 'uhd'
-  //   - return '' if nothing matches
-  // Feel free to tweak the priority order if you think Intel should win when
-  // it's named more explicitly than the others.
+  const s = (gpuString || '').toString().toLowerCase();
+  if (!s) return '';
+  if (/(nvidia|geforce|quadro)/.test(s)) return 'nvidia';
+  if (/(amd|radeon|rdna|rx\s*\d|vega)/.test(s)) return 'amd';
+  if (/(intel|arc|iris|uhd|xe\b)/.test(s)) return 'intel';
   return '';
 }
 
@@ -281,6 +277,25 @@ async function fetchMyUserConfigs(clientId, session) {
   const myhwParseBtn   = document.getElementById('myhw-parse-btn');
   const myhwClearBtn   = document.getElementById('myhw-clear-btn');
   const myhwStatus     = document.getElementById('myhw-parse-status');
+  const myhwTabButtons = Array.from(document.querySelectorAll('.profile-tab-btn[data-pane]'));
+  const myhwTabPanels  = {
+    systems: document.getElementById('myhw-pane-systems'),
+    local: document.getElementById('myhw-pane-local'),
+  };
+
+  function setMyHardwarePane(name) {
+    myhwTabButtons.forEach((btn) => {
+      const active = btn.dataset.pane === name;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    for (const [pane, el] of Object.entries(myhwTabPanels)) {
+      if (!el) continue;
+      const active = pane === name;
+      el.classList.toggle('active', active);
+      el.hidden = !active;
+    }
+  }
 
   function loadMyHardware() {
     for (const [field, el] of Object.entries(myhwInputs)) {
@@ -388,6 +403,10 @@ async function fetchMyUserConfigs(clientId, session) {
   for (const [field, el] of Object.entries(myhwInputs)) {
     el?.addEventListener('change', () => saveMyHwField(field, el.value));
   }
+  myhwTabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => setMyHardwarePane(btn.dataset.pane));
+  });
+  setMyHardwarePane('systems');
 
   // Parse pasted Steam system info and fill the boxes
   myhwParseBtn?.addEventListener('click', () => {
@@ -463,8 +482,11 @@ async function fetchMyUserConfigs(clientId, session) {
         </td>
         <td>${escapeHtml(formatSystemUpdated(r.updated_at))}</td>
         <td class="col-default">
-          <button type="button" class="profile-systems-star ${r.is_default ? 'active' : ''}"
-            data-role="default" title="Set as default">${r.is_default ? '*' : 'o'}</button>
+          <label class="profile-systems-default-toggle" title="Set as default">
+            <input type="checkbox" data-role="default" ${r.is_default ? 'checked' : ''}>
+            <span class="profile-systems-default-switch" aria-hidden="true"></span>
+            <span class="profile-systems-default-text">${r.is_default ? 'Default' : ''}</span>
+          </label>
         </td>
         <td class="col-delete">
           <button type="button" class="profile-systems-trash" data-role="delete" title="Delete">x</button>
@@ -532,6 +554,7 @@ async function fetchMyUserConfigs(clientId, session) {
         await refreshSystems();
         const row = systemsCache.find(r => r.device_id === deviceId);
         if (row) askReplaceLocalFrom(row);
+        setMyHardwarePane('local');
       } else if (btn.dataset.role === 'delete') {
         if (!window.confirm('Delete this system? The plugin will re-create it next time you upload.')) return;
         await deleteSystem(steamId, deviceId, s);

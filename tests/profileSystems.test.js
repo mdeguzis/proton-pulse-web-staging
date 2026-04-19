@@ -34,6 +34,7 @@ ctx.__getSteamIdFromSession = getSteamIdFromSession;
 ctx.__escapeHtml            = escapeHtml;
 ctx.__formatSystemUpdated   = formatSystemUpdated;
 ctx.__fetchMyUserConfigs    = fetchMyUserConfigs;
+ctx.__inferGpuVendor        = inferGpuVendor;
 `;
 
 // Baseline fetch result so the init IIFE inside profile.js doesn't blow up
@@ -386,6 +387,36 @@ describe('formatSystemUpdated', () => {
     // Date('not-a-date') -> Invalid Date; helper should return the raw value
     // so the user sees what came back from the DB, not "Invalid Date"
     expect(ctx.__formatSystemUpdated('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('inferGpuVendor', () => {
+  test('detects nvidia-style names first', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__inferGpuVendor('NVIDIA GeForce RTX 4070')).toBe('nvidia');
+    expect(ctx.__inferGpuVendor('Quadro RTX 4000')).toBe('nvidia');
+  });
+
+  test('detects amd-style names', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__inferGpuVendor('AMD Radeon RX 7800 XT')).toBe('amd');
+    expect(ctx.__inferGpuVendor('RDNA 3 graphics')).toBe('amd');
+  });
+
+  test('detects intel-style names', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__inferGpuVendor('Intel Arc A770')).toBe('intel');
+    expect(ctx.__inferGpuVendor('Intel Iris Xe Graphics')).toBe('intel');
+  });
+
+  test('returns empty string when no vendor matches', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__inferGpuVendor('Mystery GPU')).toBe('');
+    expect(ctx.__inferGpuVendor('')).toBe('');
   });
 });
 

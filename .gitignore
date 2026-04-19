@@ -58,3 +58,7 @@ docs/superpowers/specs/
 
 # Logs
 *.log
+
+# JavaScript package manager artifacts
+node_modules/
+pnpm-lock.yaml

@@ -262,6 +262,28 @@
 }
 .profile-refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
 
+.profile-tabs {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.profile-tab-btn {
+  font-size: 0.7rem;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.profile-tab-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(74,159,208,0.1);
+}
+.profile-tab-panel { display: none; }
+.profile-tab-panel.active { display: block; }
+
 .profile-systems-table {
   width: 100%;
   border-collapse: collapse;
@@ -286,7 +308,7 @@
 .profile-systems-table th.col-default,
 .profile-systems-table th.col-delete {
   text-align: center;
-  width: 60px;
+  width: 80px;
 }
 .profile-systems-label-input {
   background: transparent;
@@ -302,7 +324,6 @@
   border-color: var(--border2);
   outline: none;
 }
-.profile-systems-star,
 .profile-systems-trash {
   background: none;
   border: none;
@@ -311,8 +332,51 @@
   cursor: pointer;
   padding: 2px 6px;
 }
-.profile-systems-star.active { color: #d4a843; }
 .profile-systems-trash:hover { color: #c85050; }
+.profile-systems-default-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.profile-systems-default-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.profile-systems-default-switch {
+  width: 34px;
+  height: 18px;
+  background: var(--border2);
+  border-radius: 999px;
+  position: relative;
+  transition: background .15s;
+}
+.profile-systems-default-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .15s;
+}
+.profile-systems-default-toggle input:checked + .profile-systems-default-switch {
+  background: rgba(212, 168, 67, 0.85);
+}
+.profile-systems-default-toggle input:checked + .profile-systems-default-switch::after {
+  transform: translateX(16px);
+}
+.profile-systems-default-text {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.profile-systems-default-toggle input:checked ~ .profile-systems-default-text {
+  color: #e6c160;
+}
 
 /* -- My uploaded configs table -- */
 
@@ -361,4 +425,3 @@
   display: inline-block;
 }
 .profile-configs-view-link:hover { color: var(--accent); border-color: var(--accent); }
-

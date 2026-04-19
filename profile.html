@@ -184,29 +184,125 @@
         </div>
       </div>
 
-      <!-- Server-side systems uploaded from the Decky plugin -->
       <div class="profile-section">
         <div class="profile-section-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>Your systems</span>
-          <button type="button" class="profile-refresh-btn" id="systems-refresh-btn">Refresh</button>
-        </div>
-        <div class="profile-field">
-          <div id="systems-empty" class="profile-field-hint" hidden>
-            Open Pulse on your Steam Deck and press <strong>Upload to Pulse</strong> in the plugin settings. Your systems will show up here.
+          <span>My hardware</span>
+          <div class="profile-tabs" role="tablist" aria-label="My hardware views">
+            <button type="button" class="profile-tab-btn active" id="myhw-tab-systems" data-pane="systems" role="tab" aria-selected="true">Uploaded systems</button>
+            <button type="button" class="profile-tab-btn" id="myhw-tab-local" data-pane="local" role="tab" aria-selected="false">Web prefill</button>
           </div>
-          <div id="systems-loading" class="profile-field-hint">Loading your systems...</div>
-          <table class="profile-systems-table" id="systems-table" hidden>
-            <thead>
-              <tr>
-                <th>Label</th>
-                <th>Updated</th>
-                <th class="col-default">Default</th>
-                <th class="col-delete"></th>
-              </tr>
-            </thead>
-            <tbody id="systems-tbody"></tbody>
-          </table>
-          <div id="systems-status" class="profile-field-hint" style="margin-top:6px"></div>
+        </div>
+        <div class="profile-tab-panel active" id="myhw-pane-systems" role="tabpanel" aria-labelledby="myhw-tab-systems">
+          <div class="profile-field">
+            <div class="profile-field-hint" style="margin-top:0">
+              Systems uploaded from the Decky plugin. Mark one as your default to use it as the main source for web report prefill.
+            </div>
+          </div>
+          <div class="profile-field">
+            <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:8px">
+              <button type="button" class="profile-refresh-btn" id="systems-refresh-btn">Refresh</button>
+            </div>
+            <div id="systems-empty" class="profile-field-hint" hidden>
+              Open Pulse on your Steam Deck and press <strong>Upload to Pulse</strong> in the plugin settings. Your systems will show up here.
+            </div>
+            <div id="systems-loading" class="profile-field-hint">Loading your systems...</div>
+            <table class="profile-systems-table" id="systems-table" hidden>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Updated</th>
+                  <th class="col-default">Default</th>
+                  <th class="col-delete"></th>
+                </tr>
+              </thead>
+              <tbody id="systems-tbody"></tbody>
+            </table>
+            <div id="systems-status" class="profile-field-hint" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div class="profile-tab-panel" id="myhw-pane-local" role="tabpanel" aria-labelledby="myhw-tab-local" hidden>
+          <div class="profile-field">
+            <div class="profile-field-hint" style="margin-top:0">
+              These values only live in this browser and pre-fill the web submit form. They can be copied from your default uploaded system or edited manually.
+            </div>
+          </div>
+          <div class="profile-field">
+            <div class="profile-field-label">Paste Steam system information</div>
+            <div class="profile-field-value" style="flex-direction:column;align-items:stretch;gap:8px">
+              <textarea id="myhw-paste" class="profile-textarea" rows="6"
+                placeholder="Open Steam → Help → System Information, copy the whole thing, paste it here. Same format ProtonDB accepts."></textarea>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button type="button" class="profile-parse-btn" id="myhw-parse-btn">Parse and fill</button>
+                <button type="button" class="profile-clear-btn" id="myhw-clear-btn">Clear all</button>
+                <span id="myhw-parse-status" style="font-size:0.76rem;color:var(--muted)"></span>
+              </div>
+            </div>
+            <div class="profile-field-hint">
+              Pasting is optional, you can also just fill the boxes below. These values pre-fill the submit-a-report form when using the web app.
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">CPU</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-cpu" class="profile-select" placeholder="e.g. AMD Ryzen 7 5800X3D" maxlength="120">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">GPU</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-gpu" class="profile-select" placeholder="e.g. NVIDIA GeForce RTX 4070" maxlength="120">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">GPU vendor</div>
+            <div class="profile-field-value">
+              <select id="myhw-gpu-vendor" class="profile-select">
+                <option value="">--</option>
+                <option value="nvidia">NVIDIA</option>
+                <option value="amd">AMD</option>
+                <option value="intel">Intel</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">GPU driver</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-gpu-driver" class="profile-select" placeholder="e.g. Mesa 24.1.0 or 555.42.02" maxlength="80">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">RAM</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-ram" class="profile-select" placeholder="e.g. 32 GB" maxlength="20">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">VRAM (MB)</div>
+            <div class="profile-field-value">
+              <input type="number" id="myhw-vram-mb" class="profile-select" placeholder="e.g. 8192" min="0" max="262144">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">OS</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-os" class="profile-select" placeholder="e.g. Arch Linux" maxlength="60">
+              <input type="text" id="myhw-os-version" class="profile-select" placeholder="Version (e.g. 24.04)" style="max-width:140px" maxlength="30">
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <div class="profile-field-label">Kernel</div>
+            <div class="profile-field-value">
+              <input type="text" id="myhw-kernel" class="profile-select" placeholder="e.g. 6.8.0" maxlength="60">
+            </div>
+          </div>
         </div>
       </div>
 
@@ -233,89 +329,6 @@
             <tbody id="my-configs-tbody"></tbody>
           </table>
           <div id="my-configs-status" class="profile-field-hint" style="margin-top:6px"></div>
-        </div>
-      </div>
-
-      <!-- Actual hardware spec, used to auto-fill the submit-a-report form on the web app -->
-      <div class="profile-section">
-        <div class="profile-section-title">My hardware</div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">Paste Steam system information</div>
-          <div class="profile-field-value" style="flex-direction:column;align-items:stretch;gap:8px">
-            <textarea id="myhw-paste" class="profile-textarea" rows="6"
-              placeholder="Open Steam → Help → System Information, copy the whole thing, paste it here. Same format ProtonDB accepts."></textarea>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <button type="button" class="profile-parse-btn" id="myhw-parse-btn">Parse and fill</button>
-              <button type="button" class="profile-clear-btn" id="myhw-clear-btn">Clear all</button>
-              <span id="myhw-parse-status" style="font-size:0.76rem;color:var(--muted)"></span>
-            </div>
-          </div>
-          <div class="profile-field-hint">
-            Pasting is optional, you can also just fill the boxes below. These values pre-fill the submit-a-report form when using the web app.
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">CPU</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-cpu" class="profile-select" placeholder="e.g. AMD Ryzen 7 5800X3D" maxlength="120">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">GPU</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-gpu" class="profile-select" placeholder="e.g. NVIDIA GeForce RTX 4070" maxlength="120">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">GPU vendor</div>
-          <div class="profile-field-value">
-            <select id="myhw-gpu-vendor" class="profile-select">
-              <option value="">--</option>
-              <option value="nvidia">NVIDIA</option>
-              <option value="amd">AMD</option>
-              <option value="intel">Intel</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">GPU driver</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-gpu-driver" class="profile-select" placeholder="e.g. Mesa 24.1.0 or 555.42.02" maxlength="80">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">RAM</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-ram" class="profile-select" placeholder="e.g. 32 GB" maxlength="20">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">VRAM (MB)</div>
-          <div class="profile-field-value">
-            <input type="number" id="myhw-vram-mb" class="profile-select" placeholder="e.g. 8192" min="0" max="262144">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">OS</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-os" class="profile-select" placeholder="e.g. Arch Linux" maxlength="60">
-            <input type="text" id="myhw-os-version" class="profile-select" placeholder="Version (e.g. 24.04)" style="max-width:140px" maxlength="30">
-          </div>
-        </div>
-
-        <div class="profile-field">
-          <div class="profile-field-label">Kernel</div>
-          <div class="profile-field-value">
-            <input type="text" id="myhw-kernel" class="profile-select" placeholder="e.g. 6.8.0" maxlength="60">
-          </div>
         </div>
       </div>
 
