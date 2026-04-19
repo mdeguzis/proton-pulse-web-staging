@@ -1145,7 +1145,7 @@ async function renderGamePage(appId) {
 
       <div class="reports-section-head" id="pulse-summary">
         <div class="reports-section-copy">
-          <span class="reports-section-title">Community Pulse Configs &amp; Reports</span>
+          <span class="reports-section-title">Community Configs &amp; Reports</span>
           <span class="reports-section-subtitle">Saved Pulse configs and compatibility reports from ProtonDB and Proton Pulse contributors, listed together and labeled by source.</span>
         </div>
         <div class="sort-bar">
