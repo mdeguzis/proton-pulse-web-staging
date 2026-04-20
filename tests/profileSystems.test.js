@@ -37,6 +37,11 @@ ctx.__fetchMyUserConfigs    = fetchMyUserConfigs;
 ctx.__inferGpuVendor        = inferGpuVendor;
 ctx.__inferSystemLabel      = inferSystemLabel;
 ctx.__isGenericSystemLabel  = isGenericSystemLabel;
+ctx.__cleanUnknown          = cleanUnknown;
+ctx.__parseSteamSystemInfo  = parseSteamSystemInfo;
+ctx.__getMyHwFieldOrigins   = getMyHwFieldOrigins;
+ctx.__setMyHwFieldOrigin    = setMyHwFieldOrigin;
+ctx.__setMyHwFieldOrigins   = setMyHwFieldOrigins;
 `;
 
 // Baseline fetch result so the init IIFE inside profile.js doesn't blow up
@@ -293,6 +298,17 @@ describe('system label inference', () => {
     expect(ctx.__isGenericSystemLabel('Living Room Deck')).toBe(false);
   });
 
+  // Plugin-side sometimes writes "Unknown system" when it can't derive a
+  // better label. Catch that in the self-heal path too.
+  test('treats "Unknown system" and "uploaded system" as generic', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__isGenericSystemLabel('Unknown system')).toBe(true);
+    expect(ctx.__isGenericSystemLabel('Uploaded system')).toBe(true);
+    expect(ctx.__isGenericSystemLabel('UNKNOWN SYSTEM')).toBe(true);
+    expect(ctx.__isGenericSystemLabel('')).toBe(true);
+  });
+
   test('infers Steam Deck for VanGogh / SteamOS uploads', async () => {
     const { ctx } = makeCtx({ access_token: 'tok' });
     await flush();
@@ -305,6 +321,143 @@ Driver: AMD VanGogh [AMD Custom GPU 0405]
 RAM: 14564 Mb
       `,
     })).toBe('Steam Deck');
+  });
+
+  // Board-model match wins over chipset so LCD vs OLED is preserved
+  test('names a Steam Deck OLED from Valve Galileo board', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__inferSystemLabel({
+      sysinfo_text: [
+        'Computer Information:',
+        '  Manufacturer: Valve',
+        '  Model: Galileo',
+      ].join('\n'),
+    })).toBe('Steam Deck OLED');
+  });
+
+  test('names a Steam Deck LCD from Valve Jupiter board', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__inferSystemLabel({
+      sysinfo_text: [
+        'Computer Information:',
+        '  Manufacturer: Valve',
+        '  Model: Jupiter',
+      ].join('\n'),
+    })).toBe('Steam Deck LCD');
+  });
+
+  // When nothing matches the Deck heuristics, fall back to {OS}-{VENDOR}-{GPU}
+  // so the row still reads as a piece of hardware and not "Unknown"
+  test('builds OS-VENDOR-GPU from parsed fields when Deck match fails', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__inferSystemLabel({
+      sysinfo_text: [
+        'Operating System Version:',
+        '  "Arch Linux" (64 bit)',
+        'Driver: NVIDIA Corporation NVIDIA GeForce RTX 4070',
+      ].join('\n'),
+    })).toBe('Arch-NVIDIA-GeForce RTX 4070');
+  });
+
+  // Only OS parsed? Still better than a literal "Uploaded system"
+  test('returns just the OS when that is all that parsed', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__inferSystemLabel({
+      sysinfo_text: 'Operating System Version:\n    "SteamOS 3.6" (64 bit)',
+    })).toBe('SteamOS');
+  });
+
+  // Nothing at all -> the guaranteed last resort
+  test('falls back to "Uploaded system" for an empty blob', async () => {
+    const { ctx } = makeCtx({ access_token: 'tok' });
+    await flush();
+    expect(ctx.__inferSystemLabel({ sysinfo_text: '' })).toBe('Uploaded system');
+  });
+});
+
+describe('cleanUnknown + parseSteamSystemInfo', () => {
+  test('cleanUnknown drops literal "Unknown" (any case, with whitespace)', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__cleanUnknown('Unknown')).toBe('');
+    expect(ctx.__cleanUnknown('  unknown  ')).toBe('');
+    expect(ctx.__cleanUnknown('UNKNOWN')).toBe('');
+    expect(ctx.__cleanUnknown('Arch Linux')).toBe('Arch Linux');
+    expect(ctx.__cleanUnknown('')).toBe('');
+    expect(ctx.__cleanUnknown(null)).toBe('');
+  });
+
+  // Sysinfo blob from the Deck when glxinfo / os-release probes all failed.
+  // "Unknown" should land as missing, not as the string value
+  test('strips Unknown CPU/OS/kernel from parsed output', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    const blob = [
+      'CPU Brand:  Unknown',
+      'Operating System Version:',
+      '    Unknown',
+      'Kernel Version:  Unknown',
+    ].join('\n');
+    const out = ctx.__parseSteamSystemInfo(blob);
+    expect(out.cpu).toBeUndefined();
+    expect(out.os).toBeUndefined();
+    expect(out.kernel).toBeUndefined();
+  });
+
+  // Manufacturer/Model land on the "Computer Information:" block and survive
+  // when everything else probes blank — they're how Deck recognition works
+  test('parses Manufacturer and Model into the output', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    const blob = [
+      'Computer Information:',
+      '  Manufacturer:  Valve',
+      '  Model:  Galileo',
+    ].join('\n');
+    const out = ctx.__parseSteamSystemInfo(blob);
+    expect(out.manufacturer).toBe('Valve');
+    expect(out.model).toBe('Galileo');
+  });
+});
+
+describe('my-hardware field origins', () => {
+  test('getMyHwFieldOrigins returns {} when nothing is stored', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    expect(ctx.__getMyHwFieldOrigins()).toEqual({});
+  });
+
+  test('setMyHwFieldOrigin writes one field without clobbering the rest', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    ctx.__setMyHwFieldOrigin('cpu', 'default-system');
+    ctx.__setMyHwFieldOrigin('gpu', 'steam-paste');
+    const origins = ctx.__getMyHwFieldOrigins();
+    expect(origins).toEqual({ cpu: 'default-system', gpu: 'steam-paste' });
+  });
+
+  // Passing a falsy origin is the documented way to clear a single field,
+  // used when we wipe a value before re-tagging it
+  test('setMyHwFieldOrigin with empty origin removes that key', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    ctx.__setMyHwFieldOrigin('cpu', 'manual');
+    ctx.__setMyHwFieldOrigin('cpu', '');
+    expect(ctx.__getMyHwFieldOrigins()).toEqual({});
+  });
+
+  // When the whole map is empty, the LS key should be gone — otherwise we
+  // leave an empty "{}" kicking around forever
+  test('setMyHwFieldOrigins({}) removes the localStorage key', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+    ctx.__setMyHwFieldOrigin('os', 'default-system');
+    ctx.__setMyHwFieldOrigins({});
+    expect(ctx.localStorage.getItem('proton-pulse:myhw:field-origins')).toBeNull();
   });
 });
 

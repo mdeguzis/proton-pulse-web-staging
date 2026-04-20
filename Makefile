@@ -145,21 +145,21 @@ gh-run-watch: gh-check
 		ACTIVE_RUNS="$$(gh run list $$WORKFLOW_ARGS --limit 20 --json databaseId,workflowName,status,displayTitle,headBranch,event,startedAt --jq '.[] | select(.status != "completed") | "#\(.databaseId) | \(.workflowName // "-")\nstatus: \(.status) | event: \(.event) | branch: \(.headBranch // "-")\nstarted: \(.startedAt // "-")\ntitle: \(.displayTitle)\n"')"; \
 		COMPLETED_RUNS="$$(gh run list $$WORKFLOW_ARGS --limit 3 --json databaseId,workflowName,status,conclusion,displayTitle,headBranch,event,updatedAt --jq '.[] | select(.status == "completed") | "#\(.databaseId) | \(.workflowName // "-")\nresult: \(.conclusion // "-") | event: \(.event) | branch: \(.headBranch // "-")\nupdated: \(.updatedAt // "-")\ntitle: \(.displayTitle)\n"')"; \
 		echo "========================================"; \
-		echo "Active Runs"; \
-		echo "========================================"; \
-		if [ -n "$$ACTIVE_RUNS" ]; then \
-			printf "%s\n" "$$ACTIVE_RUNS"; \
-		else \
-			echo "No active runs found."; \
-		fi; \
-		echo ""; \
-		echo "========================================"; \
 		echo "Last 3 Completed Runs"; \
 		echo "========================================"; \
 		if [ -n "$$COMPLETED_RUNS" ]; then \
 			printf "%s\n" "$$COMPLETED_RUNS"; \
 		else \
 			echo "No completed runs found."; \
+		fi; \
+		echo ""; \
+		echo "========================================"; \
+		echo "Active Runs"; \
+		echo "========================================"; \
+		if [ -n "$$ACTIVE_RUNS" ]; then \
+			printf "%s\n" "$$ACTIVE_RUNS"; \
+		else \
+			echo "No active runs found."; \
 		fi; \
 		echo ""; \
 		if [ -z "$$ACTIVE_RUNS" ]; then \

@@ -21,6 +21,20 @@ const MYHW_KEYS = {
 };
 const MYHW_SOURCE_META_KEY = 'proton-pulse:myhw:source-meta';
 
+// Per-field origin tracking. This is separate from the single source-meta
+// blob so the UI can label each input individually, e.g. "CPU from default
+// system" vs "GPU manually edited". Values: 'default-system' | 'steam-paste'
+// | 'manual'. Missing entry = never set, show nothing.
+const MYHW_FIELD_ORIGINS_KEY = 'proton-pulse:myhw:field-origins';
+
+// Short, human-readable caption per origin. Keep these terse because they
+// render inline next to every field label
+const MYHW_ORIGIN_LABELS = {
+  'default-system': 'from default system',
+  'steam-paste':    'from pasted sysinfo',
+  'manual':         'edited',
+};
+
 // -- Supabase user_systems helpers --
 // Keep these next to MYHW_KEYS so everything hardware-related is grouped.
 // SUPABASE_URL and SUPABASE_ANON_KEY come from supabase-client.js (loaded
@@ -119,13 +133,25 @@ function setShowUsername(val) {
 // match is still useful (just fills whatever it finds).
 //
 // See https://help.steampowered.com/ for the panel that produces this text.
+// Treat a literal "Unknown" (case-insensitive) as "no data". The Deck's
+// sysinfo generator places this when it can't probe, and letting it slip
+// through makes the prefill boxes look populated when they really aren't
+function cleanUnknown(s) {
+  if (typeof s !== 'string') return '';
+  const t = s.trim();
+  return /^unknown$/i.test(t) ? '' : t;
+}
+
 function parseSteamSystemInfo(text) {
   const out = {};
   if (!text || typeof text !== 'string') return out;
 
   // CPU: "CPU Brand: AMD Ryzen 7 5800X3D 8-Core Processor"
   const cpu = text.match(/CPU Brand:\s*(.+)/i);
-  if (cpu) out.cpu = cpu[1].trim();
+  if (cpu) {
+    const v = cleanUnknown(cpu[1]);
+    if (v) out.cpu = v;
+  }
 
   // "Operating System Version:" is a header. The actual value sits on
   // the next line. Windows Steam quotes it ("Arch Linux"), the Linux
@@ -135,15 +161,33 @@ function parseSteamSystemInfo(text) {
   if (os) {
     // strip the "(64 bit)" tail first so any wrapping quotes end up
     // at the real end of the string, then peel those off
-    out.os = os[1].trim()
+    const v = cleanUnknown(os[1].trim()
       .replace(/\s*\(.*?\)\s*/g, '')
-      .replace(/^"(.*)"$/, '$1')
-      .trim();
+      .replace(/^"(.*)"$/, '$1'));
+    if (v) out.os = v;
+  }
+
+  // Board Manufacturer / Model / Form Factor from the "Computer Information:"
+  // block. These survive when everything else (glxinfo, cpuinfo) fails and
+  // are the cleanest way to recognize a Steam Deck (Valve Jupiter = LCD,
+  // Valve Galileo = OLED).
+  const vendorM = text.match(/Manufacturer:\s*(.+)/i);
+  if (vendorM) {
+    const v = cleanUnknown(vendorM[1]);
+    if (v) out.manufacturer = v;
+  }
+  const modelM  = text.match(/Model:\s*(.+)/i);
+  if (modelM) {
+    const v = cleanUnknown(modelM[1]);
+    if (v) out.model = v;
   }
 
   // Kernel name+version as one blob (matches Linux and SteamOS layouts)
   const kVer  = text.match(/Kernel Version:\s*(.+)/i);
-  if (kVer) out.kernel = kVer[1].trim();
+  if (kVer) {
+    const v = cleanUnknown(kVer[1]);
+    if (v) out.kernel = v;
+  }
 
   // Video card: Steam prints "Driver:  NVIDIA Corporation NVIDIA GeForce RTX 4070"
   // On the Deck in game mode the plugin may fall back to lspci (no X11),
@@ -153,7 +197,12 @@ function parseSteamSystemInfo(text) {
   if (gpu) {
     let g = gpu[1].trim();
     if (!/^unknown$/i.test(g)) {
-      g = g.replace(/^(NVIDIA Corporation|Advanced Micro Devices.*?Inc\.|AMD|Intel Corporation|Intel)\s+/i, '');
+      // Two-pass strip: drop the corp prefix first, then peel a trailing
+      // "NVIDIA " that often doubles up in Steam's output, e.g.
+      // "NVIDIA Corporation NVIDIA GeForce RTX 4070" -> "GeForce RTX 4070"
+      g = g
+        .replace(/^(NVIDIA Corporation|Advanced Micro Devices.*?Inc\.|AMD|Intel Corporation|Intel)\s+/i, '')
+        .replace(/^NVIDIA\s+/i, '');
       out.gpu = g;
     }
   }
@@ -202,23 +251,43 @@ function parseUploadedSystem(row) {
 
 function isGenericSystemLabel(label) {
   const s = (label || '').toString().trim().toLowerCase();
-  return !s || s === 'unknown' || s === 'unnamed' || s === 'system' || s === 'uploaded system';
+  return !s
+    || s === 'unknown'
+    || s === 'unknown system'
+    || s === 'unnamed'
+    || s === 'system'
+    || s === 'uploaded system';
 }
 
+// Build a short label. Priority order (matches the plugin's generateLabel so
+// the plugin-stored label and the self-heal path land in the same place):
+//   1) Steam Deck when board or APU identifies it
+//   2) "{OS}-{VENDOR}-{GPU_MODEL}" as a generic hardware-derived fallback
+//   3) 'Uploaded system' when there's literally nothing to go on
 function inferSystemLabel(rowOrParsed) {
   const parsed = rowOrParsed?.sysinfo_text !== undefined ? parseUploadedSystem(rowOrParsed) : (rowOrParsed || {});
-  const combined = [parsed.cpu, parsed.gpu, parsed.os, parsed.kernel].filter(Boolean).join(' ').toLowerCase();
-  if (/steam\s*deck|steamos|vangogh|amd custom apu 0405/.test(combined)) return 'Steam Deck';
 
-  const vendor = parsed.gpuVendor || inferGpuVendor(parsed.gpu || '');
-  const vendorLabel = { nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' }[vendor] || '';
+  // Deck detection — board first, then chipset hints in the raw text. Board
+  // match gets us LCD vs OLED, chipset-only falls back to the generic label.
+  const manufacturer = (parsed.manufacturer || '').trim();
+  const model        = (parsed.model || '').trim();
+  const deckByBoard  = /^valve$/i.test(manufacturer) && /^(jupiter|galileo)$/i.test(model);
+  const combined     = [parsed.cpu, parsed.gpu, parsed.os, parsed.kernel].filter(Boolean).join(' ').toLowerCase();
+  const deckByChips  = /vangogh|amd custom apu 0405/.test(combined);
+  if (deckByBoard || deckByChips) {
+    if (/galileo/i.test(model)) return 'Steam Deck OLED';
+    if (/jupiter/i.test(model)) return 'Steam Deck LCD';
+    return 'Steam Deck';
+  }
+
+  // Dash-joined fallback: OS-VENDOR-GPU. Each piece is optional so a machine
+  // with only a parsed OS still gets a useful label (and no stray dashes).
   const osBase = (parsed.os || '').trim().split(/\s+/)[0];
-
-  if (vendorLabel && osBase) return `${vendorLabel} ${osBase} system`;
-  if (/ryzen/i.test(parsed.cpu || '')) return 'AMD Ryzen system';
-  if (/intel/i.test(parsed.cpu || '')) return 'Intel system';
-  if (vendorLabel) return `${vendorLabel} system`;
-  if (osBase) return `${osBase} system`;
+  const vendorKey = parsed.gpuVendor || inferGpuVendor(parsed.gpu || '');
+  const vendorLabel = { nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' }[vendorKey] || '';
+  const gpuModel = (parsed.gpu || '').trim();
+  const parts = [osBase, vendorLabel, gpuModel].filter(Boolean);
+  if (parts.length) return parts.join('-');
   return 'Uploaded system';
 }
 
@@ -242,6 +311,30 @@ function setMyHwSourceMeta(meta) {
     return;
   }
   localStorage.setItem(MYHW_SOURCE_META_KEY, JSON.stringify(meta));
+}
+
+function getMyHwFieldOrigins() {
+  try {
+    const raw = localStorage.getItem(MYHW_FIELD_ORIGINS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setMyHwFieldOrigins(origins) {
+  if (!origins || Object.keys(origins).length === 0) {
+    localStorage.removeItem(MYHW_FIELD_ORIGINS_KEY);
+    return;
+  }
+  localStorage.setItem(MYHW_FIELD_ORIGINS_KEY, JSON.stringify(origins));
+}
+
+function setMyHwFieldOrigin(field, origin) {
+  const cur = getMyHwFieldOrigins();
+  if (!origin) delete cur[field];
+  else cur[field] = origin;
+  setMyHwFieldOrigins(cur);
 }
 
 // Small helpers pulled out of the page-init IIFE so they can be unit-tested.
@@ -403,24 +496,54 @@ async function fetchMyUserConfigs(clientId, session) {
     myhwSourceBody.textContent = 'These values were entered directly in this browser and will pre-fill the web submit form.';
   }
 
+  // Map the meta.type we use in source-meta over to the short key used for
+  // per-field origin badges. steam-paste and uploaded-default both write all
+  // fields at once, so every field written inherits that type.
+  function fieldOriginKeyFor(sourceMeta) {
+    if (!sourceMeta) return null;
+    if (sourceMeta.type === 'uploaded-default') return 'default-system';
+    if (sourceMeta.type === 'steam-paste')      return 'steam-paste';
+    return null;
+  }
+
+  function renderMyHwFieldOrigins() {
+    const origins = getMyHwFieldOrigins();
+    document.querySelectorAll('[data-myhw-origin]').forEach((el) => {
+      const field  = el.dataset.myhwOrigin;
+      const origin = origins[field];
+      const caption = origin ? MYHW_ORIGIN_LABELS[origin] : '';
+      el.textContent = caption || '';
+      if (caption) el.setAttribute('data-origin', origin);
+      else el.removeAttribute('data-origin');
+    });
+  }
+
   function setLocalHardwareFromParsed(parsed, sourceMeta) {
     suppressMyHwSourceTracking = true;
     try {
+      const originKey = fieldOriginKeyFor(sourceMeta);
+      // Reset ALL origins before writing, so fields that aren't in this parsed
+      // batch don't keep a stale "from default system" label
+      const nextOrigins = {};
       for (const [field, val] of Object.entries(parsed)) {
         const el = myhwInputs[field];
         if (!el) continue;
         el.value = val;
         saveMyHwField(field, val);
+        if (originKey) nextOrigins[field] = originKey;
       }
+      setMyHwFieldOrigins(nextOrigins);
       setMyHwSourceMeta(sourceMeta);
       renderMyHwSource();
+      renderMyHwFieldOrigins();
     } finally {
       suppressMyHwSourceTracking = false;
     }
   }
 
-  function markLocalHardwareEdited() {
+  function markLocalHardwareEdited(field) {
     if (suppressMyHwSourceTracking) return;
+    if (field) setMyHwFieldOrigin(field, 'manual');
     const prev = getMyHwSourceMeta();
     if (!prev) {
       setMyHwSourceMeta({ type: 'manual' });
@@ -432,6 +555,7 @@ async function fetchMyUserConfigs(clientId, session) {
       });
     }
     renderMyHwSource();
+    renderMyHwFieldOrigins();
   }
 
   function showUser(user) {
@@ -458,6 +582,7 @@ async function fetchMyUserConfigs(clientId, session) {
     if (hwOsInput)   hwOsInput.value   = localStorage.getItem(HW_OS_KEY)  || '';
     loadMyHardware();
     renderMyHwSource();
+    renderMyHwFieldOrigins();
 
     signedOut.hidden = true;
     signedIn.hidden  = false;
@@ -517,11 +642,12 @@ async function fetchMyUserConfigs(clientId, session) {
     localStorage.setItem(HW_OS_KEY, hwOsInput.value.trim());
   });
 
-  // Save each My-hardware field as it changes
+  // Save each My-hardware field as it changes, and flag it as manually edited
+  // so the per-field origin badge flips to "edited"
   for (const [field, el] of Object.entries(myhwInputs)) {
     el?.addEventListener('change', () => {
       saveMyHwField(field, el.value);
-      markLocalHardwareEdited();
+      markLocalHardwareEdited(field);
     });
   }
   myhwTabButtons.forEach((btn) => {

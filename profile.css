@@ -96,6 +96,42 @@
   letter-spacing: 0.08em;
   color: var(--muted);
   margin-bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Per-field origin pill in the My Hardware / Web prefill pane. Empty by
+   default so untagged fields don't get a stray border. profile.js fills
+   textContent + data-origin when it knows where a value came from. */
+.profile-field-origin {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  line-height: 1.4;
+}
+.profile-field-origin:empty { display: none; }
+.profile-field-origin[data-origin="default-system"] {
+  color: #9ecbe8;
+  border-color: rgba(74,159,208,0.35);
+  background: rgba(74,159,208,0.1);
+}
+.profile-field-origin[data-origin="steam-paste"] {
+  color: #a9d7b6;
+  border-color: rgba(76,175,128,0.35);
+  background: rgba(76,175,128,0.1);
+}
+.profile-field-origin[data-origin="manual"] {
+  color: #d4b36a;
+  border-color: rgba(212,168,67,0.4);
+  background: rgba(212,168,67,0.1);
 }
 .profile-field-value {
   display: flex;
