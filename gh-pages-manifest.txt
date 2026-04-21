@@ -2,6 +2,7 @@
 # For intentionally excluded files, see gh-pages-exclude-manifest.txt.
 app.html
 app.js
+app-2ea49be02.js
 app.css
 index.html
 index.js
