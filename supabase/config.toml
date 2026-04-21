@@ -1,0 +1,11 @@
+[functions.plugin-link-start]
+verify_jwt = false
+
+[functions.plugin-link-status]
+verify_jwt = false
+
+[functions.plugin-link-unlink]
+verify_jwt = false
+
+[functions.user-system-upload]
+verify_jwt = false

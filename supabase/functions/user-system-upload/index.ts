@@ -19,6 +19,26 @@ function requireString(value: unknown, name: string): string {
   return value;
 }
 
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const parts = ["message", "error", "details", "hint", "code"]
+      .map((key) => {
+        const value = (error as Record<string, unknown>)[key];
+        return typeof value === "string" && value.trim() ? `${key}: ${value}` : null;
+      })
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join("; ");
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return Object.prototype.toString.call(error);
+    }
+  }
+  return String(error);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -88,7 +108,7 @@ Deno.serve(async (req: Request) => {
 
     return Response.json({ ok: true, inserted, isDefault }, { headers: corsHeaders });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatUnknownError(error);
     const status = message.endsWith(" is required") ? 400 : 500;
     return Response.json({ error: message }, { status, headers: corsHeaders });
   }
