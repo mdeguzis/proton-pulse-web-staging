@@ -90,6 +90,12 @@ jobs:
             official-data/reports \
             /tmp/protondb-output
 
+      - name: Seed official dump provenance metadata
+        run: |
+          uv run python scripts/split_reports.py seed-official-metadata \
+            official-data/reports \
+            /tmp/protondb-output
+
       - name: Backfill Missing Apps
         run: |
           uv run python scripts/split_reports.py backfill \
