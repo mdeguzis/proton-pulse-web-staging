@@ -229,9 +229,14 @@ code {
 }
 .sidebar-links a .nav-icon {
   width: 16px;
-  text-align: center;
-  font-size: 0.9rem;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+.sidebar-links a .nav-icon svg {
+  display: block;
 }
 
 .sidebar-note {
