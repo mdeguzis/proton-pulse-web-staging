@@ -66,3 +66,6 @@ pnpm-lock.yaml
 
 # Supabase local CLI state
 supabase/.temp/
+
+# Generated analysis output
+scripts/scoring_analysis_results.json

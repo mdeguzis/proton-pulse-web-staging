@@ -465,6 +465,10 @@
 }
 .sf-row input:focus, .sf-row select:focus, .sf-row textarea:focus { border-color: var(--accent); }
 .sf-row textarea { resize: vertical; }
+.sf-row--check { flex-direction: column; gap: 3px; }
+.sf-check-label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 0.76rem; cursor: pointer; width: auto; }
+.sf-check-label input[type="checkbox"] { width: auto; flex: none; cursor: pointer; }
+.sf-check-hint { font-size: 0.68rem; color: var(--muted); padding-left: 1px; }
 .hub-links {
   display: flex;
   flex-wrap: wrap;
@@ -795,6 +799,11 @@ a.card:hover { text-decoration: none; }
   background: rgba(100,180,100,0.1);
   border-color: rgba(100,180,100,0.25);
   color: #7ecf7e;
+}
+.source-badge.owned-game {
+  background: rgba(80,200,120,0.12);
+  border-color: rgba(80,200,120,0.30);
+  color: #5ec87a;
 }
 
 /* detail expand */
