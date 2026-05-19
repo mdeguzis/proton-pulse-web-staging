@@ -20,7 +20,10 @@ build:
 	else \
 		cp app.js "$$NEWFILE"; \
 		sed -i "s|$$OLD|$$NEWFILE|g" app.html; \
-		echo "Built $$NEWFILE and updated app.html (was $$OLD)."; \
+		if ! grep -qxF "$$NEWFILE" gh-pages-manifest.txt; then \
+			echo "$$NEWFILE" >> gh-pages-manifest.txt; \
+		fi; \
+		echo "Built $$NEWFILE, updated app.html and gh-pages-manifest.txt (was $$OLD)."; \
 	fi
 
 help:
