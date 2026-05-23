@@ -151,103 +151,95 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
         if app_id in app_years:
             sample_entries.append(f'<a href="data/{app_id}/latest.json">{name}</a> ({app_id})')
 
+    # Page-specific styles. Site-wide identity comes from site.css; this block only
+    # adds what data-index needs (grid rows, detail split, json tinting). All colors
+    # ride the same --accent / --green-hi / --mono variables for visual consistency.
+    page_style = """
+    h1 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 0.4em; }
+    .meta { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.04em; margin-bottom: 1em; }
+    .popular { margin-bottom: 1.4em; }
+    .popular .label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 6px; }
+    .popular a { color: var(--accent); }
+    .filter-row { margin: 14px 0 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    #index-filter { flex: 0 1 380px; padding: 8px 12px; background: rgba(11,17,22,0.6); border: 1px solid var(--border2); color: var(--text); font-size: 0.88rem; font-family: inherit; }
+    #index-filter:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    #index-filter-help { font-size: 0.78rem; color: var(--muted); margin: 0; }
+    .pager { margin: 1em 0; display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 0.8rem; }
+    .pager button { padding: 6px 14px; background: rgba(11,17,22,0.6); color: var(--text); border: 1px solid var(--border2); cursor: pointer; font-family: inherit; font-size: 0.8rem; }
+    .pager button:hover:not(:disabled) { background: var(--s2); border-color: var(--accent); }
+    .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #index-page-info { color: var(--muted); }
+    ul#index-results { list-style: none; padding: 0; margin: 12px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 8px; }
+    ul#index-results > li { display: contents; }
+    ul#index-results a.row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(180deg, rgba(27,40,56,0.5), rgba(11,17,22,0.4)); border: 1px solid var(--border); color: var(--text); transition: border-color .12s, background .12s, transform .12s, box-shadow .12s; }
+    ul#index-results a.row:hover { border-color: var(--accent); background: linear-gradient(180deg, rgba(102,192,244,0.08), rgba(11,17,22,0.5)); box-shadow: 0 0 18px -6px var(--accent-glow); transform: translateY(-1px); text-decoration: none; }
+    ul#index-results .appid { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); min-width: 80px; flex-shrink: 0; }
+    ul#index-results .title { flex: 1; color: var(--text); }
+    ul#index-results .years { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
+
+    /* detail view: master/detail split with years on the left, JSON on the right */
+    .detail-view { display: none; }
+    .detail-view.is-open { display: block; }
+    .grid-view.is-hidden { display: none; }
+    .detail-head { display: flex; align-items: center; gap: 14px; margin: 16px 0; padding: 14px 18px; background: linear-gradient(180deg, rgba(27,40,56,0.55), rgba(11,17,22,0.45)); border: 1px solid var(--border); border-left: 3px solid var(--accent); flex-wrap: wrap; }
+    .detail-head .back { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(11,17,22,0.55); border: 1px solid var(--border2); color: var(--muted); font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+    .detail-head .back:hover { color: var(--accent-hi); border-color: var(--accent); text-decoration: none; }
+    .detail-title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; font-size: 1.2rem; color: var(--strong); margin: 0; }
+    .detail-appid { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); letter-spacing: 0.06em; }
+    .detail-spacer { flex: 1; }
+    .detail-split { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: stretch; min-height: 500px; }
+    @media (max-width: 760px) { .detail-split { grid-template-columns: 1fr; } }
+    .year-list { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: rgba(11,17,22,0.4); border: 1px solid var(--border); }
+    .year-list .label { font-family: var(--mono); font-size: 0.66rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 6px; }
+    .year-list button { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: 1px solid transparent; border-left: 2px solid var(--border2); color: var(--muted); font-family: var(--mono); font-size: 0.86rem; text-align: left; cursor: pointer; }
+    .year-list button:hover { color: var(--text); background: rgba(102,192,244,0.05); border-left-color: var(--accent-soft); }
+    .year-list button.is-active { color: var(--accent-hi); background: var(--accent-soft); border-left-color: var(--accent); box-shadow: inset 2px 0 8px -2px var(--accent-glow); }
+    .year-list button .badge { margin-left: auto; font-family: var(--mono); font-size: 0.62rem; color: var(--green-hi); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+    .json-pane { display: flex; flex-direction: column; background: rgba(11,17,22,0.55); border: 1px solid var(--border); overflow: hidden; }
+    .json-pane-head { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--s1); font-family: var(--mono); font-size: 0.78rem; }
+    .json-pane-head .path { color: var(--accent); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .json-pane-head .status { color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.7rem; }
+    .json-pane-head .copy { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 2px 8px; font-family: var(--mono); font-size: 0.72rem; cursor: pointer; }
+    .json-pane-head .copy:hover { color: var(--accent-hi); border-color: var(--accent); }
+    .json-pane pre { flex: 1; margin: 0; padding: 14px 18px; overflow: auto; font-family: var(--mono); font-size: 0.78rem; line-height: 1.6; color: var(--text); max-height: 70vh; }
+    .json-pane .tok-k { color: var(--accent-hi); }
+    .json-pane .tok-s { color: var(--green-hi); }
+    .json-pane .tok-n { color: #ff9d4d; }
+    .json-pane .tok-b { color: var(--magenta); }
+    .json-pane .tok-nl { color: var(--muted); }
+"""
+
     lines = [
         "<!DOCTYPE html>",
         '<html lang="en">',
         "<head>",
         '  <meta charset="utf-8">',
-        '  <meta name="color-scheme" content="light dark">',
-        "  <title>proton-pulse-data index</title>",
-        "  <style>",
-        "    :root {",
-        "      color-scheme: light dark;",
-        "      --bg: #f5f7fb;",
-        "      --panel: #ffffff;",
-        "      --text: #172033;",
-        "      --muted: #5c677d;",
-        "      --link: #0f62fe;",
-        "      --border: #d9e0ee;",
-        "      --shadow: rgba(0, 0, 0, 0.08);",
-        "      --details-bg: #eef1f6;",
-        "    }",
-        "    @media (prefers-color-scheme: dark) {",
-        "      :root {",
-        "        --bg: #1a1a2e;",
-        "        --panel: #16213e;",
-        "        --text: #e0e0e0;",
-        "        --muted: #7a9bb5;",
-        "        --link: #5dade2;",
-        "        --border: #333;",
-        "        --shadow: rgba(0, 0, 0, 0.3);",
-        "        --details-bg: #1a2744;",
-        "      }",
-        "    }",
-        "    * { box-sizing: border-box; }",
-        "    body {",
-        "      margin: 0;",
-        "      padding: 2rem;",
-        "      background: var(--bg);",
-        "      color: var(--text);",
-        "      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;",
-        "    }",
-        "    main {",
-        "      max-width: 72rem;",
-        "      margin: 0 auto;",
-        "      padding: 1.5rem;",
-        "      background: var(--panel);",
-        "      border: 1px solid var(--border);",
-        "      border-radius: 18px;",
-        "      box-shadow: 0 18px 44px var(--shadow);",
-        "    }",
-        "    h1, h2 { line-height: 1.15; }",
-        "    a { color: var(--link); }",
-        "    p { color: var(--muted); }",
-        "    ul { padding-left: 1.25rem; }",
-        "    details {",
-        "      padding: 0.45rem 0.7rem;",
-        "      background: var(--details-bg);",
-        "      border: 1px solid var(--border);",
-        "      border-radius: 12px;",
-        "    }",
-        "    details + details, li + li { margin-top: 0.5rem; }",
-        "    summary { cursor: pointer; font-weight: 600; }",
-        "    .filter-row { margin: 1rem 0 1.25rem; }",
-        "    #index-filter {",
-        "      width: min(100%, 32rem);",
-        "      padding: 0.75rem 0.9rem;",
-        "      border-radius: 12px;",
-        "      border: 1px solid var(--border);",
-        "      background: var(--details-bg);",
-        "      color: var(--text);",
-        "      font: inherit;",
-        "    }",
-        "    #index-filter-help { margin-top: 0.5rem; font-size: 0.95rem; }",
-        "    .is-hidden { display: none; }",
-        "    @media (max-width: 640px) {",
-        "      body { padding: 1rem; }",
-        "      main { padding: 1rem; }",
-        "    }",
-        "  </style>",
+        '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+        '  <meta name="color-scheme" content="dark">',
+        "  <title>Data Index - Proton Pulse</title>",
         '  <link rel="stylesheet" href="site.css">',
+        f'  <style>{page_style}</style>',
         "</head>",
         "<body>",
         # topbar.js injects the shared banner + nav at body start
         '<script src="topbar.js"></script>',
         '<div class="main-content"><div class="main-inner">',
-        "<main>",
-        "<h1>proton-pulse-data index</h1>",
-        f"<p><strong>{len(sorted_app_ids)}</strong> games tracked. Monthly-updated community reports.</p>",
+
+        # ── grid view ──
+        '<section class="grid-view">',
+        "<h1>Data Index</h1>",
+        '<p class="meta">// Per-game JSON reports under <code>/data/{appId}/</code></p>',
+        f'<p class="meta"><strong>{len(sorted_app_ids):,}</strong> games tracked &middot; monthly-updated community reports</p>',
     ]
 
     if sample_entries:
-        lines.append("<h2>Popular titles</h2>")
-        lines.append("<p>" + " &middot; ".join(sample_entries) + "</p>")
+        lines.append('<div class="popular"><div class="label">Popular titles</div>')
+        lines.append('<p>' + " &middot; ".join(sample_entries) + '</p></div>')
 
     lines += [
-        "<h2>All games (by app ID)</h2>",
         '<div class="filter-row">',
-        '  <input id="index-filter" type="search" placeholder="Jump to an App ID or title…" autocomplete="off">',
-        '  <p id="index-filter-help">Type to narrow the list. The filter is saved in the URL.</p>',
+        '  <input id="index-filter" type="search" placeholder="Filter by title or App ID..." autocomplete="off">',
+        '  <p id="index-filter-help">Filter is saved in the URL.</p>',
         "</div>",
         '<div class="pager">',
         '  <button id="index-prev" type="button">Previous</button>',
@@ -255,6 +247,27 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
         '  <button id="index-next" type="button">Next</button>',
         "</div>",
         '<ul id="index-results"></ul>',
+        "</section>",
+
+        # ── detail view (hidden until a tile is clicked) ──
+        '<section class="detail-view" id="detail-view">',
+        '  <div class="detail-head">',
+        '    <a class="back" href="#" id="detail-back">&larr; Back to index</a>',
+        '    <h2 class="detail-title" id="detail-title">—</h2>',
+        '    <span class="detail-appid" id="detail-appid"></span>',
+        "  </div>",
+        '  <div class="detail-split">',
+        '    <div class="year-list" id="year-list"><div class="label">Year files</div></div>',
+        '    <div class="json-pane">',
+        '      <div class="json-pane-head">',
+        '        <span class="path" id="json-path">/data/—/—.json</span>',
+        '        <span class="status" id="json-status">Loading…</span>',
+        '        <button class="copy" id="json-copy" type="button">Copy</button>',
+        "      </div>",
+        '      <pre id="json-content"></pre>',
+        "    </div>",
+        "  </div>",
+        "</section>",
     ]
 
     js_entries = []
@@ -267,69 +280,194 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
     now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines += [
         f"<script>const indexEntries=[{','.join(js_entries)}];</script>",
-        f"<p>Generated: {now}</p>",
-        "<script>",
-        "const indexFilter=document.getElementById('index-filter');",
-        "const indexFilterHelp=document.getElementById('index-filter-help');",
-        "const indexResults=document.getElementById('index-results');",
-        "const indexPrev=document.getElementById('index-prev');",
-        "const indexNext=document.getElementById('index-next');",
-        "const indexPageInfo=document.getElementById('index-page-info');",
-        "const PAGE_SIZE=200;",
-        "let filteredEntries=indexEntries;",
-        "let currentPage=0;",
-        "function readIndexFilter(){",
-        "  const params=new URLSearchParams(window.location.search);",
-        "  return params.get('q')||'';",
-        "}",
-        "function writeIndexFilter(value){",
-        "  const params=new URLSearchParams(window.location.search);",
-        "  if(value) params.set('q', value); else params.delete('q');",
-        "  const query=params.toString();",
-        "  const next=window.location.pathname+(query?`?${query}`:'');",
-        "  window.history.replaceState(null,'',next);",
-        "}",
-        "function renderIndexPage(){",
-        "  const totalPages=Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));",
-        "  currentPage=Math.min(Math.max(0, currentPage), totalPages - 1);",
-        "  const start=currentPage * PAGE_SIZE;",
-        "  const slice=filteredEntries.slice(start, start + PAGE_SIZE);",
-        "  indexResults.innerHTML=slice.map(([appId, title, display, years])=>{",
-        "    const latestHref=`data/${appId}/latest.json`;",
-        "    const yearRows=years.map((year)=>`<li><a href=\"data/${appId}/${year}.json\">${year}.json</a></li>`).join('');",
-        "    return `<li><details><summary>${display}</summary><ul><li><a href=\"${latestHref}\"><strong>latest.json</strong></a></li>${yearRows}</ul></details></li>`;",
-        "  }).join('');",
-        "  indexPageInfo.textContent=filteredEntries.length",
-        "    ? `Showing ${start + 1}–${Math.min(start + slice.length, filteredEntries.length)} of ${filteredEntries.length}`",
-        "    : 'No matching apps';",
-        "  indexPrev.disabled=currentPage===0;",
-        "  indexNext.disabled=currentPage>=totalPages - 1 || filteredEntries.length===0;",
-        "}",
-        "function applyIndexFilter(){",
-        "  const raw=indexFilter.value.trim();",
-        "  const query=raw.toLowerCase();",
-        "  filteredEntries=!query",
-        "    ? indexEntries",
-        "    : indexEntries.filter(([appId, title, display])=>{",
-        "        const haystack=`${appId} ${title} ${display}`.toLowerCase();",
-        "        return haystack.includes(query);",
-        "      });",
-        "  currentPage=0;",
-        "  indexFilterHelp.textContent=query",
-        "    ? `${filteredEntries.length} matching app${filteredEntries.length===1?'':'s'}`",
-        "    : 'Type to narrow the list. The filter is saved in the URL.';",
-        "  writeIndexFilter(raw);",
-        "  renderIndexPage();",
-        "}",
-        "indexFilter.value=readIndexFilter();",
-        "indexFilter.addEventListener('input', applyIndexFilter);",
-        "indexPrev.addEventListener('click', ()=>{ if(currentPage>0){ currentPage-=1; renderIndexPage(); } });",
-        "indexNext.addEventListener('click', ()=>{ const totalPages=Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE)); if(currentPage<totalPages-1){ currentPage+=1; renderIndexPage(); } });",
-        "applyIndexFilter();",
-        "</script>",
-        "</main>",
-        # close the .main-content / .main-inner wrappers opened above
-        "</div></div>",
+        f'<p class="meta" style="margin-top:24px">// Generated: {now}</p>',
+        "</div></div>",  # close .main-content / .main-inner
+
+        # The behavior script is large enough that splitting it into one string per
+        # line bloats the file -- emit it as a single <script> block instead.
+        """<script>
+(function () {
+  // ---- Grid view rendering with pagination ----
+  const PAGE_SIZE = 200;
+  const indexFilter = document.getElementById('index-filter');
+  const indexFilterHelp = document.getElementById('index-filter-help');
+  const indexResults = document.getElementById('index-results');
+  const indexPrev = document.getElementById('index-prev');
+  const indexNext = document.getElementById('index-next');
+  const indexPageInfo = document.getElementById('index-page-info');
+  let filteredEntries = indexEntries;
+  let currentPage = 0;
+
+  function readQuery() {
+    return new URLSearchParams(location.search).get('q') || '';
+  }
+  function writeQuery(value) {
+    const params = new URLSearchParams(location.search);
+    if (value) params.set('q', value); else params.delete('q');
+    const q = params.toString();
+    history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+  }
+
+  function renderPage() {
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+    currentPage = Math.min(Math.max(0, currentPage), totalPages - 1);
+    const start = currentPage * PAGE_SIZE;
+    const slice = filteredEntries.slice(start, start + PAGE_SIZE);
+    indexResults.innerHTML = slice.map(([appId, title, _display, years]) => {
+      const yearStr = years.join(' ');
+      const safeTitle = (title || appId).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+      return `<li><a class="row" href="#/${appId}">` +
+             `<span class="appid">${appId}</span>` +
+             `<span class="title">${safeTitle}</span>` +
+             `<span class="years">${yearStr}</span>` +
+             `</a></li>`;
+    }).join('');
+    indexPageInfo.textContent = filteredEntries.length
+      ? `Showing ${start + 1}–${Math.min(start + slice.length, filteredEntries.length)} of ${filteredEntries.length.toLocaleString()}`
+      : 'No matching apps';
+    indexPrev.disabled = currentPage === 0;
+    indexNext.disabled = currentPage >= totalPages - 1 || filteredEntries.length === 0;
+  }
+
+  function applyFilter() {
+    const raw = indexFilter.value.trim();
+    const q = raw.toLowerCase();
+    filteredEntries = !q ? indexEntries : indexEntries.filter(([appId, title, display]) => {
+      return (`${appId} ${title} ${display}`).toLowerCase().includes(q);
+    });
+    currentPage = 0;
+    indexFilterHelp.textContent = q
+      ? `${filteredEntries.length.toLocaleString()} matching app${filteredEntries.length === 1 ? '' : 's'}`
+      : 'Filter is saved in the URL.';
+    writeQuery(raw);
+    renderPage();
+  }
+
+  indexFilter.value = readQuery();
+  indexFilter.addEventListener('input', applyFilter);
+  indexPrev.addEventListener('click', () => { if (currentPage > 0) { currentPage--; renderPage(); } });
+  indexNext.addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+    if (currentPage < totalPages - 1) { currentPage++; renderPage(); }
+  });
+  applyFilter();
+
+  // ---- Detail view: master/detail split with real JSON fetch ----
+  const gridView = document.querySelector('.grid-view');
+  const detailView = document.getElementById('detail-view');
+  const titleEl = document.getElementById('detail-title');
+  const appidEl = document.getElementById('detail-appid');
+  const yearListEl = document.getElementById('year-list');
+  const pathEl = document.getElementById('json-path');
+  const statusEl = document.getElementById('json-status');
+  const contentEl = document.getElementById('json-content');
+  const copyBtn = document.getElementById('json-copy');
+  const backBtn = document.getElementById('detail-back');
+
+  function entryFor(appId) {
+    return indexEntries.find(e => e[0] === appId);
+  }
+
+  function jsonHtml(value) {
+    const json = JSON.stringify(value, null, 2);
+    return json
+      .replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+      .replace(/("(\\\\u[a-fA-F0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(\\.\\d*)?([eE][+\\-]?\\d+)?)/g, function (m) {
+        let cls = 'tok-n';
+        if (/^"/.test(m)) cls = /:$/.test(m) ? 'tok-k' : 'tok-s';
+        else if (/^(true|false)$/.test(m)) cls = 'tok-b';
+        else if (/null/.test(m)) cls = 'tok-nl';
+        return '<span class="' + cls + '">' + m + '</span>';
+      });
+  }
+
+  let activeFetch = null;
+  function loadYear(appId, file) {
+    pathEl.textContent = '/data/' + appId + '/' + file;
+    statusEl.textContent = 'loading';
+    contentEl.textContent = '';
+    const url = 'data/' + appId + '/' + file;
+    const token = Symbol();
+    activeFetch = token;
+    fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (activeFetch !== token) return; // a newer click superseded us
+        statusEl.textContent = 'ok';
+        contentEl.innerHTML = jsonHtml(data);
+      })
+      .catch(err => {
+        if (activeFetch !== token) return;
+        statusEl.textContent = 'error';
+        contentEl.textContent = 'Failed to load ' + url + ' (' + err + ')';
+      });
+  }
+
+  function openDetail(appId, year) {
+    const entry = entryFor(appId);
+    if (!entry) { closeDetail(); return; }
+    const [, title, , years] = entry;
+    const selected = year && years.includes(year) ? year : years[years.length - 1];
+
+    gridView.classList.add('is-hidden');
+    detailView.classList.add('is-open');
+    titleEl.textContent = title || appId;
+    appidEl.textContent = '// ' + appId;
+
+    yearListEl.innerHTML = '<div class="label">Year files</div>' +
+      '<button data-file="latest.json" class="' + (selected === years[years.length - 1] ? 'is-active' : '') + '">' +
+        '<span class="file">latest.json</span><span class="badge">latest</span></button>' +
+      years.slice().reverse().map(y => {
+        const file = y + '.json';
+        const active = y === selected;
+        return '<button data-year="' + y + '" data-file="' + file + '" class="' + (active ? 'is-active' : '') + '">' +
+               '<span class="file">' + file + '</span></button>';
+      }).join('');
+
+    yearListEl.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        yearListEl.querySelectorAll('button').forEach(x => x.classList.remove('is-active'));
+        b.classList.add('is-active');
+        const y = b.dataset.year;
+        if (y) history.replaceState(null, '', '#/' + appId + '/' + y);
+        else history.replaceState(null, '', '#/' + appId);
+        loadYear(appId, b.dataset.file);
+      });
+    });
+
+    // Default load: the most recent year (latest.json points to the same content)
+    loadYear(appId, selected + '.json');
+  }
+
+  function closeDetail() {
+    gridView.classList.remove('is-hidden');
+    detailView.classList.remove('is-open');
+    activeFetch = null;
+  }
+
+  backBtn.addEventListener('click', e => {
+    e.preventDefault();
+    history.pushState(null, '', location.pathname + location.search);
+    closeDetail();
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const txt = contentEl.textContent;
+    navigator.clipboard?.writeText(txt).then(() => {
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => copyBtn.textContent = old, 1200);
+    });
+  });
+
+  function routeFromHash() {
+    const m = location.hash.match(/^#\\/(\\d+)(?:\\/(\\d{4}))?/);
+    if (m) openDetail(m[1], m[2]);
+    else closeDetail();
+  }
+  window.addEventListener('hashchange', routeFromHash);
+  routeFromHash();
+})();
+</script>""",
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>',
         '<script src="supabase-client.js"></script>',
         "</body>",
