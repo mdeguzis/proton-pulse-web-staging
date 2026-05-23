@@ -1392,56 +1392,5 @@ function getPluginLinkCodeFromLocation(loc = window.location) {
 
   void refreshMyConfigs();
 
-  // ── Topbar auth chip ──────────────────────────────────────────────────────
-  (function() {
-    const loginBtn  = document.getElementById('google-login-btn');
-    const userMenu  = document.getElementById('google-user-menu');
-    const avatarEl  = document.getElementById('google-avatar');
-    const nameEl    = document.getElementById('google-username');
-    const menuBtn   = document.getElementById('google-menu-btn');
-    const dropdown  = document.getElementById('google-dropdown');
-    const logoutBtn = document.getElementById('google-logout-btn');
-
-    SupaAuth.onStateChange(({ user }) => {
-      if (user) {
-        loginBtn.hidden    = true;
-        userMenu.hidden    = false;
-        avatarEl.src       = user.user_metadata?.avatar_url || '';
-        avatarEl.alt       = user.user_metadata?.name || user.email || '';
-        nameEl.textContent = user.user_metadata?.name || user.email || '';
-      } else {
-        loginBtn.hidden = false;
-        userMenu.hidden = true;
-        if (dropdown) dropdown.classList.remove('open');
-      }
-    });
-
-    loginBtn?.addEventListener('click', () => {
-      window.location.href = SupaAuth.buildLoginPageUrl(window.location.href);
-    });
-    logoutBtn?.addEventListener('click', () => { dropdown.classList.remove('open'); SupaAuth.logout(); });
-    userMenu?.addEventListener('click', e => {
-      if (dropdown.contains(e.target)) return;
-      dropdown.classList.toggle('open');
-    });
-
-    const chip = document.getElementById('gh-auth-chip');
-    document.addEventListener('click', e => {
-      if (chip && chip.contains(e.target)) return;
-      if (dropdown) dropdown.classList.remove('open');
-    });
-  })();
-
-  // ── Sidebar toggle ────────────────────────────────────────────────────────
-  const toggle  = document.getElementById('sidebar-toggle');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  toggle?.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
-  });
-  overlay?.addEventListener('click', () => {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-  });
+  // Topbar auth chip + mobile nav are now wired in topbar.js (shared across all pages)
 })();

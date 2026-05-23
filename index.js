@@ -1,40 +1,5 @@
-// Sidebar + search
-(function() {
-  var toggle  = document.getElementById('sidebar-toggle');
-  var sidebar = document.getElementById('sidebar');
-  var overlay = document.getElementById('sidebar-overlay');
-
-  function closeSidebar() {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-  }
-
-  toggle.addEventListener('click', function() {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
-  });
-
-  overlay.addEventListener('click', closeSidebar);
-
-  // close sidebar when a nav link is clicked (mobile)
-  sidebar.querySelectorAll('a').forEach(function(a) {
-    a.addEventListener('click', closeSidebar);
-  });
-
-  // Search: navigate to app.html (avoids CORS issues with Steam storesearch API on GitHub Pages)
-  var searchInput = document.getElementById('search');
-  searchInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      var q = searchInput.value.trim();
-      if (!q) return;
-      if (/^\d+$/.test(q)) {
-        window.location.href = 'app.html#/app/' + q;
-      } else {
-        window.location.href = 'app.html?q=' + encodeURIComponent(q);
-      }
-    }
-  });
-})();
+// Homepage-only logic. Universal nav chrome (banner, nav row, mobile drawer,
+// search dropdown, auth indicator) lives in topbar.js.
 
 // Pulse report count. Uses HEAD + Content-Range so we don't care whether
 // PostgREST returns the aggregate in the body; the header is always there
@@ -56,41 +21,47 @@
   } catch (_) {}
 })();
 
-// Steam auth chip
-(function initSteamAuth() {
-  const loginBtn  = document.getElementById('google-login-btn');
-  const userMenu  = document.getElementById('google-user-menu');
-  const avatarEl  = document.getElementById('google-avatar');
-  const nameEl    = document.getElementById('google-username');
-  const dropdown  = document.getElementById('google-dropdown');
-  const logoutBtn = document.getElementById('google-logout-btn');
+// Coverage stats. Prefers /coverage-summary.json (emitted by the data pipeline
+// in scripts/pipeline/finalize.py:generate_coverage_report) since it's tiny
+// and structured. Falls back to scraping coverage.html if the JSON isn't there
+// (e.g. an older deployment). In local vite dev both 404 -> em-dash stays.
+(async function loadCoverageStats() {
+  function setStat(id, value) {
+    if (value == null) return;
+    const el = document.getElementById(id);
+    if (el) el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+  }
 
-  SupaAuth.onStateChange(({ user }) => {
-    if (user) {
-      loginBtn.hidden    = true;
-      userMenu.hidden    = false;
-      avatarEl.src       = user.user_metadata?.avatar_url || '';
-      avatarEl.alt       = user.user_metadata?.name || user.email || '';
-      nameEl.textContent = user.user_metadata?.name || user.email || '';
-    } else {
-      loginBtn.hidden = false;
-      userMenu.hidden = true;
-      if (dropdown) dropdown.classList.remove('open');
+  // try the JSON summary first
+  try {
+    const resp = await fetch('coverage-summary.json', { cache: 'no-store' });
+    if (resp.ok) {
+      const ct = resp.headers.get('content-type') || '';
+      if (ct.includes('application/json') || ct.includes('text/plain')) {
+        const data = await resp.json();
+        setStat('stat-steam-games',    data.steam_games);
+        setStat('stat-protondb-games', data.protondb_games);
+        setStat('stat-indexed',        data.indexed);
+        return;
+      }
     }
-  });
+  } catch (_) { /* fall through to HTML scrape */ }
 
-  loginBtn?.addEventListener('click', () => {
-    window.location.href = SupaAuth.buildLoginPageUrl(window.location.href);
-  });
-  logoutBtn?.addEventListener('click', () => { dropdown.classList.remove('open'); SupaAuth.logout(); });
-  userMenu?.addEventListener('click', e => {
-    if (dropdown.contains(e.target)) return;
-    dropdown.classList.toggle('open');
-  });
-
-  const chip = document.getElementById('gh-auth-chip');
-  document.addEventListener('click', e => {
-    if (chip && chip.contains(e.target)) return;
-    if (dropdown) dropdown.classList.remove('open');
-  });
+  // fallback: parse coverage.html for the same numbers
+  try {
+    const resp = await fetch('coverage.html');
+    if (!resp.ok) return;
+    const html = await resp.text();
+    function pick(label) {
+      const safe = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(
+        '<div class="label">' + safe + '<\\/div>\\s*<div class="value">([\\d,]+)<\\/div>'
+      );
+      const m = html.match(re);
+      return m ? m[1] : null;
+    }
+    setStat('stat-steam-games',    pick('Steam Games'));
+    setStat('stat-protondb-games', pick('ProtonDB Total'));
+    setStat('stat-indexed',        pick('Indexed (with data)'));
+  } catch (_) { /* leave em-dash placeholders */ }
 })();

@@ -4,6 +4,13 @@ backups/
 *.tar.gz
 *.zip
 
+# Pipeline-generated pages and data. Real versions ship via the production pipeline.
+# Local dev stubs go in their place for vite preview - never commit either.
+coverage.html
+coverage-summary.json
+data-index.html
+search-index.json
+
 # Python
 __pycache__/
 *.py[cod]

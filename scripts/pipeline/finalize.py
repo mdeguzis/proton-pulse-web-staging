@@ -228,15 +228,15 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
         "      main { padding: 1rem; }",
         "    }",
         "  </style>",
+        '  <link rel="stylesheet" href="site.css">',
         "</head>",
         "<body>",
+        # topbar.js injects the shared banner + nav at body start
+        '<script src="topbar.js"></script>',
+        '<div class="main-content"><div class="main-inner">',
         "<main>",
         "<h1>proton-pulse-data index</h1>",
-        "<p>Monthly-updated ProtonDB per-game community reports. "
-        f"<strong>{len(sorted_app_ids)}</strong> games tracked. "
-        '<a href="index.html">Home</a> · '
-        '<a href="app.html">Game Search</a> · '
-        '<a href="coverage.html">Coverage Report</a></p>',
+        f"<p><strong>{len(sorted_app_ids)}</strong> games tracked. Monthly-updated community reports.</p>",
     ]
 
     if sample_entries:
@@ -328,6 +328,10 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
         "applyIndexFilter();",
         "</script>",
         "</main>",
+        # close the .main-content / .main-inner wrappers opened above
+        "</div></div>",
+        '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>',
+        '<script src="supabase-client.js"></script>',
         "</body>",
         "</html>",
     ]
@@ -485,36 +489,46 @@ def generate_coverage_report(
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>proton-pulse-data coverage report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coverage Report - Proton Pulse</title>
+<meta name="color-scheme" content="dark">
+<link rel="stylesheet" href="site.css">
 <style>
-body {{ font-family: system-ui, sans-serif; margin: 2em; background: #1a1a2e; color: #e0e0e0; }}
+/* coverage page only - table + stats layout that lives below the shared topbar */
 table {{ border-collapse: collapse; width: 100%; }}
-th, td {{ border: 1px solid #333; padding: 6px 10px; text-align: left; }}
-th {{ background: #16213e; color: #e0e0e0; cursor: pointer; user-select: none; }}
-th:hover {{ background: #1a3a5c; }}
-tr:nth-child(even) {{ background: #16213e; }}
-tr:nth-child(odd) {{ background: #1a1a2e; }}
-.yes {{ color: #4caf50; font-weight: bold; }}
-.no {{ color: #666; }}
-a {{ color: #5dade2; }}
-.stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 1.5em; }}
-.stat-card {{ background: #16213e; border: 1px solid #333; border-radius: 8px; padding: 14px 18px; }}
-.stat-card .label {{ font-size: 0.8em; color: #7a9bb5; text-transform: uppercase; letter-spacing: 0.05em; }}
-.stat-card .value {{ font-size: 1.6em; font-weight: bold; color: #5dade2; margin: 4px 0; }}
-.stat-card .detail {{ font-size: 0.8em; color: #999; }}
-.pct {{ color: #4caf50; }}
+th, td {{ border: 1px solid var(--border); padding: 6px 10px; text-align: left; }}
+th {{ background: var(--s2); color: var(--text); cursor: pointer; user-select: none; }}
+th:hover {{ background: var(--s3); }}
+tr:nth-child(even) {{ background: var(--s1); }}
+tr:nth-child(odd) {{ background: rgba(0,0,0,0.1); }}
+.yes {{ color: var(--green-hi); font-weight: bold; }}
+.no {{ color: var(--muted); }}
+.stats {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 1.5em; }}
+@media (max-width: 1100px) {{ .stats {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} }}
+@media (max-width: 640px) {{ .stats {{ grid-template-columns: 1fr; }} }}
+.stat-card {{ background: linear-gradient(180deg, rgba(27,40,56,0.55), rgba(11,17,22,0.45)); border: 1px solid var(--border); padding: 14px 18px; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }}
+.stat-card .label {{ font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em; }}
+.stat-card .value {{ font-family: var(--mono); font-size: 1.7rem; font-weight: 600; color: var(--accent-hi); margin: 4px 0; text-shadow: 0 0 14px var(--accent-glow); }}
+.stat-card .detail {{ font-size: 0.78rem; color: var(--muted); }}
+.pct {{ color: var(--green-hi); }}
 .filters {{ margin-bottom: 1em; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
-#filter {{ padding: 6px; width: 300px; background: #16213e; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; }}
-.toggle {{ padding: 6px 14px; border: 2px solid #5dade2; border-radius: 4px; background: transparent; color: #5dade2; cursor: pointer; font-weight: bold; }}
-.toggle.active {{ background: #5dade2; color: #1a1a2e; }}
+#filter {{ padding: 8px 10px; width: 320px; background: rgba(11,17,22,0.6); color: var(--text); border: 1px solid var(--border2); }}
+#filter:focus {{ border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }}
+.toggle {{ padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; font-weight: 600; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.04em; transition: color .12s, border-color .12s, background .12s; }}
+.toggle:hover {{ color: var(--text); border-color: var(--accent); }}
+.toggle.active {{ background: var(--accent-soft); color: var(--accent-hi); border-color: var(--accent); }}
 .pager {{ margin: 1em 0; display: flex; gap: 8px; align-items: center; }}
-.pager button {{ padding: 4px 12px; background: #16213e; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; cursor: pointer; }}
-.pager button:hover {{ background: #1a3a5c; }}
+.pager button {{ padding: 6px 14px; background: rgba(11,17,22,0.6); color: var(--text); border: 1px solid var(--border2); cursor: pointer; font-family: inherit; font-size: 0.82rem; }}
+.pager button:hover {{ background: var(--s2); border-color: var(--accent); }}
+.coverage-meta {{ color: var(--muted); margin-bottom: 1em; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.04em; }}
 </style>
 </head>
 <body>
-<h1>Coverage Report</h1>
-<p style="color:#7a9bb5;margin-bottom:1em;">Generated: {now}</p>
+<!-- shared topbar (banner + nav + drawer) injected by topbar.js -->
+<script src="topbar.js"></script>
+<div class="main-content"><div class="main-inner">
+<h1 style="font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.02em;margin-bottom:0.4em">Coverage Report</h1>
+<p class="coverage-meta">// Generated: {now}</p>
 <div class="stats">
 <div class="stat-card">
   <div class="label">Steam Games</div>
@@ -711,11 +725,32 @@ page=initialState.page;
 document.querySelectorAll(".toggle").forEach(b=>b.classList.toggle("active",activeSrc.has(b.dataset.src)));
 apply(false);
 </script>
+</div></div>
 </body></html>
 """
     report_file = output_path / "coverage.html"
     report_file.write_text(html)
     log(f"[coverage] Written: {report_file}")
+
+    # Emit a tiny coverage-summary.json next to coverage.html so the homepage
+    # (and any other consumer) can grab the headline numbers without parsing
+    # 100KB of HTML. Keep this lean - only stats the landing page actually uses.
+    # See proton-pulse-data/index.js: loadCoverageStats()
+    summary = {
+        "generated_at": now,
+        "steam_games":      steam_count,
+        "protondb_games":   protondb_unique_games,
+        "protondb_reports": protondb_total_reports,
+        "indexed":          indexed_count,
+        "official":         official_count,
+        "backfill":         backfill_count,
+        "pct_of_steam":            round(pct_of_steam, 2),
+        "pct_of_protondb":         round(pct_of_protondb_total, 2),
+        "protondb_pct_of_steam":   round(protondb_pct_of_steam, 2),
+    }
+    summary_file = output_path / "coverage-summary.json"
+    summary_file.write_text(json.dumps(summary, indent=2) + "\n")
+    log(f"[coverage] Written: {summary_file}")
 
 
 def probe_cache_to_catalog(probe_cache: dict[str, dict]) -> dict[str, str]:

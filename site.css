@@ -1,26 +1,61 @@
 /* ---------------------------------------------
    Proton Pulse - shared design system
+   Identity: Steam Deck navy + atom orbital motif + cyberpunk polish
+   Palette pulls from store.steampowered.com (link blue, install green)
    --------------------------------------------- */
 
+/* Google Fonts: Space Grotesk for display, Inter for body, JetBrains Mono for stats/code */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 :root {
-  --bg:      #151a20;
-  --s1:      #1c2128;
-  --s2:      #242c38;
-  --s3:      #2c3644;
-  --border:  #343e50;
-  --border2: #445066;
-  --text:    #d8e0ea;
-  --muted:   #7e94a8;
-  --accent:  #56aad8;
-  --strong:  #f2f5f9;
-  --green:   #4caf80;
-  --gold:    #c8a050;
-  --silver:  #8fa0b0;
-  --bronze:  #b07040;
-  --red:     #c85050;
-  --mono:    "SF Mono", "Consolas", "Liberation Mono", monospace;
-  --sidebar-w: 260px;
-  --topnav-h: 48px;
+  /* surfaces - deep Steam navy gradient stack */
+  --bg:        #0b1116;
+  --bg-top:    #0b1116;
+  --bg-bot:    #131c26;
+  --s1:        #131c26;
+  --s2:        #1b2838;   /* Steam store main panel */
+  --s3:        #2a475e;   /* Steam store card raised */
+  --border:    #1f3346;
+  --border2:   #2f4a63;
+
+  /* text */
+  --text:      #c7d5e0;   /* Steam body text */
+  --strong:    #ffffff;
+  --muted:     #67788c;
+
+  /* identity accents
+     blue is primary (Steam links), green is the "alive / compatible" pop,
+     magenta is the cyberpunk punctuation - used sparingly for glows only */
+  --accent:       #66c0f4;
+  --accent-hi:    #aedcff;
+  --accent-soft:  rgba(102, 192, 244, 0.16);
+  --accent-glow:  rgba(102, 192, 244, 0.45);
+
+  --green:        #a4d007;  /* Steam install button green */
+  --green-hi:     #beee11;
+  --green-glow:   rgba(190, 238, 17, 0.35);
+
+  --magenta:      #ff3aa5;
+  --magenta-glow: rgba(255, 58, 165, 0.35);
+
+  /* tiers (kept for compat across pages) */
+  --gold:    #ffc83d;
+  --silver:  #c0c8d2;
+  --bronze:  #c08858;
+  --red:     #ff5566;
+
+  /* type */
+  --font-display: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:         "JetBrains Mono", "SF Mono", "Consolas", "Liberation Mono", monospace;
+
+  /* layout */
+  --sidebar-w:    260px;  /* legacy, kept until all pages migrate off sidebar */
+  --banner-h:     46px;   /* identity strip - tighter to drop vertical padding */
+  --nav-h:        44px;   /* functional nav row underneath */
+  --topnav-h:     calc(var(--banner-h) + var(--nav-h));
+  --content-max:  1440px; /* widescreen comfort cap, replaces old 1080px */
+  --content-pad:  clamp(16px, 3.2vw, 48px);
 }
 
 *, *::before, *::after {
@@ -35,11 +70,42 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(102, 192, 244, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(190, 238, 17, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--bg-top), var(--bg-bot));
+  background-attachment: fixed;
   color: var(--text);
-  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.6 var(--font-body);
+  font-feature-settings: "ss01", "cv11";
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
 }
+
+/* scanline + grain overlay - keeps it textured, never loud */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image:
+    repeating-linear-gradient(0deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px);
+  mix-blend-mode: overlay;
+  opacity: 0.6;
+}
+
+/* keep real content above the overlay */
+.topbar, .main-content { position: relative; z-index: 2; }
+.topbar { z-index: 200; }
+
+/* legacy sidebar: hide for pages that still have the markup so they don't double-render */
+.sidebar-nav, .sidebar-overlay { display: none !important; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -53,10 +119,8 @@ code {
 }
 
 /* ============================================================
-   LAYOUT: sidebar + topbar shell
+   LAYOUT: two-tier topbar (identity banner + functional nav row)
    ============================================================ */
-
-/* -- Top bar (always visible, slim) -- */
 
 .topbar {
   position: fixed;
@@ -64,109 +128,376 @@ code {
   left: 0;
   right: 0;
   z-index: 200;
-  height: var(--topnav-h);
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  background: var(--s1);
+  flex-direction: column;
+  background:
+    linear-gradient(180deg, rgba(11, 17, 22, 0.94), rgba(19, 28, 38, 0.92));
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 0 rgba(102, 192, 244, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.topbar-toggle {
-  display: none;
-  background: none;
-  border: 1px solid var(--border2);
-  color: var(--muted);
-  font-size: 1.1rem;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: color .15s, border-color .15s;
-}
-.topbar-toggle:hover { color: var(--text); border-color: var(--accent); }
-
-.hamburger,
-.hamburger::before,
-.hamburger::after {
-  display: block;
-  width: 16px;
-  height: 2px;
-  background: currentColor;
-  position: relative;
-}
-.hamburger::before,
-.hamburger::after {
+/* hairline cyan->green signal under the whole topbar */
+.topbar::after {
   content: '';
   position: absolute;
-  left: 0;
-  width: 16px;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(102, 192, 244, 0.55) 25%,
+    rgba(190, 238, 17, 0.55) 55%,
+    rgba(102, 192, 244, 0.45) 75%,
+    transparent 100%);
+  pointer-events: none;
 }
-.hamburger::before { top: -5px; }
-.hamburger::after  { top:  5px; }
 
-.topbar-brand {
+/* ---- Tier 1: identity banner with animated orbital + pulse backdrop ---- */
+
+.topbar-banner {
+  position: relative;
+  height: var(--banner-h);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 18px;
+  padding: 0 var(--content-pad);
+  overflow: hidden;
+}
+
+.topbar-banner-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.55;
+  z-index: 0;
+}
+
+.topbar-banner-bg .banner-pulse {
+  stroke-dasharray: 160 1600;
+  stroke-dashoffset: 0;
+  animation: banner-pulse-sweep 5.5s linear infinite;
+  filter: drop-shadow(0 0 4px var(--green-glow));
+}
+
+/* atoms get a gentle drift in opacity so the field feels alive even when
+   you're not looking directly at the electrons */
+.topbar-banner-bg .banner-atoms > g {
+  animation: atom-breathe 6s ease-in-out infinite;
+}
+.topbar-banner-bg .banner-atoms > g:nth-child(2) { animation-delay: -1.5s; }
+.topbar-banner-bg .banner-atoms > g:nth-child(3) { animation-delay: -3s; }
+.topbar-banner-bg .banner-atoms > g:nth-child(4) { animation-delay: -4.5s; }
+
+@keyframes banner-pulse-sweep { to { stroke-dashoffset: -1760; } }
+@keyframes atom-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-banner-bg .banner-pulse,
+  .topbar-banner-bg .banner-atoms > g { animation: none; }
+  /* SMIL animations on <animateMotion> respect this via the global media
+     query in user agents that honor it; on those that don't, the motion
+     will continue but rings stop. acceptable trade-off */
+}
+
+.topbar-brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--strong);
-  font-weight: 700;
-  font-size: 0.88rem;
-  letter-spacing: -0.01em;
   flex-shrink: 0;
 }
 .topbar-brand:hover { text-decoration: none; color: var(--strong); }
 
-.topbar-spacer { flex: 1; }
-
-.topbar-link {
-  font-size: 0.78rem;
-  color: var(--muted);
-  transition: color .12s;
+/* brand mark: intentionally STATIC. logos shouldn't perpetually spin or it
+   reads as AI-generated motion noise. all the kinetic identity lives in the
+   banner backdrop below, not in the lockup */
+.topbar-brand-mark {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px var(--accent-glow));
 }
-.topbar-link:hover { color: var(--text); text-decoration: none; }
+.topbar-brand-mark svg { width: 100%; height: 100%; }
 
-.topbar-link--button {
+.topbar-brand-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--strong);
+}
+.topbar-brand-text .brand-accent {
+  background: linear-gradient(90deg, var(--accent-hi), var(--green-hi));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.topbar-brand-tag {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-left: 14px;
+  margin-left: 4px;
+  border-left: 1px solid var(--border);
+  line-height: 1;
+  align-self: center;
+}
+
+.topbar-banner-actions {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* small icon-only link in the banner actions (GitHub, etc.) - sized to match
+   the My Account button height so the trio aligns visually */
+.banner-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  background: rgba(11, 17, 22, 0.55);
+  transition: color .12s, border-color .12s, background .12s, box-shadow .12s;
+}
+.banner-icon-link:hover {
+  color: var(--accent-hi);
+  border-color: var(--accent);
+  background: rgba(102, 192, 244, 0.08);
+  box-shadow: 0 0 14px -4px var(--accent-glow);
+  text-decoration: none;
+}
+.banner-icon-link .nav-icon { width: 16px; height: 16px; }
+
+/* ---- Tier 2: functional nav row ---- */
+
+.topbar-nav {
+  position: relative;
+  height: var(--nav-h);
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: 0 var(--content-pad);
+  background: rgba(11, 17, 22, 0.45);
+  border-top: 1px solid var(--border);
+}
+
+.topnav-links {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.topnav-links > a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid #3a4658;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #242c38, #1b212b);
-  color: #f2f5f9;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 4px 10px rgba(0, 0, 0, 0.18);
-  transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-bottom: 2px solid transparent;
+  transition: color .12s, border-color .12s, background .12s;
+  position: relative;
+}
+.topnav-links > a:hover {
+  color: var(--text);
+  background: rgba(102, 192, 244, 0.05);
+  text-decoration: none;
+}
+.topnav-links > a.active {
+  color: var(--accent-hi);
+  border-bottom-color: var(--accent);
+  background: linear-gradient(180deg, transparent, var(--accent-soft));
+}
+.topnav-links > a.active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
-.topbar-link--button::before {
-  content: '';
+.topnav-links .nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* search pill in the nav row */
+.topbar-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  min-width: 200px;
+  max-width: 360px;
+  flex: 0 1 320px;
+}
+.topbar-search-icon {
+  position: absolute;
+  left: 10px;
   width: 14px;
   height: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.topbar-search-wrap input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px 0 30px;
+  background: rgba(11, 17, 22, 0.6);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.topbar-search-wrap input::placeholder { color: var(--muted); }
+.topbar-search-wrap input:focus {
+  border-color: var(--accent);
+  background: rgba(11, 17, 22, 0.85);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.topbar-search-wrap input:focus + .topbar-search-icon { color: var(--accent); }
+
+/* live results dropdown - drops down from the search pill */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 250;
+  background: linear-gradient(180deg, rgba(19, 28, 38, 0.98), rgba(11, 17, 22, 0.98));
+  border: 1px solid var(--border2);
+  border-top-color: var(--accent);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(102, 192, 244, 0.08);
+  max-height: 360px;
+  overflow-y: auto;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+.search-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 0.84rem;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s, color .1s;
+}
+.search-dropdown a:last-child { border-bottom: none; }
+.search-dropdown a:hover,
+.search-dropdown a.is-focused {
+  background: rgba(102, 192, 244, 0.1);
+  color: var(--strong);
+  text-decoration: none;
+}
+.search-dropdown img {
+  width: 92px;
+  height: 34px;
+  object-fit: cover;
+  background: var(--s2);
   flex-shrink: 0;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.search-dropdown .sd-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-dropdown .sd-appid {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.search-dropdown .sd-empty {
+  padding: 14px 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+.search-dropdown .sd-empty code {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.74rem;
 }
 
-.topbar-link--button:hover {
-  color: #fff;
-  border-color: #4a596f;
-  background: linear-gradient(180deg, #2a3442, #202733);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 8px 16px rgba(0, 0, 0, 0.24);
-  transform: translateY(-1px);
+/* hide the mobile-only toggle on desktop, show on small screens via media query below */
+.topbar-mobile-toggle {
+  display: none;
+  width: 36px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text);
+  cursor: pointer;
 }
+.topbar-mobile-toggle svg { width: 18px; height: 18px; }
+.topbar-mobile-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* mobile drawer that slides down from the topbar */
+.mobile-nav-drawer {
+  position: fixed;
+  top: var(--topnav-h);
+  left: 0;
+  right: 0;
+  z-index: 199;
+  background: linear-gradient(180deg, rgba(19, 28, 38, 0.98), rgba(11, 17, 22, 0.98));
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  display: none;
+}
+.mobile-nav-drawer.open { display: block; }
+.mobile-nav-drawer a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px var(--content-pad);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.mobile-nav-drawer a:last-child { border-bottom: none; }
+.mobile-nav-drawer a:hover { background: rgba(102, 192, 244, 0.06); text-decoration: none; }
+.mobile-nav-drawer a.active { color: var(--accent-hi); background: var(--accent-soft); }
+.mobile-nav-drawer a .nav-icon { width: 18px; height: 18px; color: var(--accent); }
+
+/* legacy classes - kept for pages still using the old single-row topbar styles */
+.topbar-toggle, .hamburger, .topbar-spacer, .topbar-link, .topbar-link--button { display: none !important; }
 
 /* -- Sidebar -- */
 
@@ -177,7 +508,10 @@ code {
   bottom: 0;
   width: var(--sidebar-w);
   z-index: 150;
-  background: var(--s1);
+  background:
+    linear-gradient(180deg, rgba(19, 28, 38, 0.96), rgba(11, 17, 22, 0.98));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -223,9 +557,10 @@ code {
   text-decoration: none;
 }
 .sidebar-links a.active {
-  color: var(--accent);
+  color: var(--accent-hi);
   border-left-color: var(--accent);
-  background: rgba(74, 159, 208, 0.06);
+  background: linear-gradient(90deg, var(--accent-soft), transparent 80%);
+  box-shadow: inset 2px 0 8px -2px var(--accent-glow);
 }
 .sidebar-links a .nav-icon {
   width: 16px;
@@ -261,8 +596,10 @@ code {
   transition: color .12s, border-color .12s;
 }
 .sidebar-contact-btn:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--green-hi);
+  border-color: var(--green);
+  background: linear-gradient(180deg, rgba(190, 238, 17, 0.08), transparent);
+  box-shadow: 0 0 18px -4px var(--green-glow);
   text-decoration: none;
 }
 
@@ -287,11 +624,13 @@ code {
 }
 .sidebar-brand-icon img { width: 32px; height: 32px; object-fit: contain; }
 .sidebar-brand-copy h2 {
-  font-size: 0.82rem;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--strong);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
   line-height: 1.2;
+  text-transform: uppercase;
 }
 .sidebar-brand-copy p {
   font-size: 0.7rem;
@@ -300,42 +639,34 @@ code {
   margin-top: 1px;
 }
 
-/* -- Main content area -- */
+/* -- Main content area - no sidebar, fills the width responsively -- */
 
 .main-content {
-  margin-left: var(--sidebar-w);
   margin-top: var(--topnav-h);
   min-height: calc(100vh - var(--topnav-h));
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .main-inner {
   flex: 1;
   width: 100%;
-  max-width: 1080px;
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: 24px 28px 48px;
+  padding: 32px var(--content-pad) 56px;
 }
-
-/* -- Overlay for mobile sidebar -- */
-
-.sidebar-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 140;
-  background: rgba(0,0,0,0.5);
-}
-.sidebar-overlay.open { display: block; }
 
 /* -- Footer -- */
 
 .sitefooter {
   border-top: 1px solid var(--border);
-  padding: 16px 28px;
+  padding: 16px var(--content-pad);
   font-size: 0.74rem;
   color: var(--muted);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  width: 100%;
 }
 .sitefooter a { color: var(--muted); }
 .sitefooter a:hover { color: var(--text); text-decoration: underline; }
@@ -345,20 +676,40 @@ code {
    ============================================================ */
 
 .section-label {
-  font-size: 0.62rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   color: var(--muted);
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+}
+.section-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  flex-shrink: 0;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
 }
 
 .eyebrow {
-  font-size: 0.62rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  margin-bottom: 4px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 6px;
 }
+.eyebrow::before { content: '// '; opacity: 0.7; }
 
 /* -- Tier badge colors -- */
 .tier-platinum { background: #b4c7dc; color: #0a0c10; }
@@ -369,47 +720,50 @@ code {
 .tier-pending  { background: #3a4a5a; color: var(--muted); }
 
 /* ============================================================
-   RESPONSIVE - sidebar collapse
+   RESPONSIVE - horizontal nav collapses to mobile drawer
    ============================================================ */
 
-@media (max-width: 860px) {
-  .topbar-toggle { display: flex; }
-
-  .sidebar-nav {
-    transform: translateX(-100%);
-    transition: transform .22s ease;
-    box-shadow: none;
-  }
-  .sidebar-nav.open {
-    transform: translateX(0);
-    box-shadow: 6px 0 24px rgba(0,0,0,0.4);
-  }
-
-  .main-content {
-    margin-left: 0;
-  }
-
-  .main-inner {
-    padding: 20px 16px 40px;
-  }
-
-  /* hide desktop-only topbar links */
-  .topbar-desktop-only { display: none; }
+/* tablet: drop the brand tagline + tighten gaps */
+@media (max-width: 1024px) {
+  .topbar-brand-tag { display: none; }
+  .topbar-search-wrap { flex: 0 1 240px; min-width: 160px; }
 }
 
-@media (min-width: 861px) {
-  /* sidebar always open on desktop */
-  .sidebar-nav {
-    transform: translateX(0);
-    top: 0;
+/* mobile: collapse the nav row, show hamburger, drawer takes over */
+@media (max-width: 760px) {
+  :root { --banner-h: 52px; --nav-h: 0px; }
+
+  .topbar-banner {
+    padding: 0 16px;
+    gap: 10px;
   }
-  .sidebar-overlay { display: none !important; }
-  .topbar { left: var(--sidebar-w); }
-  .topbar-brand { display: none; }
+  .topbar-brand-text { font-size: 1rem; }
+
+  /* hide the desktop nav row entirely on mobile */
+  .topbar-nav { display: none; }
+
+  /* show the hamburger */
+  .topbar-mobile-toggle { display: inline-flex; }
+
+  /* tighten the login button area on small screens */
+  .gh-login-btn__label { display: none; }
+  .gh-login-btn { padding: 4px 8px 4px 6px; }
+
+  .topbar-desktop-only { display: none !important; }
+
+  .main-inner { padding: 24px 16px 40px; }
+}
+
+/* very small screens: even tighter banner */
+@media (max-width: 480px) {
+  .topbar-brand-mark { width: 26px; height: 26px; }
+  .topbar-brand-text { font-size: 0.92rem; letter-spacing: 0.04em; }
 }
 
 /* ============================================================
-   AUTH CHIP — shared across all pages
+   AUTH CHIP — homepage uses the simplified .auth-link variant.
+   Pages still rendering the old .gh-login-btn / .gh-user-menu markup
+   continue to work via the legacy rules below
    ============================================================ */
 
 .gh-auth-chip {
@@ -417,6 +771,48 @@ code {
   align-items: center;
   position: relative;
   flex-shrink: 0;
+}
+
+/* simplified auth links - replaces the verbose login button on the homepage.
+   profile.html owns the actual sign-in/out flow */
+.auth-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--text);
+  background: rgba(11, 17, 22, 0.55);
+  border: 1px solid var(--border2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: color .12s, border-color .12s, background .12s, box-shadow .12s;
+}
+.auth-link:hover {
+  color: var(--accent-hi);
+  border-color: var(--accent);
+  background: rgba(102, 192, 244, 0.08);
+  box-shadow: 0 0 16px -4px var(--accent-glow);
+  text-decoration: none;
+}
+.auth-link .nav-icon { width: 16px; height: 16px; color: var(--accent); }
+
+.auth-link--signedin { text-transform: none; letter-spacing: 0; padding: 0 10px 0 4px; }
+.auth-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border2);
+}
+.auth-username {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .gh-login-btn {
