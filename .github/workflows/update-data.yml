@@ -221,6 +221,35 @@ jobs:
           name: probe-input
           path: /tmp/protondb-output
 
+      # Pull existing gh-pages data so probe-backfill can skip apps that were
+      # already covered in prior runs. Without this, the artifact only carries
+      # the small dump+manifest set (~8K apps), so the ~21K apps that were
+      # probe-backfilled in previous runs look "missing" and get re-fetched
+      # every single time (4+ hour stall). See wiki Data-Pipeline.md
+      # "Known Issue" for full background.
+      - name: Checkout current gh-pages for data merge
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-data
+          fetch-depth: 1
+        continue-on-error: true
+
+      - name: Merge gh-pages data into probe input
+        run: |
+          if [ -d gh-pages-data/data ]; then
+            mkdir -p /tmp/protondb-output/data
+            # -rn: recursive, no-clobber. Artifact wins on overlap (it's the
+            # freshest dump from Stage 1), gh-pages fills the historical gaps
+            # for probe-backfilled apps not in the artifact.
+            cp -rn gh-pages-data/data/. /tmp/protondb-output/data/ || true
+            ARTIFACT_COUNT=$(ls /tmp/protondb-output/data 2>/dev/null | wc -l)
+            GHPAGES_COUNT=$(ls gh-pages-data/data 2>/dev/null | wc -l)
+            echo "Merged data: artifact had ~${ARTIFACT_COUNT} app dirs after gh-pages merge (gh-pages had ${GHPAGES_COUNT})"
+          else
+            echo "No gh-pages data branch to merge (first run or branch absent)"
+          fi
+
       - name: Restore pipeline cache
         uses: actions/cache/restore@v4
         with:
