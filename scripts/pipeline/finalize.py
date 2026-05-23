@@ -635,8 +635,11 @@ def generate_coverage_report(
 /* coverage page only - table + stats layout that lives below the shared topbar */
 table {{ border-collapse: collapse; width: 100%; }}
 th, td {{ border: 1px solid var(--border); padding: 6px 10px; text-align: left; }}
-th {{ background: var(--s2); color: var(--text); cursor: pointer; user-select: none; }}
-th:hover {{ background: var(--s3); }}
+th {{ background: var(--s2); color: var(--text); cursor: pointer; user-select: none; position: relative; padding-right: 22px; transition: background .12s, color .12s; }}
+th:hover {{ background: var(--s3); color: var(--accent-hi); }}
+th::after {{ content: '\\2195'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.85em; opacity: 0.4; }}
+th.sort-asc::after {{ content: '\\25B2'; color: var(--accent); opacity: 1; }}
+th.sort-desc::after {{ content: '\\25BC'; color: var(--accent); opacity: 1; }}
 tr:nth-child(even) {{ background: var(--s1); }}
 tr:nth-child(odd) {{ background: rgba(0,0,0,0.1); }}
 .yes {{ color: var(--green-hi); font-weight: bold; }}
@@ -812,7 +815,14 @@ function apply(resetPage=true){{
 }}
 function doSort(c){{
   if(sortCol===c)sortAsc*=-1;else{{sortCol=c;sortAsc=1}}
+  updateSortIndicator();
   doSortFiltered();page=0;render();
+}}
+function updateSortIndicator(){{
+  document.querySelectorAll('th').forEach((th,i)=>{{
+    th.classList.remove('sort-asc','sort-desc');
+    if(i===sortCol)th.classList.add(sortAsc>0?'sort-asc':'sort-desc');
+  }});
 }}
 function doSortFiltered(){{
   const c=sortCol,d=sortAsc;
@@ -862,6 +872,7 @@ sortAsc=initialState.dir;
 page=initialState.page;
 document.querySelectorAll(".toggle").forEach(b=>b.classList.toggle("active",activeSrc.has(b.dataset.src)));
 apply(false);
+updateSortIndicator();
 </script>
 </div></div>
 </body></html>
