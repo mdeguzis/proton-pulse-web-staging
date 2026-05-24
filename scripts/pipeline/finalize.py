@@ -429,7 +429,12 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
     const entry = entryFor(appId);
     if (!entry) { closeDetail(); return; }
     const [, title, , years] = entry;
-    const selected = year && years.includes(year) ? year : years[years.length - 1];
+    // Two distinct UI states: "latest mode" (no year in hash) vs "year mode"
+    // (specific year). Even though latest.json on disk == latest year.json,
+    // only one button is highlighted at a time. Loaded file resolves to the
+    // newest year file in either case (latest.json is just a mirror).
+    const useLatest = !year;
+    const targetYear = year && years.includes(year) ? year : years[years.length - 1];
 
     gridView.classList.add('is-hidden');
     detailView.classList.add('is-open');
@@ -437,11 +442,11 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
     appidEl.textContent = '// ' + appId;
 
     yearListEl.innerHTML = '<div class="label">Year files</div>' +
-      '<button data-file="latest.json" class="' + (selected === years[years.length - 1] ? 'is-active' : '') + '">' +
+      '<button data-file="latest.json" data-mode="latest" class="' + (useLatest ? 'is-active' : '') + '">' +
         '<span class="file">latest.json</span><span class="badge">latest</span></button>' +
       years.slice().reverse().map(y => {
         const file = y + '.json';
-        const active = y === selected;
+        const active = !useLatest && y === targetYear;
         return '<button data-year="' + y + '" data-file="' + file + '" class="' + (active ? 'is-active' : '') + '">' +
                '<span class="file">' + file + '</span></button>';
       }).join('');
@@ -457,8 +462,9 @@ def generate_index_html(index_keys: set, output_path: Path) -> None:
       });
     });
 
-    // Default load: the most recent year (latest.json points to the same content)
-    loadYear(appId, selected + '.json');
+    // Default load: latest.json content for either mode (the file on disk
+    // mirrors the newest year). The visual highlight tells you which mode
+    loadYear(appId, useLatest ? 'latest.json' : (targetYear + '.json'));
   }
 
   function closeDetail() {

@@ -33,11 +33,11 @@ h2 {
 /* ── top-line numbers ────────────────────────────────────────────────── */
 .stat-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 28px;
 }
-@media (max-width: 880px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1080px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 500px) { .stat-strip { grid-template-columns: 1fr; } }
 .stat-tile {
   position: relative;
@@ -378,6 +378,7 @@ h2 {
   const metaEl = document.getElementById('stats-meta');
 
   let stats = null;        // raw stats.json payload
+  let coverage = null;     // coverage-summary.json (Steam catalog / ProtonDB totals)
   let filter = { dim: null, value: null }; // active client-side filter
 
   // Cosmetic labels for normalized tokens. Falls back to titlecase otherwise.
@@ -521,6 +522,12 @@ h2 {
     const borked = stats.by_rating?.borked || 0;
     const borkedPct = totalReports ? (borked / totalReports * 100).toFixed(1) : '0';
     const pulseCount = stats.by_source?.pulse || 0;
+    // Coverage numbers come from coverage-summary.json. Falls back to em-dash
+    // placeholders if not loaded yet (older deploys, or fetch failed).
+    const steamGames = coverage?.steam_games || null;
+    const protondbGames = coverage?.protondb_games || null;
+    const pctOfSteam = coverage?.pct_of_steam ?? null;
+    const pctOfProtondb = coverage?.pct_of_protondb ?? null;
 
     // Pre-render the layout once, then bind dynamic regions
     root.innerHTML = `
@@ -529,6 +536,16 @@ h2 {
           <div class="label">Total reports</div>
           <div class="value">${fmt(totalReports)}</div>
           <div class="detail">across <strong>${fmt(totalGames)}</strong> games</div>
+        </div>
+        <div class="stat-tile" title="Share of the full Steam catalog (~${fmt(steamGames)} games) we have compatibility data for">
+          <div class="label">Of Steam catalog</div>
+          <div class="value">${pctOfSteam != null ? pctOfSteam.toFixed(1) : '—'}<span style="font-size:0.7em;color:var(--muted);margin-left:2px">%</span></div>
+          <div class="detail">${steamGames ? `<strong>${fmt(totalGames)}</strong> of <strong>${fmt(steamGames)}</strong> Steam games` : 'awaiting next pipeline run'}</div>
+        </div>
+        <div class="stat-tile" title="Share of games on ProtonDB that have local mirror data">
+          <div class="label">Of ProtonDB</div>
+          <div class="value">${pctOfProtondb != null ? pctOfProtondb.toFixed(1) : '—'}<span style="font-size:0.7em;color:var(--muted);margin-left:2px">%</span></div>
+          <div class="detail">${protondbGames ? `<strong>${fmt(totalGames)}</strong> of <strong>${fmt(protondbGames)}</strong> on ProtonDB` : 'awaiting next pipeline run'}</div>
         </div>
         <div class="stat-tile">
           <div class="label">Platinum rate</div>
@@ -756,10 +773,16 @@ h2 {
   const qVal = params.get('value');
   if (qDim && qVal) filter = { dim: qDim, value: qVal };
 
-  fetch('stats.json', { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(payload => {
-      stats = payload;
+  // Fetch stats.json (required) and coverage-summary.json (optional) in
+  // parallel. Coverage gives us steam catalog totals for the % tiles; if it
+  // fetches fail we still render with em-dash fallbacks in those tiles.
+  Promise.all([
+    fetch('stats.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch('coverage-summary.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+  ])
+    .then(([statsPayload, coveragePayload]) => {
+      stats = statsPayload;
+      coverage = coveragePayload;
       metaEl.textContent = `// Generated: ${stats.generated_at || 'unknown'} · ${fmt(stats.total_reports)} reports across ${fmt(stats.total_games)} games`;
       renderAll();
     })
