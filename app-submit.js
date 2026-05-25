@@ -60,6 +60,8 @@ async function submitReport(appId, title, form) {
     tinkeringMethods: state.tinkeringMethods ? [...state.tinkeringMethods] : [],
     isTinker: !!(state.tinkeringMethods && state.tinkeringMethods.size > 0),
     ...Object.fromEntries(FAULT_KEYS_WEB.map(k => [k, state.faults?.[k] || null])),
+    // optional notes per fault section, only captured when user answered Yes
+    ...Object.fromEntries(FAULT_KEYS_WEB.map(k => [k + 'Notes', (form[k + 'Notes']?.value || '').trim() || null])),
     onlineMultiplayer: state.onlineMultiplayer || null,
     localMultiplayer:  state.localMultiplayer  || null,
     verdict:    installFailed ? 'no' : (state.verdict || null),
@@ -181,6 +183,9 @@ async function populateSubmitForm(el) {
     <div class="sf-question" id="q-${k}">
       <div class="sf-q-label">${q} *</div>
       ${ynBtns(k)}
+      <div class="sf-fault-notes sf-hidden" id="q-${k}-notes">
+        <textarea name="${k}Notes" rows="2" placeholder="Notes (optional)"></textarea>
+      </div>
     </div>`).join('');
   const tinkerMethods = [
     'Changed game config files','winetricks','protontricks','protonfixes',
@@ -365,11 +370,17 @@ async function populateSubmitForm(el) {
     });
   });
 
-  // Wire fault radios
+  // Wire fault radios + show/hide optional notes
   FAULT_KEYS_WEB.forEach(k => {
     form.querySelectorAll(`input[name="${k}"]`).forEach(radio => {
       radio.addEventListener('change', () => {
         state.faults[k] = radio.value;
+        // show notes field when user selects Yes
+        const notesEl = container.querySelector(`#q-${k}-notes`);
+        if (notesEl) {
+          if (radio.value === 'yes') notesEl.classList.remove('sf-hidden');
+          else notesEl.classList.add('sf-hidden');
+        }
         updateFormUI();
       });
     });

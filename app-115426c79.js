@@ -928,7 +928,7 @@ function renderSignalStrip(r) {
     renderSignalIcon('oob',     fr.verdictOob, 'Works out of the box',
       { neutralLabel: formNeutral }),
     renderSignalIcon('tinker',  tinkerValue,   'Tinker required',
-      { positiveState: 'warn', neutralLabel: formNeutral }),
+      { positiveState: 'warn', negativeState: 'good', neutralLabel: formNeutral }),
     renderSignalIcon('deck',    deckValue,     'Steam Deck',
       { positiveState: 'info', neutralLabel: 'Not detected' }),
     renderSignalIcon('owns',    ownsValue,     'Reporter owns the game',

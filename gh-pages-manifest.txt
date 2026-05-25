@@ -5,7 +5,6 @@ app.js
 app-scoring.js
 app-search.js
 app-submit.js
-app-591bee286.js
 app.css
 index.html
 index.js
@@ -32,6 +31,7 @@ topbar.js
 gh-gist.js
 assets/steam-logo.png
 assets/steam-logo-glyph.png
+favicon.svg
 assets/steam-login-button-preview.html
 privacy.html
 terms.html
@@ -40,3 +40,4 @@ CNAME
 .nojekyll
 gh-pages-manifest.txt
 gh-pages-exclude-manifest.txt
+app-115426c79.js

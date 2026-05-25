@@ -280,6 +280,15 @@
   // (avoids a dark->light flash)
   initTheme();
 
+  // inject favicon if the page doesn't already have one
+  if (!document.querySelector('link[rel="icon"]')) {
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/svg+xml';
+    link.href = 'favicon.svg';
+    document.head.appendChild(link);
+  }
+
   function inject() {
     if (document.querySelector('.topbar')) return; // page already has it (e.g. inlined for SSR)
     // sprite first so the <use href="#..."> refs in the banner resolve immediately
