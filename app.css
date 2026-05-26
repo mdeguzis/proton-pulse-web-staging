@@ -644,6 +644,8 @@
 /* hub links */
 
 .submit-report-btn {
+  display: inline-flex;
+  align-items: center;
   background: rgba(76,175,80,0.12);
   border: 1px solid #4caf50;
   color: #4caf50;
@@ -654,8 +656,9 @@
   flex-shrink: 0;
   font-family: inherit;
   min-height: 34px;
+  text-decoration: none;
 }
-.submit-report-btn:hover { background: rgba(76,175,80,0.25); }
+.submit-report-btn:hover { background: rgba(76,175,80,0.25); text-decoration: none; }
 .sf-row {
   display: flex;
   align-items: flex-start;
