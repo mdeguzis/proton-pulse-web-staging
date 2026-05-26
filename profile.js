@@ -1291,6 +1291,96 @@ const MOCK_REPORTS = [
   systemsTable?.addEventListener('focusout', handleSystemsLabelBlur);
   systemsRefresh?.addEventListener('click', () => { void refreshSystems(); });
 
+  // manual system add form
+  const addSysBtn = document.getElementById('add-system-btn');
+  const addSysForm = document.getElementById('add-system-form');
+  const addSysSubmit = document.getElementById('add-sys-submit');
+  const addSysCancel = document.getElementById('add-sys-cancel');
+  const addSysStatus = document.getElementById('add-sys-status');
+
+  addSysBtn?.addEventListener('click', () => {
+    addSysForm.hidden = !addSysForm.hidden;
+    if (!addSysForm.hidden) addSysBtn.textContent = '- Cancel';
+    else addSysBtn.textContent = '+ Add system';
+  });
+
+  addSysCancel?.addEventListener('click', () => {
+    addSysForm.hidden = true;
+    addSysBtn.textContent = '+ Add system';
+  });
+
+  addSysSubmit?.addEventListener('click', async () => {
+    const label = document.getElementById('add-sys-label')?.value?.trim() || 'Manual system';
+    const cpu = document.getElementById('add-sys-cpu')?.value?.trim() || '';
+    const gpu = document.getElementById('add-sys-gpu')?.value?.trim() || '';
+    const gpuVendor = document.getElementById('add-sys-gpu-vendor')?.value || '';
+    const gpuDriver = document.getElementById('add-sys-gpu-driver')?.value?.trim() || '';
+    const ram = document.getElementById('add-sys-ram')?.value?.trim() || '';
+    const vram = document.getElementById('add-sys-vram')?.value?.trim() || '';
+    const os = document.getElementById('add-sys-os')?.value?.trim() || '';
+    const kernel = document.getElementById('add-sys-kernel')?.value?.trim() || '';
+
+    if (!cpu && !gpu) {
+      if (addSysStatus) { addSysStatus.textContent = 'At least CPU or GPU is needed'; addSysStatus.style.color = 'var(--red)'; }
+      return;
+    }
+
+    // build a sysinfo_text blob that parseSteamSystemInfo can read back
+    const lines = [];
+    if (cpu) lines.push(`CPU Brand: ${cpu}`);
+    if (gpu) lines.push(`Video Card: ${gpu}`);
+    if (gpuDriver) lines.push(`Driver Version: ${gpuDriver}`);
+    // convert user-entered GB to the MB format parseSteamSystemInfo expects
+    if (ram) {
+      const gb = parseInt(ram.replace(/[^0-9]/g, ''), 10);
+      lines.push(`RAM: ${gb * 1024} Mb`);
+    }
+    if (vram) lines.push(`VRAM: ${vram} Mb`);
+    if (os) lines.push(`OS Version: ${os}`);
+    if (kernel) lines.push(`Kernel Version: ${kernel}`);
+    const sysinfoText = lines.join('\n');
+
+    // generate a device_id for web-created systems so they dont collide
+    const deviceId = 'web-' + crypto.randomUUID().slice(0, 12);
+
+    try {
+      addSysSubmit.disabled = true;
+      addSysSubmit.textContent = 'Saving...';
+      const s = await SupaAuth.getSession();
+      const protonPulseUserId = getProtonPulseUserIdFromSession(s);
+      if (!protonPulseUserId) throw new Error('Not signed in');
+
+      const isFirst = systemsCache.length === 0;
+
+      const resp = await fetch(supabaseUserSystemsUrl(), {
+        method: 'POST',
+        headers: supabaseHeaders(s, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({
+          proton_pulse_user_id: protonPulseUserId,
+          device_id: deviceId,
+          label,
+          sysinfo_text: sysinfoText,
+          is_default: isFirst,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+      if (!resp.ok) throw new Error(`Save failed: HTTP ${resp.status}`);
+
+      addSysForm.hidden = true;
+      addSysBtn.textContent = '+ Add system';
+      // clear the form inputs
+      ['add-sys-label','add-sys-cpu','add-sys-gpu','add-sys-gpu-vendor','add-sys-gpu-driver','add-sys-ram','add-sys-vram','add-sys-os','add-sys-kernel']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      showSystemsStatus('System added', true);
+      void refreshSystems();
+    } catch (e) {
+      if (addSysStatus) { addSysStatus.textContent = e.message || 'Failed'; addSysStatus.style.color = 'var(--red)'; }
+    } finally {
+      addSysSubmit.disabled = false;
+      addSysSubmit.textContent = 'Save system';
+    }
+  });
+
   // Initial fetch so the table populates on page load
   void refreshSystems();
 
