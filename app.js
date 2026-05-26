@@ -729,46 +729,84 @@ function trendSummary(reps) {
 
 // - Deck Verified status helpers (stub for now) -------
 //
-// Real Deck compatibility comes from Steam's steam_deck_compatibility endpoint,
-// which the pipeline will publish per-game (task #37). Until then this stub
-// gives a deterministic-per-appId fake status so the UI is fully testable.
-// Values mirror Valve's official 4 buckets: verified, playable, unsupported,
-// unknown. When the real data lands, getDeckStatusForApp() swaps out for the
-// pipeline lookup and everything downstream keeps working unchanged.
-
 const DECK_STATUS_LABELS = {
   verified:    'Verified',
   playable:    'Playable',
   unsupported: 'Unsupported',
   unknown:     'Unknown',
 };
-// The 4 criteria Valve evaluates for each title - same wording the Steam Store
-// shows in its compatibility popup. Used for the per-criterion checklist in
-// the modal so users see WHY a game got its status, not just the summary
 const DECK_CRITERIA_LABELS = [
   'All functionality is accessible when using the default controller configuration',
   'This game shows Steam Deck controller icons',
   'In-game interface text is legible on Steam Deck',
   'This game\'s default graphics configuration performs well on Steam Deck',
 ];
-// Pre-seeded sample profiles. Each entry maps a status to per-criterion
-// results: true=pass, false=fail, null=warning (the "yellow i" in the Steam
-// Store popup means "works but with caveats")
-const DECK_SAMPLE_PROFILES = {
-  verified:    { criteria: [true,  true,  true,  true]  },
-  playable:    { criteria: [null,  null,  null,  true]  },
-  unsupported: { criteria: [false, false, false, false] },
-};
-// Stub: deterministic per-appId sample so each game shows a stable fake
-// status (no jitter on refresh). Real implementation pulls from per-game
-// pipeline JSON (task #37). Returns null when no info is available
-function getDeckStatusForApp(appId) {
+
+// Steam's resolved_category values: 0=unknown, 1=unsupported, 2=playable, 3=verified
+const DECK_CAT_MAP = { 0: 'unknown', 1: 'unsupported', 2: 'playable', 3: 'verified' };
+// display_type in resolved_items: 2=fail, 3=info/caveat, 4=pass
+const DECK_DISPLAY_MAP = { 4: true, 3: null, 2: false };
+
+// cache fetched deck compat so we dont re-fetch on every render
+const _deckCache = {};
+
+async function fetchDeckStatusForApp(appId) {
   if (!appId) return { status: 'unknown', criteria: null };
-  const buckets = ['verified', 'playable', 'unsupported', 'unknown'];
-  const idx = Math.abs(Number(appId) % buckets.length);
-  const status = buckets[idx];
-  const profile = DECK_SAMPLE_PROFILES[status] || null;
-  return { status, criteria: profile?.criteria || null };
+  if (_deckCache[appId]) return _deckCache[appId];
+  try {
+    const r = await fetch(`https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport?nAppID=${appId}`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (!d.success) throw new Error('no data');
+    const cat = d.results?.resolved_category ?? 0;
+    const status = DECK_CAT_MAP[cat] || 'unknown';
+    // map each resolved_item to a true/false/null criterion result
+    const items = d.results?.resolved_items || [];
+    const criteria = items.length >= 4
+      ? items.slice(0, 4).map(i => DECK_DISPLAY_MAP[i.display_type] ?? null)
+      : null;
+    const ret = { status, criteria };
+    _deckCache[appId] = ret;
+    return ret;
+  } catch {
+    const ret = { status: 'unknown', criteria: null };
+    _deckCache[appId] = ret;
+    return ret;
+  }
+}
+
+// synchronous fallback used for initial render before the async fetch returns
+function getDeckStatusForApp(appId) {
+  return _deckCache[appId] || { status: 'unknown', criteria: null };
+}
+
+// cache fetched system requirements
+const _reqsCache = {};
+
+async function fetchMinRequirements(appId) {
+  if (!appId) return null;
+  if (_reqsCache[appId] !== undefined) return _reqsCache[appId];
+  try {
+    const r = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const app = d?.[appId]?.data;
+    if (!app) { _reqsCache[appId] = null; return null; }
+    const reqs = app.pc_requirements;
+    if (!reqs || (typeof reqs === 'object' && !reqs.minimum)) {
+      _reqsCache[appId] = null;
+      return null;
+    }
+    const ret = {
+      minimum: reqs.minimum || null,
+      recommended: reqs.recommended || null,
+    };
+    _reqsCache[appId] = ret;
+    return ret;
+  } catch {
+    _reqsCache[appId] = null;
+    return null;
+  }
 }
 
 // Inline SVGs for Deck status icons. All 24x24 viewBox + currentColor so a
@@ -1682,6 +1720,35 @@ async function renderGamePage(appId) {
 
     // async-enhance author blocks with stats + avatars after the DOM is ready
     void enhanceAuthorBlocks(reps.filter(r => r._kind !== 'config'));
+
+    // fetch real Steam Deck compat + min requirements and patch the UI
+    void (async () => {
+      const [deckData, reqsData] = await Promise.all([
+        fetchDeckStatusForApp(appId),
+        fetchMinRequirements(appId),
+      ]);
+      // update deck status button icon + modal
+      const deckBtn = el.querySelector('#deck-status-btn');
+      if (deckBtn && deckData.status !== 'unknown') {
+        const lbl = DECK_STATUS_LABELS[deckData.status] || 'Unknown';
+        deckBtn.querySelector('svg').innerHTML = DECK_STATUS_ICON_SVG[deckData.status] || DECK_STATUS_ICON_SVG.unknown;
+        deckBtn.title = `Steam Deck: ${lbl} (click for details)`;
+      }
+      const deckTip = el.querySelector('#deck-status-tip');
+      if (deckTip) deckTip.innerHTML = `<div class="info-tooltip-inner">${renderDeckStatusModalContent(appId)}</div>`;
+
+      // fill min requirements panel
+      const reqsEl = el.querySelector('#min-reqs-content');
+      if (reqsEl && reqsData) {
+        reqsEl.innerHTML = `
+          <h3 style="margin:0 0 8px;font-size:0.95rem;color:var(--strong)">Minimum System Requirements</h3>
+          ${reqsData.minimum || '<p style="color:var(--muted)">No minimum requirements listed.</p>'}
+          ${reqsData.recommended ? `<h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--strong)">Recommended</h3>${reqsData.recommended}` : ''}
+        `;
+      } else if (reqsEl) {
+        reqsEl.innerHTML = '<p style="color:var(--muted);padding:8px 0">No system requirements available from Steam for this title.</p>';
+      }
+    })();
   }
 
   render();
