@@ -92,6 +92,22 @@ async function submitReport(appId, title, form) {
   if (!session) return { ok: false, error: 'Sign in with Steam to submit a report.' };
   const protonPulseUserId = getProtonPulseUserIdFromSession(session);
   const state = form._formState || {};
+
+  // validate required compatibility questions before submitting
+  const missing = [];
+  if (!state.canInstall) missing.push('Can you install the game?');
+  if (state.canInstall === 'yes' && !state.canStart) missing.push('Can you start the game?');
+  if (state.canInstall === 'yes' && state.canStart === 'yes' && !state.canPlay) missing.push('Can you play the game?');
+  const allInstallYes = state.canInstall === 'yes' && state.canStart === 'yes' && state.canPlay === 'yes';
+  if (allInstallYes) {
+    if (!state.verdict) missing.push('Overall, did the game work?');
+    const unansweredFaults = FAULT_KEYS_WEB.filter(k => !state.faults?.[k]);
+    if (unansweredFaults.length > 0) missing.push(`${unansweredFaults.length} fault question(s)`);
+  }
+  if (missing.length > 0) {
+    return { ok: false, error: `Answer required questions: ${missing.join(', ')}` };
+  }
+
   const installFailed = state.canInstall === 'no' || state.canStart === 'no' || state.canPlay === 'no';
   const derivedRating = deriveRatingFromState(state);
   const formResponses = {

@@ -111,6 +111,30 @@
       e.preventDefault();
       const statusEl = el.querySelector('#submit-status');
       const submitBtn = form.querySelector('button[type="submit"]');
+
+      // highlight unanswered required questions
+      el.querySelectorAll('.sf-question.sf-needs-answer').forEach(q => q.classList.remove('sf-needs-answer'));
+      const state = form._formState || {};
+      const needsAnswer = [];
+      if (!state.canInstall) needsAnswer.push('q-canInstall');
+      if (state.canInstall === 'yes' && !state.canStart) needsAnswer.push('q-canStart');
+      if (state.canInstall === 'yes' && state.canStart === 'yes' && !state.canPlay) needsAnswer.push('q-canPlay');
+      const allYes = state.canInstall === 'yes' && state.canStart === 'yes' && state.canPlay === 'yes';
+      if (allYes && !state.verdict) needsAnswer.push('q-verdict');
+      if (allYes) {
+        for (const k of (typeof FAULT_KEYS_WEB !== 'undefined' ? FAULT_KEYS_WEB : [])) {
+          if (!state.faults?.[k]) needsAnswer.push('q-' + k);
+        }
+      }
+      for (const id of needsAnswer) {
+        const q = el.querySelector('#' + id);
+        if (q) q.classList.add('sf-needs-answer');
+      }
+      if (needsAnswer.length > 0) {
+        const first = el.querySelector('#' + needsAnswer[0]);
+        first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
       if (statusEl) { statusEl.textContent = 'Submitting...'; statusEl.style.color = 'var(--accent)'; }
 
