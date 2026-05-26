@@ -1297,8 +1297,6 @@ const MOCK_REPORTS = [
   const addSysSubmit = document.getElementById('add-sys-submit');
   const addSysCancel = document.getElementById('add-sys-cancel');
   const addSysStatus = document.getElementById('add-sys-status');
-  console.log('[profile] add-system wiring:', { btn: !!addSysBtn, form: !!addSysForm, submit: !!addSysSubmit });
-
   if (addSysBtn && addSysForm) {
     addSysBtn.addEventListener('click', () => {
       addSysForm.hidden = !addSysForm.hidden;
