@@ -304,6 +304,36 @@ async function fetchCdn(appId) {
   } catch { return []; }
 }
 
+// Live fallback: when CDN has no data for a game, attempt a direct fetch from
+// the ProtonDB public API so games not yet in our mirror still show tier data.
+async function fetchProtonDbLive(appId) {
+  try {
+    const r = await fetch(
+      `https://www.protondb.com/api/v1/reports/summaries/${appId}.json`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!r.ok) return [];
+    const data = await r.json();
+    // Normalise into the same shape our CDN rows use so the rest of the
+    // pipeline treats live results identically to cached ones.
+    if (!data || !data.tier) return [];
+    console.log(`[proton-pulse] CDN miss for ${appId} -- resolved live from ProtonDB API | tier=${data.tier} total=${data.total}`);
+    // Return a synthetic summary row so the tier badge and report count render.
+    return [{
+      appId,
+      tier:          data.tier,
+      total:         data.total || 0,
+      trendingTier:  data.trendingTier || data.tier,
+      score:         data.score || 0,
+      source:        'protondb-live',
+      _liveOnly:     true,
+    }];
+  } catch (e) {
+    console.debug(`[proton-pulse] ProtonDB live fallback failed for ${appId}:`, e);
+    return [];
+  }
+}
+
 /** Deduplicate rows by voter_id, keeping only the most recent per unique client. */
 function latestPerClient(rows) {
   const seen = new Map();
@@ -1215,8 +1245,16 @@ async function renderGamePage(appId) {
     fetchConfigPlaytimeTotals(appId),
   ]);
 
+  // If CDN returned nothing, attempt a live fetch from ProtonDB so games not
+  // yet in our mirror still show tier data rather than a hard "no results".
+  let liveFallback = [];
+  if (!cdn.length) {
+    liveFallback = await fetchProtonDbLive(appId);
+  }
+
   const reports = [
     ...cdn.map(r => ({ ...r, source: 'protondb' })),
+    ...liveFallback.map(r => ({ ...r, source: 'protondb' })),
     ...nativeReports,
   ];
 
