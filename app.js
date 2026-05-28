@@ -494,7 +494,7 @@ function renderStatsPanel(stats, appId) {
             <div style="background:var(--bg);border-radius:4px;height:10px;overflow:hidden">
               <div style="width:${confidencePct}%;height:100%;background:${confBarColor};transition:width 0.3s"></div>
             </div>
-            <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Based on ${totalReports} total report${totalReports !== 1 ? 's' : ''} &mdash; <a href="confidence.html?app=${appId}" style="color:var(--accent)">full breakdown</a></div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Based on ${totalReports} total report${totalReports !== 1 ? 's' : ''} &mdash; <a href="confidence.html?app=${appId}" style="color:var(--accent)">History, versions &amp; full breakdown &rarr;</a></div>
           </div>
         </div>
         ${factorRows}

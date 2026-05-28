@@ -523,8 +523,157 @@ h1 {
         <div class="cb-factor"><div><div class="cb-factor-label">Notes</div><div class="cb-factor-detail">${hasNotes ? (report.notes.length > 80 ? esc(report.notes.slice(0, 80)) + '...' : esc(report.notes)) : 'None provided'}</div></div><div class="cb-factor-value ${hasNotes ? 'cb-positive' : 'cb-neutral'}">${hasNotes ? report.notes.length + ' chars' : 'absent'}</div></div>
       </div>
 
-      <a class="cb-back" href="app.html#/app/${esc(appId)}">&larr; Back to ${esc(gameTitle)}</a>
+      <a class="cb-back" href="confidence.html?app=${esc(appId)}">&larr; Back to aggregate stats</a>
     `;
+  }
+
+  // Smooth SVG cubic bezier path through an array of {x,y} points.
+  function smoothPath(pts) {
+    if (!pts.length) return '';
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const cx = ((pts[i].x + pts[i + 1].x) / 2).toFixed(1);
+      d += ` C ${cx} ${pts[i].y.toFixed(1)} ${cx} ${pts[i + 1].y.toFixed(1)} ${pts[i + 1].x.toFixed(1)} ${pts[i + 1].y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  // SVG dual-line area chart: positive (silver+) vs negative (bronze/borked) reports over time.
+  function buildHistoryChart(reports) {
+    if (!reports.length) return '<div style="color:var(--muted);font-size:0.78rem">No report history available.</div>';
+
+    // Bucket reports by year-month for last 24 months
+    const now = Date.now() / 1000;
+    const MONTHS = 24;
+    const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const rawBuckets = {};
+    for (const r of reports) {
+      if (!r.timestamp) continue;
+      const d = new Date(r.timestamp * 1000);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!rawBuckets[key]) rawBuckets[key] = { pos: 0, neg: 0 };
+      if (['platinum','gold','silver'].includes(r.rating)) rawBuckets[key].pos++;
+      else rawBuckets[key].neg++;
+    }
+
+    // Generate all month slots for the window (earliest report to now)
+    const monthKeys = [];
+    const earliestTs = Math.min(...reports.map(r => r.timestamp || now)) ;
+    const windowStart = Math.max(earliestTs, now - MONTHS * 30.5 * 86400);
+    for (let i = 0; i < MONTHS; i++) {
+      const d = new Date((windowStart + i * 30.5 * 86400) * 1000);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!monthKeys.includes(key)) monthKeys.push(key);
+    }
+    monthKeys.sort();
+
+    const data = monthKeys.map(k => ({ key: k, ...(rawBuckets[k] || { pos: 0, neg: 0 }) }));
+    const maxCount = Math.max(1, ...data.map(d => d.pos + d.neg));
+    const hasAny = data.some(d => d.pos + d.neg > 0);
+    if (!hasAny) return '<div style="color:var(--muted);font-size:0.78rem">No timestamped report history available.</div>';
+
+    const W = 560, H = 140, PAD_L = 28, PAD_B = 22, PAD_T = 10;
+    const cW = W - PAD_L - 4;
+    const cH = H - PAD_B - PAD_T;
+    const n = data.length;
+    const xStep = n > 1 ? cW / (n - 1) : 0;
+    const yFor = v => (PAD_T + cH - (v / maxCount) * cH).toFixed(1);
+    const baseY = (PAD_T + cH).toFixed(1);
+
+    const posPoints = data.map((d, i) => ({ x: PAD_L + i * xStep, y: parseFloat(yFor(d.pos)) }));
+    const negPoints = data.map((d, i) => ({ x: PAD_L + i * xStep, y: parseFloat(yFor(d.neg)) }));
+
+    const posLine = smoothPath(posPoints);
+    const negLine = smoothPath(negPoints);
+    const posArea = `${posLine} L ${posPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
+    const negArea = `${negLine} L ${negPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
+
+    // Y axis tick labels
+    const yTicks = [0, Math.round(maxCount / 2), maxCount].map(v =>
+      `<text x="${PAD_L - 4}" y="${parseFloat(yFor(v)) + 3}" text-anchor="end" fill="#555" font-size="9">${v}</text>`
+    ).join('');
+
+    // X axis labels every ~3 months
+    const labelEvery = Math.ceil(n / 8);
+    const xLabels = data.map((d, i) => {
+      if (i % labelEvery !== 0 && i !== n - 1) return '';
+      const [yr, mo] = d.key.split('-');
+      return `<text x="${(PAD_L + i * xStep).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="#555" font-size="9">${MONTH_ABBR[parseInt(mo)-1]} '${yr.slice(2)}</text>`;
+    }).join('');
+
+    // Horizontal grid lines
+    const gridLines = [0.25, 0.5, 0.75].map(f =>
+      `<line x1="${PAD_L}" y1="${(PAD_T + cH * (1-f)).toFixed(1)}" x2="${W-4}" y2="${(PAD_T + cH * (1-f)).toFixed(1)}" stroke="#1e2e3e" stroke-width="1"/>`
+    ).join('');
+
+    return `
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="hcPosGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#66c0f4" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#66c0f4" stop-opacity="0.03"/>
+          </linearGradient>
+          <linearGradient id="hcNegGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c85050" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#c85050" stop-opacity="0.03"/>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
+        <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${W-4}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
+        ${yTicks}
+        <path d="${posArea}" fill="url(#hcPosGrad)"/>
+        <path d="${negArea}" fill="url(#hcNegGrad)"/>
+        <path d="${posLine}" fill="none" stroke="#66c0f4" stroke-width="1.8"/>
+        <path d="${negLine}" fill="none" stroke="#c85050" stroke-width="1.8"/>
+        ${xLabels}
+      </svg>
+      <div style="display:flex;gap:16px;margin-top:2px;font-size:0.72rem;color:var(--muted)">
+        <span><span style="display:inline-block;width:12px;height:3px;background:#66c0f4;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Positive (silver+)</span>
+        <span><span style="display:inline-block;width:12px;height:3px;background:#c85050;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Negative (bronze/borked)</span>
+      </div>`;
+  }
+
+  function computeTrend(reports) {
+    const now = Date.now() / 1000;
+    const RATING_VAL = { platinum: 5, gold: 4, silver: 3, bronze: 2, borked: 1 };
+    const recent = reports.filter(r => r.timestamp && now - r.timestamp < 90 * 86400);
+    const prior  = reports.filter(r => r.timestamp && now - r.timestamp >= 90 * 86400 && now - r.timestamp < 270 * 86400);
+    const avg = arr => arr.reduce((s, r) => s + (RATING_VAL[r.rating] || 3), 0) / arr.length;
+    if (recent.length >= 2 && prior.length >= 2) {
+      const diff = avg(recent) - avg(prior);
+      return { dir: diff > 0.3 ? 'improving' : diff < -0.3 ? 'declining' : 'stable', diff, recentCount: recent.length, priorCount: prior.length };
+    }
+    return { dir: 'insufficient', diff: 0, recentCount: recent.length, priorCount: prior.length };
+  }
+
+  function computeVersionStats(reports) {
+    const map = {};
+    for (const r of reports) {
+      const ver = r.protonVersion || r.proton_version || 'Unknown';
+      if (!map[ver]) map[ver] = { total: 0, pos: 0 };
+      map[ver].total++;
+      if (['platinum','gold','silver'].includes(r.rating)) map[ver].pos++;
+    }
+    return Object.entries(map)
+      .map(([ver, s]) => ({ ver, total: s.total, pct: Math.round((s.pos / s.total) * 100) }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  }
+
+  function computeLaunchFlags(reports) {
+    const flagMap = {};
+    const withOpts = reports.filter(r => r.launchOptions || r.launch_options);
+    for (const r of withOpts) {
+      const lo = r.launchOptions || r.launch_options || '';
+      const tokens = lo.split(/\s+/).filter(t => t.startsWith('%') || t.startsWith('-') || /^[A-Z_]+=/.test(t));
+      for (const tok of tokens) flagMap[tok] = (flagMap[tok] || 0) + 1;
+    }
+    const total = withOpts.length;
+    return Object.entries(flagMap)
+      .map(([flag, cnt]) => ({ flag, cnt, pct: total > 0 ? Math.round((cnt / total) * 100) : 0 }))
+      .sort((a, b) => b.cnt - a.cnt)
+      .slice(0, 10);
   }
 
   // Aggregate breakdown for a whole game. Shows the rating distribution,
@@ -549,6 +698,7 @@ h1 {
       `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border-radius:3px;background:${RATING_COLORS[tier] || '#3a4a5a'};color:${tier==='bronze'||tier==='borked'?'#fff':'#111'};min-width:50px;font-family:var(--mono);opacity:${cnt?1:0.35}">
         <span style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;font-weight:600">${tier}</span>
         <span style="font-size:1.1rem;font-weight:700;line-height:1">${cnt}</span>
+        <span style="font-size:0.6rem;opacity:0.75">${n > 0 ? Math.round(cnt/n*100) : 0}%</span>
       </div>`
     ).join('');
 
@@ -557,11 +707,49 @@ h1 {
     const meanConf = breakdowns.length
       ? Math.round(breakdowns.reduce((a, b) => a + b.total, 0) / breakdowns.length)
       : 0;
-
-    // Top/bottom per-report confidence range
     const scores = breakdowns.map(b => b.total).sort((a, b) => a - b);
     const lowestConf = scores[0] ?? 0;
     const highestConf = scores[scores.length - 1] ?? 0;
+
+    // Trend
+    const trend = computeTrend(reports);
+    const TREND_COLOR = { improving: '#5ba32b', declining: '#c85050', stable: 'var(--text)', insufficient: 'var(--muted)' };
+    const TREND_LABEL = { improving: 'Improving', declining: 'Declining', stable: 'Stable', insufficient: 'Insufficient data' };
+    const trendIcon = trend.dir === 'improving'
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>'
+      : trend.dir === 'declining'
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>';
+
+    // Version stats
+    const versionStats = computeVersionStats(reports);
+    const verRows = versionStats.length
+      ? versionStats.map(v => {
+          const barColor = v.pct >= 75 ? '#5ba32b' : v.pct >= 50 ? '#e0a030' : '#c85050';
+          return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="min-width:150px;font-size:0.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(v.ver)}">${esc(v.ver)}</span>
+            <div style="flex:1;background:var(--bg);border-radius:2px;height:7px;overflow:hidden">
+              <div style="width:${v.pct}%;height:100%;background:${barColor};border-radius:2px;transition:width 0.3s"></div>
+            </div>
+            <span style="width:38px;text-align:right;font-weight:700;color:${barColor}">${v.pct}%</span>
+            <span style="width:30px;text-align:right;color:var(--muted);font-size:0.72rem">${v.total}r</span>
+          </div>`;
+        }).join('')
+      : '<div style="color:var(--muted);font-size:0.78rem">No Proton version data available.</div>';
+
+    // Launch flags
+    const launchFlags = computeLaunchFlags(reports);
+    const flagRows = launchFlags.length
+      ? launchFlags.map(f => `
+          <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <code style="min-width:180px;font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.flag)}</code>
+            <div style="flex:1;background:var(--bg);border-radius:2px;height:7px;overflow:hidden">
+              <div style="width:${Math.min(100,f.pct)}%;height:100%;background:var(--accent);border-radius:2px"></div>
+            </div>
+            <span style="width:38px;text-align:right;font-weight:700">${f.pct}%</span>
+            <span style="width:28px;text-align:right;color:var(--muted);font-size:0.72rem">${f.cnt}x</span>
+          </div>`).join('')
+      : '<div style="color:var(--muted);font-size:0.78rem">No launch option data in reports.</div>';
 
     return `
       <div class="cb-header">
@@ -570,51 +758,71 @@ h1 {
           <div class="sub">App ${esc(appId)} / ${n} report${n !== 1 ? 's' : ''} / newest ${daysAgo(newestTs)}</div>
         </div>
         <span class="cb-total" style="background:${totalBg};color:${totalFg}">
-          <span class="label">Overall</span> ${displayed}%
+          <span class="label">Confidence</span> ${displayed}%
         </span>
       </div>
 
+      <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Report history</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Positive (silver+) vs. negative (bronze/borked) reports submitted over time.</p>
+      ${buildHistoryChart(reports)}
+
+      <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>Compatibility trend</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 8px">Comparing average rating in last 90 days vs. the prior 90-270 day window.</p>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--s1);border:1px solid var(--border);border-left:3px solid ${TREND_COLOR[trend.dir]}">
+        <span style="color:${TREND_COLOR[trend.dir]};display:flex;align-items:center;gap:4px;font-weight:700">${trendIcon} ${TREND_LABEL[trend.dir]}</span>
+        ${trend.dir !== 'insufficient'
+          ? `<span style="color:var(--muted);font-size:0.78rem">${trend.recentCount} report${trend.recentCount !== 1 ? 's' : ''} last 90d vs ${trend.priorCount} in prior 90-270d window</span>`
+          : `<span style="color:var(--muted);font-size:0.78rem">Need at least 2 reports in each window for trend analysis.</span>`}
+      </div>
+
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>Rating distribution</h3>
-      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">How the ${n} reports break down by tier. The overall tier badge uses a recency-weighted mean of these.</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">How the ${n} reports break down by tier.</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">${distChips}</div>
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Confidence factors</h3>
-      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">The overall confidence is primarily driven by how many reports exist (sample size). More reports means more data points, which means more trust in the aggregate rating.</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Confidence is driven by sample size, rating consistency, and data freshness.</p>
       <div class="cb-factors">
         ${renderFactor(
           'Sample size',
           `${n} report${n !== 1 ? 's' : ''} on a log-scaled curve`,
           displayed,
-          `Confidence from sample size: 1 report=30%, 5=60%, 20=85%, 50+=~95%. This game has ${n} reports so the baseline sits at ${displayed}%.`
+          `1 report=30%, 5=60%, 20=85%, 50+=~95%. This game has ${n} report${n !== 1 ? 's' : ''} -- baseline sits at ${displayed}%.`
         )}
         ${renderFactor(
           'Mean per-report confidence',
           `Average of all ${n} individual report confidence scores`,
           meanConf,
-          `Range: lowest ${lowestConf}% to highest ${highestConf}%. Reports with higher ratings and more recent timestamps score higher individually.`
+          `Range: lowest ${lowestConf}% to highest ${highestConf}%. Higher-rated, more recent reports score higher individually.`
         )}
         ${renderFactor(
           'Freshness',
-          `Newest report was ${daysAgo(newestTs)} (${daysSinceNewest}d)`,
+          `Newest report was ${daysAgo(newestTs)} (${daysSinceNewest === Infinity ? 'unknown' : daysSinceNewest + 'd'})`,
           freshnessAdjust,
-          daysSinceNewest < 180 ? 'Data is fresh (under 6 months) - no penalty.'
-            : `Data pool is aging. Freshness penalty applies because the newest report is ${daysSinceNewest} days old. Games with no recent testing lose confidence.`
+          daysSinceNewest < 180 ? 'Data is fresh (under 6 months) -- no penalty.'
+            : `Data pool is aging. Newest report is ${daysSinceNewest} days old.`
         )}
       </div>
 
       <div class="cb-formula">
-        The displayed confidence (<strong>${displayed}%</strong>) tracks the sample-size curve.
-        With ${n} reports and a newest report from ${daysAgo(newestTs)}, the data pool
-        is ${displayed >= 80 ? 'strong' : displayed >= 50 ? 'moderate' : 'thin'}.
-        ${freshnessAdjust < 0 ? `The ${Math.abs(freshnessAdjust)}-point freshness penalty reflects aging data.` : ''}
+        Confidence <strong>${displayed}%</strong> with ${n} report${n !== 1 ? 's' : ''}, newest from ${daysAgo(newestTs)}.
+        Data pool is ${displayed >= 80 ? 'strong' : displayed >= 50 ? 'moderate' : 'thin'}.
+        ${freshnessAdjust < 0 ? `Freshness penalty: -${Math.abs(freshnessAdjust)} points.` : ''}
       </div>
+
+      <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>Per-Proton-version success</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">% of reports rated silver or better per Proton version (sorted by report count).</p>
+      ${verRows}
+
+      <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/><path d="M3 15h6"/><path d="M12 9h9"/><path d="M12 15h9"/></svg>Common launch option flags</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Frequency of each flag across reports that include launch options.</p>
+      ${flagRows}
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 017 7c0 2.4-1.2 4.5-3 5.7V17a1 1 0 01-1 1h-6a1 1 0 01-1-1v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 017-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>What this means</h3>
       <div class="cb-formula">
-        ${displayed >= 80 ? `<strong>High confidence.</strong> Dozens of reports with broad consensus. The overall tier badge is well-supported by data.` :
-          displayed >= 50 ? `<strong>Moderate confidence.</strong> Enough reports to show a trend, but more data would strengthen the signal.` :
-          `<strong>Low confidence.</strong> Few reports available. The tier badge reflects what's been submitted, but take it with a grain of salt until more users report.`}
-        ${n > 0 ? ` Click any individual report's confidence pill on the <a href="app.html#/app/${esc(appId)}" style="color:var(--accent-hi)">game page</a> to see its per-report breakdown.` : ''}
+        ${displayed >= 80 ? `<strong>High confidence.</strong> Strong data pool with broad consensus.` :
+          displayed >= 50 ? `<strong>Moderate confidence.</strong> Enough reports to show a trend, but more data would help.` :
+          `<strong>Low confidence.</strong> Few reports -- take the tier badge with a grain of salt.`}
+        ${n > 0 ? ` View individual report breakdowns on the <a href="app.html#/app/${esc(appId)}" style="color:var(--accent-hi)">game page</a>.` : ''}
       </div>
 
       <a class="cb-back" href="app.html#/app/${esc(appId)}">&larr; Back to ${esc(gameTitle)}</a>
@@ -679,7 +887,7 @@ h1 {
       if (!target) {
         root.innerHTML = `<div class="error-state">
           <p>Report not found for app ${esc(appId)}.</p>
-          <a class="cb-back" href="app.html#/app/${esc(appId)}">&larr; Back to ${esc(gameTitle)}</a>
+          <a class="cb-back" href="confidence.html?app=${esc(appId)}">&larr; Back to aggregate stats</a>
         </div>`;
         return;
       }
