@@ -1143,16 +1143,18 @@ code {
   .topbar-nav { justify-content: flex-end; padding: 10px var(--content-pad); }
   .topbar-search-wrap { flex: 1 1 auto; max-width: 100%; min-width: 0; }
 
-  /* show the hamburger */
-  .topbar-mobile-toggle { display: inline-flex; }
+  /* show the hamburger, lock it so it cannot shrink or be clipped */
+  .topbar-mobile-toggle { display: inline-flex; flex-shrink: 0; }
 
   /* tighten the login button area on small screens */
   .gh-login-btn__label { display: none; }
   .gh-login-btn { padding: 4px 8px 4px 6px; }
-  /* hide auth username text so the auth avatar doesn't push the hamburger off screen */
+  /* hide username text -- avatar icon only on mobile so hamburger is never pushed off */
   .auth-username { display: none; }
-  /* ensure hamburger never shrinks or disappears due to overflow */
-  .topbar-mobile-toggle { flex-shrink: 0; }
+  /* clamp auth chip to avatar width so it can't crowd the hamburger */
+  .auth-link--signedin { padding: 0 6px; max-width: 40px; }
+  /* prevent the actions row itself from overflowing and hiding the last item */
+  .topbar-banner-actions { flex-shrink: 0; overflow: visible; }
 
   .topbar-desktop-only { display: none !important; }
 

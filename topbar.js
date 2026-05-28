@@ -597,7 +597,8 @@
         if (signedIn)  signedIn.hidden  = false;
         if (avatarEl)  avatarEl.src = (user.user_metadata && user.user_metadata.avatar_url) || '';
         if (avatarEl)  avatarEl.alt = (user.user_metadata && user.user_metadata.name) || user.email || '';
-        if (nameEl)    nameEl.textContent = (user.user_metadata && user.user_metadata.name) || user.email || '';
+        const rawName = (user.user_metadata && user.user_metadata.name) || user.email || '';
+        if (nameEl)    nameEl.textContent = rawName.length > 10 ? rawName.slice(0, 10) + '\u2026' : rawName;
       } else {
         if (signedOut) signedOut.hidden = false;
         if (signedIn)  signedIn.hidden  = true;
