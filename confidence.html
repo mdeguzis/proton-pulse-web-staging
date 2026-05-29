@@ -870,6 +870,32 @@ h1 {
     // after innerHTML lands. wire() is invoked by the caller (run())
     const history = buildHistoryChart(reports);
 
+    // Overall tier = mode of ratings (most common); on a tie prefer higher
+    // tier so an even split between gold and silver shows gold. Same intent
+    // as the badge on the main game page so the user sees the same rating
+    // here as they saw to get here in the first place
+    const TIER_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
+    const TIER_LBL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
+    let overallTier = null;
+    if (n > 0) {
+      const tierCounts = {};
+      for (const r of reports) if (counts[r.rating] != null) {
+        tierCounts[r.rating] = (tierCounts[r.rating] || 0) + 1;
+      }
+      let bestCount = -1;
+      for (const t of TIER_ORDER) {
+        if ((tierCounts[t] || 0) > bestCount) {
+          bestCount = tierCounts[t];
+          overallTier = t;
+        }
+      }
+    }
+    const tierBg = overallTier ? (RATING_COLORS[overallTier] || '#3a4a5a') : 'transparent';
+    const tierFg = (overallTier === 'bronze' || overallTier === 'borked') ? '#fff' : '#111';
+    const tierBadge = overallTier
+      ? `<span class="cb-total" style="background:${tierBg};color:${tierFg};margin-left:8px">${TIER_LBL[overallTier]}</span>`
+      : '';
+
     const html = `
       <div class="cb-header">
         <div class="cb-header-game">
@@ -879,6 +905,7 @@ h1 {
         <span class="cb-total" style="background:${totalBg};color:${totalFg}">
           <span class="label">Confidence</span> ${displayed}%
         </span>
+        ${tierBadge}
       </div>
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Report history</h3>

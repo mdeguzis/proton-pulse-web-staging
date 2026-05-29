@@ -54,21 +54,44 @@ function attachChartHover(opts) {
   } = opts;
   if (!svg || !host || !tooltip || !data || !data.length) return;
 
-  // showAt(idx) does the actual reveal -- guide line, dots, tooltip.
-  // Factored out so both the per-column rects (discrete snap) and the
-  // full-width mousemove (continuous tracking) can share it
-  const showAt = (idx) => {
+  // showAt(idx, atX) does the actual reveal -- guide line, dots, tooltip.
+  // When atX is supplied (continuous-tracking mode), the guide line + dots
+  // ride the cursor's x coordinate and their y is interpolated linearly
+  // along the segment between data[idx] and the adjacent point, so they
+  // visually slide along the line. Tooltip still shows the nearest data
+  // point (idx) so the readout stays stable. atX is omitted in the legacy
+  // discrete-rect path; the dot then sits at the data point exactly
+  const showAt = (idx, atX) => {
     const item = data[idx];
     if (item == null) return;
-    const x = getX(idx);
+    const x = atX != null ? atX : getX(idx);
     if (guide) {
       guide.setAttribute('x1', x);
       guide.setAttribute('x2', x);
     }
     dots.forEach((dot, di) => {
       if (!dot) return;
+      let cy = getYForDot(item, di);
+      if (atX != null) {
+        // Pick the neighbour segment that contains atX and linearly
+        // interpolate between this point's y and the neighbour's y
+        const here = getX(idx);
+        let neighbourIdx = -1;
+        if (atX > here && idx < data.length - 1) neighbourIdx = idx + 1;
+        else if (atX < here && idx > 0) neighbourIdx = idx - 1;
+        if (neighbourIdx !== -1) {
+          const there = getX(neighbourIdx);
+          const span = there - here;
+          if (span !== 0) {
+            const t = (atX - here) / span;
+            const yHere = cy;
+            const yThere = getYForDot(data[neighbourIdx], di);
+            cy = yHere + t * (yThere - yHere);
+          }
+        }
+      }
       dot.setAttribute('cx', x);
-      dot.setAttribute('cy', getYForDot(item, di));
+      dot.setAttribute('cy', cy);
     });
     host.classList.add('is-hovered');
     tooltip.innerHTML = renderTip(item, idx);
