@@ -47,10 +47,23 @@ h1 {
   width: 92px; height: 43px;
   object-fit: cover; border-radius: 3px;
   background: var(--bg);
+  transition: transform 0.15s;
 }
 .gs-header-info { flex: 1; min-width: 0; }
 .gs-header-info .name { font-family: var(--font-display); font-size: 1.05rem; color: var(--text); }
 .gs-header-info .sub  { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); letter-spacing: 0.04em; margin-top: 2px; }
+
+/* Boxart + name + appid is one big anchor so clicking anywhere on the left
+   side of the header goes back to the game page. Style it to look like a
+   plain block, only adding a subtle hover lift on the image and a faint
+   color shift on the name to telegraph the clickability */
+.gs-header-link {
+  display: flex; align-items: center; gap: 14px;
+  flex: 1; min-width: 0;
+  text-decoration: none; color: inherit;
+}
+.gs-header-link:hover img { transform: translateY(-1px); }
+.gs-header-link:hover .gs-header-info .name { color: var(--accent-hi); }
 
 /* Section pattern, mirrors confidence.html cb-section-head */
 .gs-section-head {
@@ -175,6 +188,52 @@ h1 {
 .is-active {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Compatibility trend: side-by-side bars for recent vs older positive ratio */
+.gs-trend {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 4px;
+}
+.gs-trend-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(20, 32, 44, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.gs-trend-summary .gs-trend-arrow {
+  font-size: 1.2rem; font-weight: 700;
+}
+.gs-trend-summary .gs-trend-dir {
+  font-family: var(--font-display);
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  font-size: 0.85rem;
+}
+.gs-trend-summary .gs-trend-delta {
+  font-family: var(--mono); font-size: 0.78rem;
+  color: var(--text);
+}
+.gs-trend-summary .gs-trend-meta {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 0.74rem;
+  color: var(--muted);
+}
+.gs-trend-bars {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0 4px;
+}
+.gs-trend-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.85rem;
+}
+.gs-trend-row .gs-trend-lbl { width: 130px; color: var(--muted); }
+.gs-trend-row .gs-trend-bar {
+  flex: 1; background: var(--bg); border-radius: 2px; height: 8px; overflow: hidden;
+}
+.gs-trend-row .gs-trend-bar > div { height: 100%; }
+.gs-trend-row .gs-trend-pct {
+  width: 44px; text-align: right; font-weight: 700; font-family: var(--mono);
 }
 
 /* Version + launch flag lists (two columns on wide, stacked on narrow) */

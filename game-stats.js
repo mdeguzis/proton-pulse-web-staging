@@ -69,14 +69,21 @@
 
   function renderHeader(appId, title) {
     const headerImg = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
+    const gameUrl = `app.html#/app/${esc(appId)}`;
+    // Whole left side (image + name + appid) is a single anchor so clicking
+    // the boxart or title takes you back to the game page. The dedicated
+    // "Back to game page" link stays on the right for keyboard/screen-reader
+    // users who want an explicit affordance
     return `
       <div class="gs-header">
-        <img src="${headerImg}" alt="" onerror="this.style.display='none'">
-        <div class="gs-header-info">
-          <div class="name">${esc(title || `App ${appId}`)}</div>
-          <div class="sub">App ${esc(appId)}</div>
-        </div>
-        <a class="gs-back" href="app.html#/app/${esc(appId)}">&larr; Back to game page</a>
+        <a class="gs-header-link" href="${gameUrl}" title="Back to ${esc(title || `App ${appId}`)}">
+          <img src="${headerImg}" alt="" onerror="this.style.display='none'">
+          <div class="gs-header-info">
+            <div class="name">${esc(title || `App ${appId}`)}</div>
+            <div class="sub">App ${esc(appId)}</div>
+          </div>
+        </a>
+        <a class="gs-back" href="${gameUrl}">&larr; Back to game page</a>
       </div>
     `;
   }
@@ -90,6 +97,7 @@
     dist: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="3" height="9"/><rect x="9" y="7" width="3" height="13"/><rect x="15" y="3" width="3" height="17"/></svg>',
     versions: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     tips: '<svg viewBox="0 0 24 24" fill="none"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z"/></svg>',
+    trend: '<svg viewBox="0 0 24 24" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
   };
 
   // --- status cards (working / confidence / freshness) ---
@@ -258,6 +266,59 @@
     return { html, wire };
   }
 
+  // --- recent vs long-term trend ---
+  //
+  // Shows the positive-report ratio in the last 90 days side-by-side with
+  // the 90-270 day window. Same numbers computeGameStats already produces;
+  // this just visualises them so users can see "still working great" vs
+  // "was working, broke recently" at a glance.
+  function renderTrend(stats) {
+    const recent = stats.recentPositiveRatio;
+    const older = stats.olderPositiveRatio;
+    if (recent == null || older == null) {
+      return `<div style="color:var(--muted);font-size:0.85rem;padding:8px 0">
+        Not enough timestamped reports across both windows to compute a trend.
+        Need at least 2 reports in the last 90 days AND 2 in the prior 90-270d window.
+      </div>`;
+    }
+    const recentPct = Math.round(recent * 100);
+    const olderPct = Math.round(older * 100);
+    const delta = recentPct - olderPct;
+    const dirLabel = stats.trendDir === 'improving' ? 'Improving'
+      : stats.trendDir === 'declining' ? 'Declining'
+      : 'Stable';
+    const dirColor = stats.trendDir === 'improving' ? '#5bd17a'
+      : stats.trendDir === 'declining' ? '#ff6b6b'
+      : '#7a9bb5';
+    const arrow = stats.trendDir === 'improving' ? '↑'
+      : stats.trendDir === 'declining' ? '↓'
+      : '→';
+    const tone = (pct) => pct >= 70 ? '#5bd17a' : pct >= 40 ? '#ffb84d' : '#ff6b6b';
+
+    return `
+      <div class="gs-trend">
+        <div class="gs-trend-summary" style="border-left:3px solid ${dirColor}">
+          <span class="gs-trend-arrow" style="color:${dirColor}">${arrow}</span>
+          <span class="gs-trend-dir" style="color:${dirColor}">${dirLabel}</span>
+          <span class="gs-trend-delta">${delta > 0 ? '+' : ''}${delta} pts vs prior window</span>
+          <span class="gs-trend-meta">${stats.recentCount} reports last 90d &middot; ${stats.priorCount} prior 90-270d</span>
+        </div>
+        <div class="gs-trend-bars">
+          <div class="gs-trend-row">
+            <span class="gs-trend-lbl">Recent (90d)</span>
+            <div class="gs-trend-bar"><div style="width:${recentPct}%;background:${tone(recentPct)}"></div></div>
+            <span class="gs-trend-pct" style="color:${tone(recentPct)}">${recentPct}%</span>
+          </div>
+          <div class="gs-trend-row">
+            <span class="gs-trend-lbl">Older (90-270d)</span>
+            <div class="gs-trend-bar"><div style="width:${olderPct}%;background:${tone(olderPct)}"></div></div>
+            <span class="gs-trend-pct" style="color:${tone(olderPct)}">${olderPct}%</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // --- confidence factors ---
 
   function renderFactors(stats) {
@@ -358,6 +419,9 @@
 
       ${sectionHead(ICON.dist, 'Rating distribution')}
       ${renderDistribution(stats)}
+
+      ${sectionHead(ICON.trend, 'Compatibility trend (recent vs older)')}
+      ${renderTrend(stats)}
 
       ${sectionHead(ICON.factors, 'Confidence factors')}
       ${renderFactors(stats)}

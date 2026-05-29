@@ -155,6 +155,38 @@ h1 {
   font-family: var(--mono);
   color: var(--muted);
 }
+
+/* Interactive chart pieces, shared with game-stats.html via
+   app-chart-interactions.js. ci- prefix = chart-interactions.
+   Hover targets are full-height invisible rects so hovering anywhere
+   over a column triggers the data-point lookup */
+.cb-history-chart { position: relative; }
+.ci-hover-target  { cursor: pointer; }
+.ci-hover-guide   { opacity: 0; stroke: rgba(255,255,255,0.22); stroke-dasharray: 3 3; pointer-events: none; transition: opacity 0.1s; }
+.ci-hover-dot     { opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+.is-hovered .ci-hover-guide,
+.is-hovered .ci-hover-dot { opacity: 1; }
+.ci-tooltip {
+  position: absolute;
+  top: 6px;
+  padding: 6px 10px;
+  background: rgba(8, 14, 22, 0.92);
+  border: 1px solid rgba(110, 180, 240, 0.28);
+  border-radius: 3px;
+  font-size: 0.78rem;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+  white-space: nowrap;
+  font-family: var(--mono);
+  z-index: 5;
+}
+.ci-tooltip .ci-tip-month { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.05em; }
+.ci-tooltip .ci-tip-row   { margin-top: 3px; display: flex; gap: 8px; align-items: center; }
+.ci-tooltip .ci-tip-dot   { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+.ci-tooltip .ci-tip-val   { margin-left: auto; font-weight: 700; }
+.is-hovered .ci-tooltip   { opacity: 1; }
 </style>
 </head>
 <body>
@@ -183,6 +215,7 @@ h1 {
 <script src="supabase-client.js"></script>
 <script src="app-scoring.js"></script>
 <script src="app-hardware.js?v=1"></script>
+<script src="app-chart-interactions.js?v=1"></script>
 
 <script>
 (function () {
@@ -529,8 +562,14 @@ h1 {
   }
 
   // SVG dual-line area chart: positive (silver+) vs negative (bronze/borked) reports over time.
+  // Returns { html, wire }. Caller injects html into the DOM, then calls
+  // wire() so the chart-interactions helper can attach hover handlers to
+  // the live <rect class="ci-hover-target"> nodes
   function buildHistoryChart(reports) {
-    if (!reports.length) return '<div style="color:var(--muted);font-size:0.78rem">No report history available.</div>';
+    if (!reports.length) return {
+      html: '<div style="color:var(--muted);font-size:0.78rem">No report history available.</div>',
+      wire: () => {},
+    };
 
     // Bucket reports by year-month for last 24 months
     const now = Date.now() / 1000;
@@ -546,9 +585,8 @@ h1 {
       else rawBuckets[key].neg++;
     }
 
-    // Generate all month slots for the window (earliest report to now)
     const monthKeys = [];
-    const earliestTs = Math.min(...reports.map(r => r.timestamp || now)) ;
+    const earliestTs = Math.min(...reports.map(r => r.timestamp || now));
     const windowStart = Math.max(earliestTs, now - MONTHS * 30.5 * 86400);
     for (let i = 0; i < MONTHS; i++) {
       const d = new Date((windowStart + i * 30.5 * 86400) * 1000);
@@ -560,68 +598,122 @@ h1 {
     const data = monthKeys.map(k => ({ key: k, ...(rawBuckets[k] || { pos: 0, neg: 0 }) }));
     const maxCount = Math.max(1, ...data.map(d => d.pos + d.neg));
     const hasAny = data.some(d => d.pos + d.neg > 0);
-    if (!hasAny) return '<div style="color:var(--muted);font-size:0.78rem">No timestamped report history available.</div>';
+    if (!hasAny) return {
+      html: '<div style="color:var(--muted);font-size:0.78rem">No timestamped report history available.</div>',
+      wire: () => {},
+    };
 
-    const W = 560, H = 140, PAD_L = 28, PAD_B = 22, PAD_T = 10;
-    const cW = W - PAD_L - 4;
+    // Bigger viewBox + preserveAspectRatio="none" so the chart stretches
+    // edge-to-edge. The old 560x140 stayed letterboxed in wide layouts
+    const W = 1000, H = 200, PAD_L = 36, PAD_B = 26, PAD_T = 12;
+    const cW = W - PAD_L - 8;
     const cH = H - PAD_B - PAD_T;
     const n = data.length;
     const xStep = n > 1 ? cW / (n - 1) : 0;
     const yFor = v => (PAD_T + cH - (v / maxCount) * cH).toFixed(1);
     const baseY = (PAD_T + cH).toFixed(1);
 
-    const posPoints = data.map((d, i) => ({ x: PAD_L + i * xStep, y: parseFloat(yFor(d.pos)) }));
-    const negPoints = data.map((d, i) => ({ x: PAD_L + i * xStep, y: parseFloat(yFor(d.neg)) }));
+    const xAt = i => PAD_L + i * xStep;
+    const yPos = item => parseFloat(yFor(item.pos));
+    const yNeg = item => parseFloat(yFor(item.neg));
 
+    const posPoints = data.map((d, i) => ({ x: xAt(i), y: yPos(d) }));
+    const negPoints = data.map((d, i) => ({ x: xAt(i), y: yNeg(d) }));
     const posLine = smoothPath(posPoints);
     const negLine = smoothPath(negPoints);
     const posArea = `${posLine} L ${posPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
     const negArea = `${negLine} L ${negPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
 
-    // Y axis tick labels
     const yTicks = [0, Math.round(maxCount / 2), maxCount].map(v =>
-      `<text x="${PAD_L - 4}" y="${parseFloat(yFor(v)) + 3}" text-anchor="end" fill="#555" font-size="9">${v}</text>`
+      `<text x="${PAD_L - 6}" y="${parseFloat(yFor(v)) + 3}" text-anchor="end" fill="#7a9bb5" font-size="10">${v}</text>`
     ).join('');
 
-    // X axis labels every ~3 months
     const labelEvery = Math.ceil(n / 8);
     const xLabels = data.map((d, i) => {
       if (i % labelEvery !== 0 && i !== n - 1) return '';
       const [yr, mo] = d.key.split('-');
-      return `<text x="${(PAD_L + i * xStep).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="#555" font-size="9">${MONTH_ABBR[parseInt(mo)-1]} '${yr.slice(2)}</text>`;
+      return `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="#7a9bb5" font-size="10">${MONTH_ABBR[parseInt(mo)-1]} '${yr.slice(2)}</text>`;
     }).join('');
 
-    // Horizontal grid lines
     const gridLines = [0.25, 0.5, 0.75].map(f =>
       `<line x1="${PAD_L}" y1="${(PAD_T + cH * (1-f)).toFixed(1)}" x2="${W-4}" y2="${(PAD_T + cH * (1-f)).toFixed(1)}" stroke="#1e2e3e" stroke-width="1"/>`
     ).join('');
 
-    return `
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="hcPosGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#66c0f4" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#66c0f4" stop-opacity="0.03"/>
-          </linearGradient>
-          <linearGradient id="hcNegGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#c85050" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#c85050" stop-opacity="0.03"/>
-          </linearGradient>
-        </defs>
-        ${gridLines}
-        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
-        <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${W-4}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
-        ${yTicks}
-        <path d="${posArea}" fill="url(#hcPosGrad)"/>
-        <path d="${negArea}" fill="url(#hcNegGrad)"/>
-        <path d="${posLine}" fill="none" stroke="#66c0f4" stroke-width="1.8"/>
-        <path d="${negLine}" fill="none" stroke="#c85050" stroke-width="1.8"/>
-        ${xLabels}
-      </svg>
-      <div style="display:flex;gap:16px;margin-top:2px;font-size:0.72rem;color:var(--muted)">
-        <span><span style="display:inline-block;width:12px;height:3px;background:#66c0f4;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Positive (silver+)</span>
-        <span><span style="display:inline-block;width:12px;height:3px;background:#c85050;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Negative (bronze/borked)</span>
-      </div>`;
+    // Invisible hover targets, one per month column. Wide enough to grab
+    // the cursor anywhere over that column
+    const colW = n > 1 ? xStep : cW;
+    const targets = data.map((_, i) => {
+      const cx = xAt(i);
+      return `<rect class="ci-hover-target" data-idx="${i}" x="${(cx - colW / 2).toFixed(1)}" y="${PAD_T}" width="${colW.toFixed(1)}" height="${cH}" fill="transparent"/>`;
+    }).join('');
+
+    const html = `
+      <div class="cb-history-chart" id="cb-history-chart">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:240px;display:block" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="hcPosGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#66c0f4" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#66c0f4" stop-opacity="0.03"/>
+            </linearGradient>
+            <linearGradient id="hcNegGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#c85050" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#c85050" stop-opacity="0.03"/>
+            </linearGradient>
+          </defs>
+          ${gridLines}
+          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
+          <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${W-4}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
+          ${yTicks}
+          <path d="${posArea}" fill="url(#hcPosGrad)"/>
+          <path d="${negArea}" fill="url(#hcNegGrad)"/>
+          <path d="${posLine}" fill="none" stroke="#66c0f4" stroke-width="1.8"/>
+          <path d="${negLine}" fill="none" stroke="#c85050" stroke-width="1.8"/>
+          ${xLabels}
+          <line class="ci-hover-guide" id="cb-hc-guide" x1="0" y1="${PAD_T}" x2="0" y2="${PAD_T + cH}"/>
+          <circle class="ci-hover-dot" id="cb-hc-dot-pos" r="4" fill="#66c0f4"/>
+          <circle class="ci-hover-dot" id="cb-hc-dot-neg" r="4" fill="#c85050"/>
+          ${targets}
+        </svg>
+        <div class="ci-tooltip" id="cb-hc-tip"></div>
+        <div style="display:flex;gap:16px;margin-top:2px;font-size:0.72rem;color:var(--muted)">
+          <span><span style="display:inline-block;width:12px;height:3px;background:#66c0f4;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Positive (silver+)</span>
+          <span><span style="display:inline-block;width:12px;height:3px;background:#c85050;border-radius:1px;vertical-align:middle;margin-right:4px"></span>Negative (bronze/borked)</span>
+        </div>
+      </div>
+    `;
+
+    const wire = () => {
+      const host = document.getElementById('cb-history-chart');
+      if (!host || typeof attachChartHover !== 'function') return;
+      const svg = host.querySelector('svg');
+      const tooltip = document.getElementById('cb-hc-tip');
+      const guide = document.getElementById('cb-hc-guide');
+      const dotPos = document.getElementById('cb-hc-dot-pos');
+      const dotNeg = document.getElementById('cb-hc-dot-neg');
+      const fmt = key => { const [yr, mo] = key.split('-'); return `${MONTH_ABBR[parseInt(mo)-1]} '${yr.slice(2)}`; };
+      attachChartHover({
+        svg, host, tooltip, guide,
+        dots: [dotPos, dotNeg],
+        data,
+        getX: xAt,
+        getYForDot: (item, dotIdx) => dotIdx === 0 ? yPos(item) : yNeg(item),
+        renderTip: item => `
+          <div class="ci-tip-month">${fmt(item.key)}</div>
+          <div class="ci-tip-row">
+            <span class="ci-tip-dot" style="background:#66c0f4"></span>
+            <span>Positive</span>
+            <span class="ci-tip-val">${item.pos}</span>
+          </div>
+          <div class="ci-tip-row">
+            <span class="ci-tip-dot" style="background:#c85050"></span>
+            <span>Negative</span>
+            <span class="ci-tip-val">${item.neg}</span>
+          </div>
+        `,
+      });
+    };
+
+    return { html, wire };
   }
 
   function computeTrend(reports) {
@@ -741,7 +833,11 @@ h1 {
           </div>`).join('')
       : '<div style="color:var(--muted);font-size:0.78rem">No launch option data in reports.</div>';
 
-    return `
+    // Chart now returns { html, wire } so the hover handler can attach
+    // after innerHTML lands. wire() is invoked by the caller (run())
+    const history = buildHistoryChart(reports);
+
+    const html = `
       <div class="cb-header">
         <div class="cb-header-game">
           <div class="name">${esc(gameTitle)}</div>
@@ -754,7 +850,7 @@ h1 {
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Report history</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Positive (silver+) vs. negative (bronze/borked) reports submitted over time.</p>
-      ${buildHistoryChart(reports)}
+      ${history.html}
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>Compatibility trend</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:0 0 8px">Comparing average rating in last 90 days vs. the prior 90-270 day window.</p>
@@ -817,6 +913,8 @@ h1 {
 
       <a class="cb-back" href="app.html#/app/${esc(appId)}">&larr; Back to ${esc(gameTitle)}</a>
     `;
+
+    return { html, wire: history.wire };
   }
 
   async function loadGame(appId) {
@@ -887,7 +985,11 @@ h1 {
       }
       root.innerHTML = previewBanner + renderReportBreakdown(target, gameTitle, appId, myHw, scoringData);
     } else {
-      root.innerHTML = previewBanner + renderGameBreakdown(reports, gameTitle, appId);
+      const out = renderGameBreakdown(reports, gameTitle, appId);
+      root.innerHTML = previewBanner + out.html;
+      // wire chart hover handlers AFTER innerHTML lands so the helper can
+      // measure live SVG nodes (otherwise hover targets stay inert)
+      if (typeof out.wire === 'function') out.wire();
     }
   }
 
