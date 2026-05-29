@@ -614,11 +614,11 @@ h1 {
     };
 
     // Bigger viewBox + preserveAspectRatio="none" so the chart stretches
-    // edge-to-edge. The old 560x140 stayed letterboxed in wide layouts.
-    // Right padding stays small (8px) so the line fills the full width;
-    // edge labels use text-anchor="start"/"end" so they stay inside the
-    // visible chart area without needing extra padding around the line
-    const W = 1000, H = 200, PAD_L = 36, PAD_R = 8, PAD_B = 26, PAD_T = 12;
+    // edge-to-edge. Both PAD_L and PAD_R stay small so the line fills the
+    // full width; y-axis numbers (13 / 7 / 0) render inside the chart at
+    // their reference y, anchored to start so they sit just to the right
+    // of the left edge instead of eating a 36px gutter
+    const W = 1000, H = 200, PAD_L = 8, PAD_R = 8, PAD_B = 26, PAD_T = 12;
     const cW = W - PAD_L - PAD_R;
     const cH = H - PAD_B - PAD_T;
     const n = data.length;
@@ -637,9 +637,17 @@ h1 {
     const posArea = `${posLine} L ${posPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
     const negArea = `${negLine} L ${negPoints[n-1].x.toFixed(1)} ${baseY} L ${PAD_L} ${baseY} Z`;
 
-    const yTicks = [0, Math.round(maxCount / 2), maxCount].map(v =>
-      `<text x="${PAD_L - 6}" y="${parseFloat(yFor(v)) + 3}" text-anchor="end" fill="#7a9bb5" font-size="10">${v}</text>`
-    ).join('');
+    // y-axis numbers sit INSIDE the chart area at their reference y,
+    // anchored to start so they cling to the left edge. They render above
+    // the line for the top tick (maxCount), at the line for the midpoint,
+    // and slightly above the baseline for 0 so the 0 doesn't get clipped
+    const yTicks = [0, Math.round(maxCount / 2), maxCount].map(v => {
+      const baseline = parseFloat(yFor(v));
+      // Top tick: 12px below baseline (so it sits BELOW the topmost line)
+      // Mid + 0: 4px above baseline (so they hover above the reference line)
+      const yPos = v === maxCount ? baseline + 12 : baseline - 4;
+      return `<text x="${PAD_L + 2}" y="${yPos}" text-anchor="start" fill="#7a9bb5" font-size="10" font-family="var(--mono)">${v}</text>`;
+    }).join('');
 
     // Edge labels (first / last) use start / end anchoring so they stay
     // inside the chart even though their data points sit at the edges.
@@ -678,7 +686,6 @@ h1 {
             </linearGradient>
           </defs>
           ${gridLines}
-          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
           <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${PAD_L + cW}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
           ${yTicks}
           <path d="${posArea}" fill="url(#hcPosGrad)"/>
