@@ -614,9 +614,13 @@ h1 {
     };
 
     // Bigger viewBox + preserveAspectRatio="none" so the chart stretches
-    // edge-to-edge. The old 560x140 stayed letterboxed in wide layouts
-    const W = 1000, H = 200, PAD_L = 36, PAD_B = 26, PAD_T = 12;
-    const cW = W - PAD_L - 8;
+    // edge-to-edge. The old 560x140 stayed letterboxed in wide layouts.
+    // PAD_R needs room for the last x-axis label (eg "May '26") which is
+    // centered at the rightmost data point - half the label text extends
+    // past that anchor, so 40-50px of right padding keeps it inside the
+    // visible chart area
+    const W = 1000, H = 200, PAD_L = 36, PAD_R = 48, PAD_B = 26, PAD_T = 12;
+    const cW = W - PAD_L - PAD_R;
     const cH = H - PAD_B - PAD_T;
     const n = data.length;
     const xStep = n > 1 ? cW / (n - 1) : 0;
@@ -646,7 +650,7 @@ h1 {
     }).join('');
 
     const gridLines = [0.25, 0.5, 0.75].map(f =>
-      `<line x1="${PAD_L}" y1="${(PAD_T + cH * (1-f)).toFixed(1)}" x2="${W-4}" y2="${(PAD_T + cH * (1-f)).toFixed(1)}" stroke="#1e2e3e" stroke-width="1"/>`
+      `<line x1="${PAD_L}" y1="${(PAD_T + cH * (1-f)).toFixed(1)}" x2="${PAD_L + cW}" y2="${(PAD_T + cH * (1-f)).toFixed(1)}" stroke="#1e2e3e" stroke-width="1"/>`
     ).join('');
 
     // Invisible hover targets, one per month column. Wide enough to grab
@@ -672,7 +676,7 @@ h1 {
           </defs>
           ${gridLines}
           <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
-          <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${W-4}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
+          <line x1="${PAD_L}" y1="${PAD_T + cH}" x2="${PAD_L + cW}" y2="${PAD_T + cH}" stroke="#2a3a4a" stroke-width="1"/>
           ${yTicks}
           <path d="${posArea}" fill="url(#hcPosGrad)"/>
           <path d="${negArea}" fill="url(#hcNegGrad)"/>
