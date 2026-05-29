@@ -790,16 +790,25 @@ h1 {
     const totalBg = confColorAt(displayed);
     const totalFg = confTextAt(displayed);
 
-    // Rating distribution
+    // Rating distribution -- one row per tier matching the per-version
+    // success bars below. Width 150px label / flex bar / pct / count, same
+    // pattern as the bottom of the page so the layouts line up visually
     const counts = { platinum: 0, gold: 0, silver: 0, bronze: 0, borked: 0 };
     for (const r of reports) if (counts[r.rating] != null) counts[r.rating]++;
-    const distChips = Object.entries(counts).map(([tier, cnt]) =>
-      `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border-radius:3px;background:${RATING_COLORS[tier] || '#3a4a5a'};color:${tier==='bronze'||tier==='borked'?'#fff':'#111'};min-width:50px;font-family:var(--mono);opacity:${cnt?1:0.35}">
-        <span style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;font-weight:600">${tier}</span>
-        <span style="font-size:1.1rem;font-weight:700;line-height:1">${cnt}</span>
-        <span style="font-size:0.6rem;opacity:0.75">${n > 0 ? Math.round(cnt/n*100) : 0}%</span>
-      </div>`
-    ).join('');
+    const TIER_LABEL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
+    const distChips = Object.entries(counts).map(([tier, cnt]) => {
+      const pct = n > 0 ? Math.round(cnt / n * 100) : 0;
+      const barColor = RATING_COLORS[tier] || '#3a4a5a';
+      const inactive = cnt === 0;
+      return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;opacity:${inactive ? 0.45 : 1}">
+        <span style="min-width:150px;font-size:0.78rem;font-weight:700;color:${barColor};text-transform:uppercase;letter-spacing:0.05em">${TIER_LABEL[tier]}</span>
+        <div style="flex:1;background:var(--bg);border-radius:2px;height:7px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:2px;transition:width 0.3s"></div>
+        </div>
+        <span style="width:38px;text-align:right;font-weight:700;color:${barColor}">${pct}%</span>
+        <span style="width:30px;text-align:right;color:var(--muted);font-size:0.72rem">${cnt}r</span>
+      </div>`;
+    }).join('');
 
     // Mean per-report confidence
     const breakdowns = reports.map(estimateScoreBreakdown);
@@ -880,7 +889,7 @@ h1 {
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>Rating distribution</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">How the ${n} reports break down by tier.</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">${distChips}</div>
+      <div style="margin-bottom:16px">${distChips}</div>
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Confidence factors</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Confidence is driven by sample size, rating consistency, and data freshness.</p>
