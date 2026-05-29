@@ -1324,8 +1324,18 @@ async function enhanceAuthorBlocks(reports) {
 
 // Permalink button - copies a deep-link to the clipboard. Hash format mirrors
 // the existing route shape: #/app/{appId}#report-{id}
+// ProtonDB reports don't carry reportId or clientId (they're imported), so
+// fall back to a short hash of timestamp+gpu+proton so every report gets a
+// stable shareable link. djb2 hash trimmed to 7 hex chars is enough collision
+// resistance for per-game uniqueness
+function hashReportKey(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return 'h' + (h >>> 0).toString(16).slice(0, 7);
+}
 function renderPermalink(r) {
-  const id = r.reportId != null ? `r${r.reportId}` : (r.clientId ? `c${r.clientId.slice(0, 8)}` : '');
+  let id = r.reportId != null ? `r${r.reportId}` : (r.clientId ? `c${r.clientId.slice(0, 8)}` : '');
+  if (!id && r.timestamp) id = hashReportKey(reportKey(r));
   if (!id || !r.appId) return '';
   const anchor = `report-${id}`;
   // Inline JS avoids needing a separate event delegate hook for now. Replace
@@ -1409,8 +1419,8 @@ function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) {
       <div class="card-footer">
         ${(() => { const fr = buildFormRows(r); return fr ? `<button class="action-btn" onclick="const p=this.closest('.card-summary').querySelector('.fr-panel');p.classList.toggle('open');this.textContent=p.classList.contains('open')?'Hide Report Responses':'Show Report Responses'">Show Report Responses</button>` : `<button class="action-btn action-btn-disabled" disabled title="Responses not available or recorded">No responses recorded</button>`; })()}
         <button class="action-btn" onclick="this.closest('.card-summary').querySelector('.hw-details-panel').classList.toggle('open');this.textContent=this.closest('.card-summary').querySelector('.hw-details-panel').classList.contains('open')?'Hide Hardware Details':'All Hardware Details'">All Hardware Details</button>
-        ${renderPermalink(r)}
         <button class="action-btn" data-report-json='${JSON.stringify(r).replace(/'/g,"&#39;")}' title="Download as JSON">JSON</button>
+        ${renderPermalink(r)}
         ${r.clientId && r.clientId === getWebClientId() ? `<button class="action-btn action-btn-danger delete-report-btn" data-app-id="${r.appId || ''}" title="Delete your report">Delete</button>` : ''}
       </div>
     </div>`;
