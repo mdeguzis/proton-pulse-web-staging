@@ -49,6 +49,17 @@ PAGES = [
         "forbidden": ["Loading reports..."],
         "required_any": ["game-header"],
     },
+    {
+        # Profile page in signed-out state -- doesn't exercise the My
+        # Hardware / My Reports sections (those need auth) but does catch JS
+        # errors in profile.js top-level + broken HTML structure that would
+        # close ancestor elements like the stray </div></div> regression
+        "path": "/profile.html",
+        "label": "profile (signed-out)",
+        "forbidden": [],
+        "required_any": ["profile-unsigned", "profile-signed-in"],
+        "content_selector": "body",
+    },
 ]
 
 
@@ -64,8 +75,11 @@ def smoke_page(driver, base_url, spec, wait_s):
     print(f"-> {label}: {url}")
     driver.get(url)
     time.sleep(wait_s)
+    # Most pages have a #content div the renderer fills in; profile-style
+    # pages don't, so fall back to <body> when there's no #content
+    selector = spec.get("content_selector", "#content")
     content = driver.execute_script(
-        "return document.getElementById('content')?.innerHTML || ''"
+        f"return (document.querySelector({selector!r})?.innerHTML) || document.body?.innerHTML || ''"
     ) or ""
     errs = driver.execute_script("return (window.__smoke_errors || []).slice()") or []
     title = driver.title or ""
