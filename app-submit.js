@@ -115,6 +115,13 @@ async function submitReport(appId, title, form, editReportId = null) {
 
   const installFailed = state.canInstall === 'no' || state.canStart === 'no' || state.canPlay === 'no';
   const derivedRating = deriveRatingFromState(state);
+  // If the deriver returns null we don't have enough info to score the
+  // submission. Refusing here is much better than the previous behavior of
+  // silently shipping `rating: 'borked'` -- that's how a legit "all yes"
+  // submission ended up showing as Borked when validation slipped through.
+  if (!derivedRating) {
+    return { ok: false, error: 'Cannot derive a rating from the answers. Please review the compatibility questions.' };
+  }
   const formResponses = {
     canInstall: state.canInstall || null,
     canStart:   state.canStart   || null,
@@ -150,7 +157,7 @@ async function submitReport(appId, title, form, editReportId = null) {
     kernel: form.kernel.value,
     proton_version: form.protonVersion.value,
     duration: form.duration.value || 'unreported',
-    rating: derivedRating || 'borked',
+    rating: derivedRating,
     notes: form.notes.value,
     launch_options: form.launchOptions.value,
     enabled_vars: {},
@@ -334,6 +341,18 @@ async function populateSubmitForm(el) {
         ${faultRows}
       </div>
 
+      <div class="sf-question sf-hidden" id="q-multiplayer-online">
+        <div class="sf-q-label">Did you test online multiplayer? <span style="font-weight:400;color:var(--muted)">(optional)</span></div>
+        <div class="sf-q-hint">Only answer if the game has online multiplayer and you tried it.</div>
+        ${ynBtns('onlineMultiplayer')}
+      </div>
+
+      <div class="sf-question sf-hidden" id="q-multiplayer-local">
+        <div class="sf-q-label">Did you test local / couch multiplayer? <span style="font-weight:400;color:var(--muted)">(optional)</span></div>
+        <div class="sf-q-hint">Only answer if the game has local multiplayer and you tried it.</div>
+        ${ynBtns('localMultiplayer')}
+      </div>
+
       <div class="sf-question sf-hidden" id="q-verdict">
         <div class="sf-q-label">Overall, did the game work? *</div>
         ${ynBtns('verdict')}
@@ -401,9 +420,16 @@ async function populateSubmitForm(el) {
     if (state.canInstall !== null) show('q-canStart'); else hide('q-canStart');
     if (state.canInstall === 'yes' && state.canStart !== null) show('q-canPlay'); else hide('q-canPlay');
 
-    // Tinkering + faults + verdict only when all install steps pass
-    if (allInstallYes) { show('q-tinkering'); show('q-faults'); show('q-verdict'); }
-    else { hide('q-tinkering'); hide('q-faults'); hide('q-verdict'); }
+    // Tinkering + faults + multiplayer + verdict only when all install steps pass
+    if (allInstallYes) {
+      show('q-tinkering'); show('q-faults');
+      show('q-multiplayer-online'); show('q-multiplayer-local');
+      show('q-verdict');
+    } else {
+      hide('q-tinkering'); hide('q-faults');
+      hide('q-multiplayer-online'); hide('q-multiplayer-local');
+      hide('q-verdict');
+    }
 
     // Out-of-box only if verdict=yes and 0 faults
     if (showOob) show('q-oob'); else { hide('q-oob'); state.verdictOob = null; clearRadios('verdictOob'); }
@@ -436,8 +462,11 @@ async function populateSubmitForm(el) {
     }
   }
 
-  // Wire yes/no radio buttons
-  ['canInstall','canStart','canPlay','verdict','verdictOob'].forEach(name => {
+  // Wire yes/no radio buttons. Multiplayer + framegen are optional but the
+  // state still needs to update on change so the submitted form_responses
+  // captures the answer.
+  ['canInstall','canStart','canPlay','verdict','verdictOob',
+   'onlineMultiplayer','localMultiplayer','requiresFramegen'].forEach(name => {
     form.querySelectorAll(`input[name="${name}"]`).forEach(radio => {
       radio.addEventListener('change', () => {
         state[name] = radio.value;

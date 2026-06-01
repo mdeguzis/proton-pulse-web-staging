@@ -263,6 +263,62 @@ describe('submitReport - form validation', () => {
   });
 });
 
+// ── submitReport rating derivation ──────────────────────────────────
+// Regression coverage for "submitted all-yes answers but got rated Borked".
+// The previous code had `rating: derivedRating || 'borked'` which silently
+// shipped the worst possible rating if anything went sideways. We now
+// refuse to submit when rating can't be derived.
+
+describe('submitReport - rating derivation', () => {
+  test('ships derived platinum when all yes + oob=yes + no faults', async () => {
+    const { ctx, fetchMock } = makeCtx({ access_token: 'tok', user: { id: 'pp-1' } });
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue({ ok: true });
+    const result = await ctx.submitReport('730', 'HL2', makeForm());
+    expect(result.ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.rating).toBe('platinum');
+  });
+
+  test('ships derived borked when canInstall=no (legit borked)', async () => {
+    const { ctx, fetchMock } = makeCtx({ access_token: 'tok', user: { id: 'pp-1' } });
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue({ ok: true });
+    const form = makeForm();
+    form._formState.canInstall = 'no';
+    form._formState.canStart = null; form._formState.canPlay = null;
+    form._formState.verdict = null;
+    const result = await ctx.submitReport('730', 'HL2', form);
+    expect(result.ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.rating).toBe('borked');
+  });
+
+  test('never silently defaults to borked when derivation returns null', async () => {
+    // Construct a state that bypasses validation (e.g. someone calls
+    // submitReport directly with an inconsistent form) and confirm we
+    // refuse instead of shipping 'borked' as a guess
+    const { ctx, fetchMock } = makeCtx({ access_token: 'tok', user: { id: 'pp-1' } });
+    fetchMock.mockClear();
+    const form = makeForm();
+    // Make state internally inconsistent: install=yes, all faults=null
+    // (validation should normally catch this, but if state arrives this
+    // way the derivation returns null and we MUST NOT default to borked)
+    form._formState.canInstall = 'yes';
+    form._formState.canStart = 'yes';
+    form._formState.canPlay = 'yes';
+    form._formState.verdict = null;
+    // Pre-pass the can-* validation but force verdict empty by clearing
+    // it after building the form. The validation will catch this first
+    // and refuse with a "Overall, did the game work?" error -- which is
+    // exactly the safe path we want
+    const result = await ctx.submitReport('730', 'HL2', form);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/did the game work|Cannot derive/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 // ── parseSteamSystemInfo ────────────────────────────────────────────
 
 describe('parseSteamSystemInfo', () => {

@@ -72,16 +72,36 @@
 
   let title = titleParam;
   if (!title) {
+    // Resolve via search-index.json (single canonical list of [appId, title]
+    // pairs). The previous attempt fetched data/{appId}/ which returns the
+    // directory's auto-generated HTML listing, not JSON -- so title silently
+    // fell through to "App {id}" for every submission.
     try {
-      const dataUrl = /^localhost/.test(location.host)
-        ? `https://www.proton-pulse.com/data/${appId}/`
-        : `data/${appId}/`;
-      const resp = await fetch(dataUrl);
+      const searchUrl = /^localhost/.test(location.host)
+        ? 'https://www.proton-pulse.com/search-index.json'
+        : 'search-index.json';
+      const resp = await fetch(searchUrl);
       if (resp.ok) {
-        const data = await resp.json();
-        title = data?.title || data?.name || '';
+        const index = await resp.json();
+        const hit = Array.isArray(index) && index.find(row => String(row[0]) === String(appId));
+        if (hit) title = hit[1] || '';
       }
     } catch {}
+    if (!title) {
+      // Last-ditch: per-app data file. Use latest.json (real path) rather
+      // than the directory listing
+      try {
+        const dataUrl = /^localhost/.test(location.host)
+          ? `https://www.proton-pulse.com/data/${appId}/latest.json`
+          : `data/${appId}/latest.json`;
+        const resp = await fetch(dataUrl);
+        if (resp.ok) {
+          const data = await resp.json();
+          // latest.json is an array of reports; any of them carries the title
+          title = (Array.isArray(data) && data[0]?.title) || data?.title || data?.name || '';
+        }
+      } catch {}
+    }
     if (!title) title = `App ${appId}`;
   }
 
