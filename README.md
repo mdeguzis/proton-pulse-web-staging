@@ -1,4 +1,4 @@
-[![Update ProtonDB Data](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/update-data.yml/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/update-data.yml) [![pages-build-deployment](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/pages/pages-build-deployment)
+[![CI](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/ci.yml/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/ci.yml) [![Update ProtonDB Data](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/update-data.yml/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/update-data.yml) [![Content Moderation](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/content-moderation.yml/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/content-moderation.yml) [![pages-build-deployment](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/mdeguzis/proton-pulse-data/actions/workflows/pages/pages-build-deployment)
 
 # proton-pulse-data
 
@@ -38,6 +38,41 @@ Lists all games with ProtonDB data available in this mirror, along with Steam ca
 
 **[Coverage Report](https://www.proton-pulse.com/coverage.html) (`coverage.html`)**
 Steam catalog coverage statistics.
+
+**[Admin Panel](https://www.proton-pulse.com/admin.html) (`admin.html`) — Moderation tools**
+Restricted to admins (Steam auth required). Provides:
+- Flagged report review with sort, filter by type and date range, and search
+- Reinstate, delete, or ban user actions per report
+- Banned user management with unban and report restore
+- Admin roster view
+
+## Content moderation
+
+User-submitted report text is scanned automatically on two layers:
+
+1. **Wordlist** (`naughty-words`) - offline multilingual filter, runs first on every row
+2. **OpenAI Moderation API** - semantic fallback for anything the wordlist misses (requires `OPENAI_API_KEY` secret; falls back to wordlist-only if absent)
+
+The scan runs every 4 hours via GitHub Actions (`content-moderation.yml`) with a 5-hour lookback window, and does a full 25-hour sweep daily at 02:00 UTC. Flagged reports are hidden from public views automatically. Report authors see a "Flagged" badge on their profile page with a plain-language explanation and a link to the Discord server for disputes.
+
+To trigger a manual scan:
+
+```bash
+gh workflow run content-moderation.yml --repo mdeguzis/proton-pulse-data \
+  -f dry_run=true -f lookback_hours=720
+```
+
+## Admin access
+
+The `admins` table in Supabase controls who can access the admin panel. To add or remove an admin directly (fallback if the panel is inaccessible):
+
+```bash
+source ~/.supabase
+curl -s -X POST "https://api.supabase.com/v1/projects/ilsgdshkaocrmibwdezk/database/query" \
+  -H "Authorization: Bearer $SUPABASE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "INSERT INTO public.admins (proton_pulse_user_id, steam_username) VALUES ('"'"'<uuid>'"'"', '"'"'<username>'"'"') ON CONFLICT DO NOTHING;"}'
+```
 
 ## Data format
 
