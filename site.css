@@ -1333,24 +1333,29 @@ code {
 @media (min-width: 1700px) { .auth-username { max-width: none; } }
 
 .auth-admin-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  margin-left: 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #e88a8a;
-  background: rgba(220, 80, 80, 0.15);
-  border: 1px solid rgba(220, 80, 80, 0.35);
-  border-radius: 4px;
-  text-decoration: none;
-  white-space: nowrap;
+  display: none; /* hidden on mobile; shown on wider screens below */
 }
-.auth-admin-chip:hover {
-  background: rgba(220, 80, 80, 0.28);
-  color: #f4a8a8;
+@media (min-width: 760px) {
+  .auth-admin-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    margin-left: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #e88a8a;
+    background: rgba(220, 80, 80, 0.15);
+    border: 1px solid rgba(220, 80, 80, 0.35);
+    border-radius: 4px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .auth-admin-chip:hover {
+    background: rgba(220, 80, 80, 0.28);
+    color: #f4a8a8;
+  }
 }
 
 .gh-login-btn {
