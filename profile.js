@@ -1163,6 +1163,25 @@ const MOCK_REPORTS = [
 
     signedOut.hidden = true;
     signedIn.hidden  = false;
+
+    // Show Role field if user is an admin.
+    checkIsAdminProfile(session).then(function (admin) {
+      const roleField = document.getElementById('profile-role-field');
+      if (roleField) roleField.hidden = !admin;
+    });
+  }
+
+  async function checkIsAdminProfile(session) {
+    if (!session || !session.access_token) return false;
+    try {
+      const res = await fetch(
+        SUPABASE_URL + '/rest/v1/admins?select=proton_pulse_user_id&limit=1',
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + session.access_token } }
+      );
+      if (!res.ok) return false;
+      const rows = await res.json();
+      return Array.isArray(rows) && rows.length > 0;
+    } catch (_) { return false; }
   }
 
   function showSignedOut() {

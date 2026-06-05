@@ -31,6 +31,7 @@
       <div class="admin-tabs" role="tablist">
         <button class="admin-tab admin-tab--active" data-tab="flagged" role="tab">Flagged Reports</button>
         <button class="admin-tab" data-tab="banned" role="tab">Banned Users</button>
+        <button class="admin-tab" data-tab="users" role="tab">All Users</button>
         <button class="admin-tab" data-tab="admins" role="tab">Admins</button>
       </div>
 
@@ -94,6 +95,31 @@
             </tr>
           </thead>
           <tbody id="banned-tbody"></tbody>
+        </table>
+      </section>
+
+      <!-- All Users -->
+      <section id="tab-users" class="admin-section" hidden>
+        <div class="admin-filters">
+          <input type="text" id="users-search" class="admin-input" placeholder="Search username or client ID...">
+          <button class="admin-btn" id="users-refresh-btn">Refresh</button>
+        </div>
+
+        <div id="users-loading" class="admin-loading">Loading...</div>
+        <div id="users-empty" class="admin-empty" hidden>No users found.</div>
+        <div id="users-error" class="admin-error" hidden></div>
+
+        <table class="admin-table" id="users-table" hidden>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Client ID</th>
+              <th>Reports</th>
+              <th>Last active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
         </table>
       </section>
 

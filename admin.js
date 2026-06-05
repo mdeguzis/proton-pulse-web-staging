@@ -117,6 +117,36 @@ async function fetchAdmins(session) {
   return res.json();
 }
 
+async function fetchAllUsers(session, { search } = {}) {
+  // Aggregate per user from author_avatars + user_configs counts.
+  const avatarUrl = `${SUPABASE_URL}/rest/v1/author_avatars?select=proton_pulse_user_id,display_name,cached_at&order=cached_at.desc`;
+  const avatarRes = await fetch(avatarUrl, { headers: supabaseHeaders(session) });
+  if (!avatarRes.ok) throw new Error(`Fetch users failed: ${avatarRes.status}`);
+  let avatars = await avatarRes.json();
+
+  if (search) {
+    const q = search.toLowerCase();
+    avatars = avatars.filter(r =>
+      (r.display_name || '').toLowerCase().includes(q) ||
+      (r.proton_pulse_user_id || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Fetch report counts per user in one query.
+  const ids = avatars.map(r => r.proton_pulse_user_id).filter(Boolean);
+  let countMap = {};
+  if (ids.length) {
+    const countUrl = `${SUPABASE_URL}/rest/v1/user_configs?select=proton_pulse_user_id&proton_pulse_user_id=in.(${ids.map(encodeURIComponent).join(',')})`;
+    const countRes = await fetch(countUrl, { headers: supabaseHeaders(session) });
+    if (countRes.ok) {
+      const configs = await countRes.json();
+      configs.forEach(c => { countMap[c.proton_pulse_user_id] = (countMap[c.proton_pulse_user_id] || 0) + 1; });
+    }
+  }
+
+  return avatars.map(r => ({ ...r, report_count: countMap[r.proton_pulse_user_id] || 0 }));
+}
+
 async function reinstateReport(session, id) {
   const url = `${SUPABASE_URL}/rest/v1/user_configs?id=eq.${id}`;
   const res = await fetch(url, {
@@ -299,6 +329,42 @@ function renderAdmins(rows) {
     </tr>`).join('');
 }
 
+function renderUsers(rows) {
+  const loading = document.getElementById('users-loading');
+  const empty   = document.getElementById('users-empty');
+  const table   = document.getElementById('users-table');
+  const tbody   = document.getElementById('users-tbody');
+  const err     = document.getElementById('users-error');
+
+  loading.hidden = true;
+  err.hidden = true;
+
+  if (!rows.length) {
+    empty.hidden = false;
+    table.hidden = true;
+    return;
+  }
+
+  empty.hidden = true;
+  table.hidden = false;
+
+  tbody.innerHTML = rows.map(r => {
+    const uid = escapeHtml(r.proton_pulse_user_id || '');
+    const name = escapeHtml(r.display_name || '(anonymous)');
+    const lastActive = escapeHtml(fmtDate(r.cached_at));
+    return `<tr>
+      <td>${name}</td>
+      <td><code class="admin-uid">${uid}</code></td>
+      <td>${r.report_count}</td>
+      <td>${lastActive}</td>
+      <td>
+        <button class="admin-btn admin-btn--danger admin-btn--sm"
+          data-action="ban-user" data-userid="${uid}" data-username="${name}">Ban</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
 // ---------------------------------------------------------------------------
 // Load sections
 // ---------------------------------------------------------------------------
@@ -347,6 +413,22 @@ async function loadBanned() {
     loading.hidden = true;
     errEl.textContent = e.message;
     errEl.hidden = false;
+  }
+}
+
+async function loadUsers() {
+  const loading = document.getElementById('users-loading');
+  const err     = document.getElementById('users-error');
+  const search  = document.getElementById('users-search')?.value.trim() || '';
+  loading.hidden = false;
+  err.hidden = true;
+  try {
+    const rows = await fetchAllUsers(currentSession, { search });
+    renderUsers(rows);
+  } catch (e) {
+    loading.hidden = true;
+    err.textContent = e.message;
+    err.hidden = false;
   }
 }
 
@@ -405,6 +487,7 @@ function wireEvents() {
       switchTab(tab);
       if (tab === 'flagged') loadFlagged();
       else if (tab === 'banned') loadBanned();
+      else if (tab === 'users') loadUsers();
       else if (tab === 'admins') loadAdmins();
     });
   });
@@ -427,6 +510,7 @@ function wireEvents() {
   // Refresh buttons
   document.getElementById('flagged-refresh-btn').addEventListener('click', loadFlagged);
   document.getElementById('banned-refresh-btn').addEventListener('click', loadBanned);
+  document.getElementById('users-refresh-btn').addEventListener('click', loadUsers);
 
   // Search inputs - live filter on enter
   document.getElementById('flagged-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadFlagged(); });
@@ -434,6 +518,7 @@ function wireEvents() {
   document.getElementById('flagged-date-from').addEventListener('change', loadFlagged);
   document.getElementById('flagged-date-to').addEventListener('change', loadFlagged);
   document.getElementById('banned-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadBanned(); });
+  document.getElementById('users-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadUsers(); });
 
   // Flagged table actions (delegated)
   document.getElementById('flagged-tbody').addEventListener('click', async e => {
@@ -482,6 +567,13 @@ function wireEvents() {
     if (action === 'ban') {
       openBanModal(btn.dataset.userId, btn.dataset.clientId, btn.dataset.username);
     }
+  });
+
+  // Users table actions (delegated)
+  document.getElementById('users-tbody').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="ban-user"]');
+    if (!btn) return;
+    openBanModal(btn.dataset.userid, null, btn.dataset.username);
   });
 
   // Banned table actions (delegated)

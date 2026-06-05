@@ -253,6 +253,20 @@
   color: #7ab3f7;
 }
 
+.profile-role-admin {
+  background: rgba(220, 80, 80, 0.1);
+  border-color: rgba(220, 80, 80, 0.35);
+  color: #e88a8a;
+}
+
+.profile-admin-link {
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-decoration: none;
+  margin-left: 10px;
+}
+.profile-admin-link:hover { text-decoration: underline; }
+
 /* danger zone */
 .profile-section-danger .profile-section-title {
   color: #c85050;

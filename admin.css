@@ -277,3 +277,11 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+.admin-uid {
+  font-size: 0.7rem;
+  color: var(--muted);
+  word-break: break-all;
+  max-width: 180px;
+  display: inline-block;
+}
