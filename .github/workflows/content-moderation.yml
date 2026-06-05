@@ -2,14 +2,16 @@ name: Content Moderation
 
 on:
   schedule:
-    # Daily at 02:00 UTC, after the data pipeline finishes.
+    # Every 4 hours for fast bad-actor response (scans last 5h with 1h overlap).
+    - cron: "0 */4 * * *"
+    # Daily deep scan at 02:00 UTC covers any gaps.
     - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       lookback_hours:
-        description: "Scan rows updated within this many hours (default: 25)"
+        description: "Scan rows updated within this many hours (default: 5 for scheduled, 25 for manual)"
         required: false
-        default: "25"
+        default: "5"
       app_id:
         description: "Restrict scan to a single Steam app ID (leave blank for all)"
         required: false
@@ -34,12 +36,25 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Resolve lookback hours
+        id: lookback
+        run: |
+          # Manual dispatch: use the input value.
+          # Scheduled: daily run (02:00 UTC) uses 25h; every-4h runs use 5h.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "hours=${{ inputs.lookback_hours || '5' }}" >> "$GITHUB_OUTPUT"
+          elif [ "$(date -u +%H)" = "02" ]; then
+            echo "hours=25" >> "$GITHUB_OUTPUT"
+          else
+            echo "hours=5" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run moderation scan
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LOOKBACK_HOURS: ${{ inputs.lookback_hours || '25' }}
+          LOOKBACK_HOURS: ${{ steps.lookback.outputs.hours }}
           APP_ID: ${{ inputs.app_id || '' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: node .github/scripts/moderate-content.mjs
