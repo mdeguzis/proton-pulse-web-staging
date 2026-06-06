@@ -425,7 +425,11 @@ async function fetchMyUserConfigs(protonPulseUserId, clientId, session) {
     + `&select=id,app_id,title,proton_version,rating,created_at,updated_at,is_flagged,is_hidden,flagged_reason`
     + `&order=created_at.desc`;
   const r = await fetch(url, { headers: supabaseHeaders(session) });
-  if (!r.ok) throw new Error(`Lookup failed: HTTP ${r.status}`);
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    console.error('[profile] fetchMyUserConfigs failed', { status: r.status, body });
+    throw new Error(`Reports lookup failed: HTTP ${r.status}${body ? ' - ' + body : ''}`);
+  }
   return await r.json();
 }
 
@@ -436,7 +440,11 @@ async function fetchMyCloudConfigs(protonPulseUserId, session) {
     + `&select=app_id,app_name,updated_at,config,is_published`
     + `&order=updated_at.desc`;
   const r = await fetch(url, { headers: supabaseHeaders(session) });
-  if (!r.ok) throw new Error(`Cloud lookup failed: HTTP ${r.status}`);
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    console.error('[profile] fetchMyCloudConfigs failed', { status: r.status, body });
+    throw new Error(`Cloud configs lookup failed: HTTP ${r.status}${body ? ' - ' + body : ''}`);
+  }
   return await r.json();
 }
 
