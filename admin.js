@@ -143,6 +143,34 @@ async function updateAdminRole(session, uuid, role) {
   if (!res.ok) throw new Error(`Update role failed: ${res.status}`);
 }
 
+// Cached flat Set of naughty-words terms (all languages, lowercase).
+let _wordlistCache = null;
+
+async function loadWordlist() {
+  if (_wordlistCache) return _wordlistCache;
+  const res = await fetch('https://cdn.jsdelivr.net/npm/naughty-words@1.2.0/index.json');
+  if (!res.ok) return null;
+  const data = await res.json();
+  const terms = new Set();
+  for (const lang of Object.values(data)) {
+    if (Array.isArray(lang)) for (const w of lang) terms.add(w.toLowerCase());
+  }
+  _wordlistCache = terms;
+  return terms;
+}
+
+function checkAgainstWordlist(pattern, isRegex, terms) {
+  if (!terms) return null;
+  if (isRegex) {
+    try {
+      const re = new RegExp(pattern, 'i');
+      const hits = [...terms].filter(t => re.test(t));
+      return hits.length ? hits.slice(0, 3) : null;
+    } catch { return null; }
+  }
+  return terms.has(pattern.toLowerCase()) ? [pattern.toLowerCase()] : null;
+}
+
 async function fetchBannedPhrases(session) {
   const url = `${SUPABASE_URL}/rest/v1/banned_phrases?select=*&order=created_at.desc`;
   const res = await fetch(url, { headers: supabaseHeaders(session) });
@@ -863,17 +891,27 @@ function wireEvents() {
   });
 
   // Validate regex button
-  document.getElementById('validate-regex-btn').addEventListener('click', () => {
+  document.getElementById('validate-regex-btn').addEventListener('click', async () => {
     const pattern = document.getElementById('new-phrase-pattern').value.trim();
     const status  = document.getElementById('add-phrase-status');
     if (!pattern) { status.textContent = 'Enter a pattern to validate.'; status.style.color = 'var(--red)'; return; }
     try {
       new RegExp(pattern);
-      status.textContent = `Valid regex: ${pattern}`;
-      status.style.color = 'var(--green)';
     } catch (e) {
       status.textContent = `Invalid regex: ${e.message}`;
       status.style.color = 'var(--red)';
+      return;
+    }
+    status.textContent = 'Checking wordlist...';
+    status.style.color = '';
+    const terms = await loadWordlist();
+    const hits = checkAgainstWordlist(pattern, true, terms);
+    if (hits) {
+      status.textContent = `Valid regex, but already covered by built-in wordlist (e.g. ${hits.join(', ')}).`;
+      status.style.color = 'var(--yellow, #e8c84a)';
+    } else {
+      status.textContent = `Valid regex. Not covered by built-in wordlist.`;
+      status.style.color = 'var(--green)';
     }
   });
 
@@ -890,9 +928,13 @@ function wireEvents() {
       }
     }
     try {
+      const terms = await loadWordlist();
+      const hits = checkAgainstWordlist(pattern, is_regex, terms);
       await addBannedPhrase(currentSession, { pattern, is_regex, description });
-      status.textContent = 'Phrase added.';
-      status.style.color = 'var(--green)';
+      status.textContent = hits
+        ? `Phrase added (note: already covered by built-in wordlist: ${hits.join(', ')}).`
+        : 'Phrase added.';
+      status.style.color = hits ? 'var(--yellow, #e8c84a)' : 'var(--green)';
       document.getElementById('new-phrase-pattern').value = '';
       document.getElementById('new-phrase-is-regex').checked = false;
       document.getElementById('new-phrase-description').value = '';
