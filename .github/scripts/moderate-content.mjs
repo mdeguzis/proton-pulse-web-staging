@@ -71,6 +71,46 @@ function ts() {
 }
 
 // ---------------------------------------------------------------------------
+// Layer 0: custom banned phrases from Supabase (admin-managed, supports regex)
+// ---------------------------------------------------------------------------
+
+let bannedPhrasesFilter = null;
+
+async function buildBannedPhrasesFilter() {
+  const url = `${SUPABASE_URL}/rest/v1/banned_phrases?select=pattern,is_regex&enabled=eq.true`;
+  try {
+    const res = await fetch(url, { headers: SUPABASE_HEADERS });
+    if (!res.ok) {
+      warn('Could not load banned_phrases from Supabase', { status: res.status });
+      return { check: () => ({ flagged: false }) };
+    }
+    const rows = await res.json();
+    log('Banned phrases loaded', { count: rows.length });
+
+    const literals = rows.filter(r => !r.is_regex).map(r => r.pattern.toLowerCase());
+    const regexes  = rows.filter(r => r.is_regex).map(r => {
+      try { return { re: new RegExp(r.pattern, 'i'), pattern: r.pattern }; }
+      catch { warn('Invalid regex in banned_phrases, skipping', { pattern: r.pattern }); return null; }
+    }).filter(Boolean);
+
+    return {
+      check(text) {
+        const lower = text.toLowerCase();
+        for (const lit of literals) {
+          if (lower.includes(lit)) return { flagged: true, term: lit };
+        }
+        for (const { re, pattern } of regexes) {
+          if (re.test(text)) return { flagged: true, term: pattern };
+        }
+        return { flagged: false };
+      },
+    };
+  } catch (e) {
+    warn('Failed to build banned phrases filter', { error: e.message });
+    return { check: () => ({ flagged: false }) };
+  }
+}
+
 // Layer 1: naughty-words wordlist (multilingual, offline)
 // ---------------------------------------------------------------------------
 
@@ -239,6 +279,7 @@ async function main() {
     openai: !!OPENAI_KEY,
   });
 
+  bannedPhrasesFilter = await buildBannedPhrasesFilter();
   wordlistFilter = await buildWordlistFilter();
 
   const rows = await fetchRecentRows();
@@ -260,8 +301,19 @@ async function main() {
     let hitReason = null;
     let hitLayer = null;
 
-    // Layer 1: wordlist
+    // Layer 0: custom banned phrases (admin-managed)
     for (const { field, text } of fields) {
+      const hit = bannedPhrasesFilter.check(text);
+      log(`Banned phrases check`, { id: row.id, field, flagged: hit.flagged, ...(hit.term ? { term: hit.term } : {}) });
+      if (hit.flagged) {
+        hitReason = `banned_phrase:${hit.term} in ${field}`;
+        hitLayer = 'banned_phrase';
+        break;
+      }
+    }
+
+    // Layer 1: wordlist
+    if (!hitReason) for (const { field, text } of fields) {
       const hit = wordlistFilter.check(text);
       log(`Wordlist check`, { id: row.id, field, flagged: hit.flagged, ...(hit.term ? { term: hit.term } : {}) });
       if (hit.flagged) {
