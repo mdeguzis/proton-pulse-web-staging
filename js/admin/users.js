@@ -86,7 +86,7 @@ export async function fetchAllUsers(session, { search } = {}) {
   return rows;
 }
 
-export function renderUsers(rows) {
+export function renderUsers(rows, { currentUserId } = {}) {
   const loading = document.getElementById('users-loading');
   const empty   = document.getElementById('users-empty');
   const table   = document.getElementById('users-table');
@@ -110,16 +110,17 @@ export function renderUsers(rows) {
     const cid = escapeHtml(r.client_id || '');
     const name = escapeHtml(r.display_name || '(anonymous)');
     const lastActive = escapeHtml(fmtDate(r.last_active));
+    const isSelf = currentUserId && r.proton_pulse_user_id === currentUserId;
+    const banBtn = isSelf
+      ? `<button class="admin-btn admin-btn--danger admin-btn--sm" disabled title="Cannot ban yourself">Ban</button>`
+      : `<button class="admin-btn admin-btn--danger admin-btn--sm" data-action="ban-user" data-userid="${uid}" data-username="${name}">Ban</button>`;
     return `<tr>
       <td>${name}</td>
       <td><code class="admin-uid">${uid || '—'}</code></td>
       <td><code class="admin-uid">${cid || '—'}</code></td>
       <td>${r.report_count}</td>
       <td>${lastActive}</td>
-      <td>
-        <button class="admin-btn admin-btn--danger admin-btn--sm"
-          data-action="ban-user" data-userid="${uid}" data-username="${name}">Ban</button>
-      </td>
+      <td>${banBtn}</td>
     </tr>`;
   }).join('');
 }

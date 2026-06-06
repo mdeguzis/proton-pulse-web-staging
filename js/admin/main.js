@@ -93,7 +93,7 @@ async function loadUsers() {
   err.hidden = true;
   try {
     const rows = await fetchAllUsers(currentSession, { search });
-    renderUsers(rows);
+    renderUsers(rows, { currentUserId: currentSession?.user?.id });
   } catch (e) {
     loading.hidden = true;
     err.textContent = e.message;
