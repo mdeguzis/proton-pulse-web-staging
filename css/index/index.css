@@ -168,6 +168,45 @@
   color: var(--muted);
 }
 
+/* primary CTA row - keeps first load focused on the two essential actions
+   (browse reports, get the plugin) plus a learn-more link to about.html */
+.welcome-cta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--strong);
+  background: var(--card);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.cta-btn:hover {
+  border-color: var(--accent);
+}
+.cta-btn:active { transform: translateY(1px); }
+.cta-primary {
+  border-color: transparent;
+  color: #0b1622;
+  background: linear-gradient(90deg, var(--accent-hi), var(--green-hi) 80%);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+.cta-primary:hover { filter: brightness(1.06); }
+.welcome-learn-more {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.welcome-learn-more a { color: var(--accent); }
+
 /* quick-actions row removed - the topnav covers those links now */
 
 /* explore grid - explicit column count per breakpoint so rows are always uniform

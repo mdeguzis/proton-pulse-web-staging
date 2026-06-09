@@ -32,6 +32,7 @@ index.html
 js/index/main.js
 css/index/index.css
 css/shared/site.css
+about.html
 auth.html
 js/auth/main.js
 css/auth/auth.css

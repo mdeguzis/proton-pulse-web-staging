@@ -33,6 +33,9 @@
     <symbol id="icon-scoring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="M5 14h14"/><path d="M5 14a4 4 0 0 0 4-4V5"/><path d="M19 14a4 4 0 0 1-4-4V5"/><path d="M19 14a4 4 0 0 1-4 4h-1a4 4 0 0 0-4 0H9a4 4 0 0 1-4-4"/>
     </symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+    </symbol>
     <symbol id="icon-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
       <path d="M9 18c-4.51 2-5-2-7-2"/>
@@ -202,6 +205,10 @@
           <svg class="nav-caret" aria-hidden="true" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
         </button>
         <div class="nav-dropdown-panel">
+          <a href="about.html" data-page="about" title="What Proton Pulse is and how it compares to ProtonDB">
+            <svg class="nav-icon" aria-hidden="true"><use href="#icon-info"/></svg>
+            <span>About</span>
+          </a>
           <a href="scoring.html" data-page="scoring" title="How compatibility scores are calculated">
             <svg class="nav-icon" aria-hidden="true"><use href="#icon-scoring"/></svg>
             <span>Scoring</span>
@@ -247,6 +254,7 @@
   <a href="data-index.html" data-page="data-index"><svg class="nav-icon" aria-hidden="true"><use href="#icon-database"/></svg> Data</a>
   <a href="coverage.html" data-page="coverage"><svg class="nav-icon" aria-hidden="true"><use href="#icon-chart"/></svg> Coverage</a>
   <a href="stats.html" data-page="stats"><svg class="nav-icon" aria-hidden="true"><use href="#icon-stats"/></svg> Stats</a>
+  <a href="about.html" data-page="about"><svg class="nav-icon" aria-hidden="true"><use href="#icon-info"/></svg> About</a>
   <a href="scoring.html" data-page="scoring"><svg class="nav-icon" aria-hidden="true"><use href="#icon-scoring"/></svg> Scoring</a>
   <a href="https://github.com/mdeguzis/decky-proton-pulse/issues/new/choose" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-contact"/></svg> Contact</a>
   <a href="https://github.com/mdeguzis/decky-proton-pulse" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-gamepad"/></svg> Decky Plugin</a>

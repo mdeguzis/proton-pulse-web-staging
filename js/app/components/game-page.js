@@ -351,10 +351,6 @@ export async function renderGamePage(appId) {
               &nbsp;/&nbsp; <strong>${configs.length}</strong> Pulse config${configs.length !== 1 ? 's' : ''}
               ${totalCommunityMinutes > 0 ? `&nbsp;/&nbsp; <strong>${fmtMinutes(totalCommunityMinutes)}</strong> community playtime (${totalSessionCount} session${totalSessionCount !== 1 ? 's' : ''})` : ''}
             </div>
-            <div class="game-header-summary">
-              Browse the combined community view for this game across ProtonDB reports, Pulse compatibility reports, and shared Pulse configs.
-            </div>
-
             ${myStatusBadge}
           </div>
         </div>
@@ -363,16 +359,8 @@ export async function renderGamePage(appId) {
           <div class="game-header-actions">
             <a class="info-btn" href="scoring.html" id="rating-info-btn" title="How scoring works (opens the canonical scoring page)"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="11" fill="#3b82f6"/><text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" fill="#fff" font-family="serif">i</text></svg></a>
             <a class="info-btn info-btn-labeled" id="stats-btn" href="game-stats.html?app=${appId}" title="Per-game compatibility stats: confidence factors, trend, Proton version success rates, launch option frequency, and proven launch options"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="4" height="18" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="12" width="4" height="9" rx="1"/></svg><span>Stats</span></a>
-            <button class="info-btn info-btn-labeled" id="min-reqs-btn" title="Minimum system requirements (from Steam Store, served by pipeline)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="20" x2="15" y2="20"/></svg><span>Min. Requirements</span></button>
             ${renderDeckStatusButton(appId)}
             <a class="submit-report-btn" href="submit.html?app=${appId}&title=${encodeURIComponent(title)}">Submit Report</a>
-          </div>
-        </div>
-        <div class="info-tooltip" id="min-reqs-tip">
-          <div class="info-tooltip-inner" id="min-reqs-content">
-            <h3 style="margin:0 0 8px;font-size:0.95rem;color:var(--strong)">Minimum System Requirements</h3>
-            <p style="color:var(--muted);font-size:0.84rem;margin:0">System requirements come from the Steam Store appdetails endpoint. The plugin already pulls these as scoring confidence boosters; webui needs the pipeline to publish them per-game (task #37). Once that lands, this panel will show the same CPU/GPU/RAM/OS minimums the plugin shows on the Configure tab.</p>
-            <p style="color:var(--muted);font-size:0.78rem;margin:8px 0 0;font-style:italic">Awaiting pipeline backfill</p>
           </div>
         </div>
         <div class="info-tooltip" id="deck-status-tip">
@@ -390,7 +378,6 @@ export async function renderGamePage(appId) {
           <a class="hub-link" href="https://steamcharts.com/app/${appId}" target="_blank" rel="noopener">Steam Charts ></a>
           <a class="hub-link" href="https://github.com/ValveSoftware/Proton/issues?q=${encodeURIComponent(title)}" target="_blank" rel="noopener">Proton Issues ></a>
           <a class="hub-link" href="${dataFilesHref(appId)}" target="_blank" rel="noopener">Data Files ></a>
-          <a class="hub-link" href="scoring.html">How Scoring Works ></a>
         </div>
       </div>
 
@@ -399,7 +386,6 @@ export async function renderGamePage(appId) {
       <div class="reports-section-head" id="pulse-summary">
         <div class="reports-section-copy">
           <span class="reports-section-title">Community Configs &amp; Reports</span>
-          <span class="reports-section-subtitle">Saved Pulse configs and compatibility reports from ProtonDB and Proton Pulse contributors, listed together and labeled by source.</span>
         </div>
         <div class="sort-bar">
           <button class="${sortMode==='recent'?'active':''}" data-sort="recent">Recent</button>
@@ -509,11 +495,6 @@ export async function renderGamePage(appId) {
     // else still references them (search/etc); safe to delete in a cleanup pass
     // #stats-btn now navigates to game-stats.html?app=ID via plain <a href>,
     // no click handler needed. The old inline tooltip flow is gone
-    el.querySelector('#min-reqs-btn')?.addEventListener('click', () => {
-      // Min-reqs panel reuses the same .info-tooltip styling. Content is a
-      // placeholder until task #37 publishes per-game sysreqs from the pipeline
-      el.querySelector('#min-reqs-tip')?.classList.toggle('open');
-    });
     el.querySelector('#deck-status-btn')?.addEventListener('click', () => {
       // Deck status modal mirrors the Steam Store Deck Compatibility popup -
       // status badge + summary sentence + per-criterion checklist
