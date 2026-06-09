@@ -17,7 +17,7 @@ const {
   computeSettingsTips,
   isPositive,
   isNegative,
-} = loadEsm(['lib/scoring/gameStats.js'], { Math, Object, Array, Date, JSON, console });
+} = loadEsm(['js/lib/scoring/gameStats.js'], { Math, Object, Array, Date, JSON, console });
 
 const NOW = Math.floor(Date.now() / 1000);
 const DAY = 86400;

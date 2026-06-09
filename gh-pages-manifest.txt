@@ -74,6 +74,8 @@ js/lib/supabase-client.js
 js/lib/topbar.js
 js/lib/gh-gist.js
 js/lib/gh-auth.js
+js/lib/scoring/gameStats.js
+js/lib/scoring/index.js
 assets/steam-logo.png
 assets/steam-logo-glyph.png
 favicon.svg

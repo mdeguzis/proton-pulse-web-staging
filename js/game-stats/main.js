@@ -1,11 +1,11 @@
 // Entry module for game-stats.html. Migrated from game-stats.js.
-import { computeGameStats } from '../../lib/scoring/gameStats.js';
+import { computeGameStats } from '../lib/scoring/gameStats.js';
 import { isPreviewHardware, loadMyHardware, renderPreviewHardwareBanner } from '../shared/hardware.js';
 import { attachChartHover, attachClickToFilter, dispatchFilter, onFilterChange } from '../shared/chart-interactions.js';
 
 // Per-game stats page (game-stats.html). Reads ?app=APPID from the URL,
 // pulls the same CDN data the main app page uses, then renders a thoughtful
-// breakdown via computeGameStats() from lib/scoring/gameStats.js.
+// breakdown via computeGameStats() from js/lib/scoring/gameStats.js.
 //
 // Same CDN base resolution as confidence.html so localhost dev preview works.
 
@@ -15,7 +15,7 @@ import { attachChartHover, attachClickToFilter, dispatchFilter, onFilterChange }
 
   const SITE_BASE = (() => {
     const parts = location.pathname.split('/').filter(Boolean);
-    return parts[0] === 'proton-pulse-data' ? '/proton-pulse-data' : '';
+    return parts[0] === 'proton-pulse-web' ? '/proton-pulse-web' : '';
   })();
   const IS_LOCAL_DEV = ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname);
   const CDN_BASE = IS_LOCAL_DEV
