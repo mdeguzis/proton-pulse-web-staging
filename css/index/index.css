@@ -179,6 +179,8 @@
 .cta-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex: 1 1 140px;
   padding: 11px 20px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -189,6 +191,7 @@
   background: linear-gradient(90deg, var(--accent), var(--accent-hi) 92%);
   text-decoration: none;
   transition: filter 0.15s, transform 0.05s, box-shadow 0.15s;
+  text-align: center;
 }
 .cta-btn:hover {
   filter: brightness(1.08);
