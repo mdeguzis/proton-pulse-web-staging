@@ -155,30 +155,34 @@
 .search-result-list {
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 
 .search-result-card {
   display: flex;
+  align-items: center;
   gap: 14px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
   color: inherit;
-}
-
-.search-result-card:last-child {
-  border-bottom: none;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
 }
 
 .search-result-card:hover {
-  background: var(--s2);
+  border-color: var(--accent);
   text-decoration: none;
 }
 
+.search-result-card:active { transform: translateY(1px); }
+
 .search-result-card img {
-  width: 120px;
-  height: 45px;
+  width: 92px;
+  height: 43px;
   object-fit: cover;
-  border: 1px solid var(--border);
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
@@ -1226,6 +1230,24 @@ a.card:hover { text-decoration: none; }
 .vote-btn:hover { color: var(--text); border-color: var(--accent); }
 .vote-btn.vote-up.active { color: var(--accent); border-color: var(--accent); }
 .vote-btn.vote-dn.active { color: #c85050; border-color: #c85050; }
+
+.tier-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--muted);
+}
+.tier-badge.tier-platinum { background: #b4c7dc; color: #0a0c10; }
+.tier-badge.tier-gold     { background: #c8a050; color: #111; }
+.tier-badge.tier-silver   { background: #8fa0b0; color: #111; }
+.tier-badge.tier-bronze   { background: #b07040; color: #fff; }
+.tier-badge.tier-borked   { background: #c85050; color: #fff; }
+.tier-badge.tier-pending  { background: var(--border); color: var(--muted); }
 
 .source-badge {
   display: inline-flex;
