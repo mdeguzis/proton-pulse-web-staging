@@ -1181,6 +1181,8 @@ a.card:hover { text-decoration: none; }
   min-width: 72px;
   flex-shrink: 0;
 }
+/* Home feed: source badges flow horizontally so cards stay compact */
+.activity-badges { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
 /* card-rating-row now shows confidence pill (left) and rating badge (right)
    side-by-side in a horizontal row. Matches the plugin's "78% GOLD" layout */
 .card-rating-row { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; justify-content: flex-end; }

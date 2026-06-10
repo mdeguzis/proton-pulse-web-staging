@@ -129,7 +129,7 @@ export function renderActivityCard(kind, row, protonDbAppIds) {
         <div class="hw">${esc(hwLine)}</div>
         <div class="age">${age}</div>
       </div>
-      <div class="right" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+      <div class="right activity-badges">
         <span class="source-badge pulse">
           <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
         </span>
