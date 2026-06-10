@@ -67,14 +67,13 @@ export async function renderHomeFallback() {
     .map((appId) => ({ appId, title: titleById.get(appId) || `App ${appId}` }))
     .filter((row) => row.title)
     .map((row) => `
-      <a class="card" href="#/app/${row.appId}" style="text-decoration:none">
-        <img src="${STEAM_IMG(row.appId)}" onerror="this.style.display='none'" alt=""
-             style="width:108px;height:40px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)">
+      <a class="card activity-card" href="#/app/${row.appId}" style="text-decoration:none">
+        <img src="${STEAM_IMG(row.appId)}" onerror="this.style.display='none'" alt="" class="activity-thumb">
         <div class="left">
           <div class="proton">${esc(row.title)}</div>
           <div class="hw">Open ProtonDB and Proton Pulse reports</div>
+          <div class="activity-badges"><span class="source-badge protondb">ProtonDB</span></div>
         </div>
-        <div class="right"><span class="source-badge protondb">ProtonDB</span></div>
       </a>`)
     .join('');
 
@@ -121,37 +120,37 @@ export function renderActivityCard(kind, row, protonDbAppIds) {
   // Reports is what enforces filling out responses before a row goes
   // public-visible. No REPORT/CONFIG badge needed on the home feed
   return `
-    <a class="card" href="#/app/${appId}" style="text-decoration:none">
-      <img src="${STEAM_IMG(appId)}" onerror="this.style.display='none'" alt=""
-           style="width:108px;height:40px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)">
+    <a class="card activity-card" href="#/app/${appId}" style="text-decoration:none">
+      <img src="${STEAM_IMG(appId)}" onerror="this.style.display='none'" alt="" class="activity-thumb">
       <div class="left">
         <div class="proton">${esc(title)}</div>
         <div class="hw">${esc(hwLine)}</div>
         <div class="age">${age}</div>
-      </div>
-      <div class="right activity-badges">
-        <span class="source-badge pulse">
-          <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
-        </span>
-        ${hasProtonDb ? '<span class="source-badge protondb">ProtonDB</span>' : ''}
-        ${isNonSteam
-          ? '<span class="source-badge non-steam-game">Non-Steam</span>'
-          : '<span class="source-badge steam-game">Steam</span>'}
+        <div class="activity-badges">
+          <span class="source-badge pulse">
+            <img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse
+          </span>
+          ${hasProtonDb ? '<span class="source-badge protondb">ProtonDB</span>' : ''}
+          ${isNonSteam
+            ? '<span class="source-badge non-steam-game">Non-Steam</span>'
+            : '<span class="source-badge steam-game">Steam</span>'}
+        </div>
       </div>
     </a>`;
 }
 
 export function renderPulseReportCards(rows) {
   return rows.map((row) => `
-    <a class="card" href="#/app/${row.app_id}" style="text-decoration:none">
-      <img src="${STEAM_IMG(row.app_id)}" onerror="this.style.display='none'" alt=""
-           style="width:108px;height:40px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)">
+    <a class="card activity-card" href="#/app/${row.app_id}" style="text-decoration:none">
+      <img src="${STEAM_IMG(row.app_id)}" onerror="this.style.display='none'" alt="" class="activity-thumb">
       <div class="left">
         <div class="proton">${esc(row.title || `App ${row.app_id}`)}</div>
         <div class="hw">${esc([row.rating, row.proton_version].filter(Boolean).join(' | '))}</div>
         <div class="age">${daysAgo(Math.floor(new Date(row.created_at).getTime() / 1000))}</div>
+        <div class="activity-badges">
+          <span class="source-badge pulse"><img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse</span>
+        </div>
       </div>
-      <div class="right"><span class="source-badge pulse"><img src="https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/assets/logo.png" alt="">Pulse</span></div>
     </a>`)
     .join('');
 }
