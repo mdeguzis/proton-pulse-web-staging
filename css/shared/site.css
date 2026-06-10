@@ -953,12 +953,12 @@ html[data-motion="off"] *::after {
   align-items: center;
   justify-content: center;
   background: none;
-  border: 1px solid var(--border2);
+  border: none;
   color: var(--text);
   cursor: pointer;
 }
 .topbar-mobile-toggle svg { width: 18px; height: 18px; }
-.topbar-mobile-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-mobile-toggle:hover { color: var(--accent); }
 
 /* mobile drawer that slides down from the topbar */
 .mobile-nav-drawer {
@@ -1302,19 +1302,16 @@ html[data-motion="off"] *::after {
   height: 30px;
   padding: 0 12px;
   color: var(--text);
-  background: rgba(11, 17, 22, 0.55);
-  border: 1px solid var(--border2);
+  background: transparent;
+  border: none;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  transition: color .12s, border-color .12s, background .12s, box-shadow .12s;
+  transition: color .12s;
 }
 .auth-link:hover {
   color: var(--accent-hi);
-  border-color: var(--accent);
-  background: rgba(102, 192, 244, 0.08);
-  box-shadow: 0 0 16px -4px var(--accent-glow);
   text-decoration: none;
 }
 .auth-link .nav-icon { width: 16px; height: 16px; color: var(--accent); }
