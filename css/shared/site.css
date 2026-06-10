@@ -542,15 +542,13 @@ html[data-motion="off"] *::after {
   width: 30px;
   height: 30px;
   color: var(--muted);
-  border: 1px solid var(--border2);
-  background: rgba(11, 17, 22, 0.55);
-  transition: color .12s, border-color .12s, background .12s, box-shadow .12s;
+  border: none;
+  background: transparent;
+  transition: color .12s, box-shadow .12s;
 }
 .banner-icon-link:hover {
   color: var(--accent-hi);
-  border-color: var(--accent);
-  background: rgba(102, 192, 244, 0.08);
-  box-shadow: 0 0 14px -4px var(--accent-glow);
+  box-shadow: none;
   text-decoration: none;
 }
 .banner-icon-link .nav-icon { width: 16px; height: 16px; }
@@ -1320,6 +1318,7 @@ html[data-motion="off"] *::after {
   text-decoration: none;
 }
 .auth-link .nav-icon { width: 16px; height: 16px; color: var(--accent); }
+.auth-link[hidden] { display: none !important; }
 
 .auth-link--signedin { text-transform: none; letter-spacing: 0; padding: 0 10px 0 4px; }
 .auth-avatar {
