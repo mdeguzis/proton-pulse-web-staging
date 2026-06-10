@@ -172,30 +172,29 @@
    (browse reports, get the plugin) plus a learn-more link to about.html */
 .welcome-cta {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   margin-bottom: 16px;
 }
 .cta-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 140px;
-  padding: 8px 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 600;
   color: #0b1622;
   white-space: nowrap;
-  /* secondary CTA: blue fill so it reads as a real button, not an outline */
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: linear-gradient(90deg, var(--accent), var(--accent-hi) 92%);
   text-decoration: none;
   transition: filter 0.15s, transform 0.05s, box-shadow 0.15s;
   text-align: center;
-}
-@media (min-width: 480px) {
-  .cta-btn { padding: 11px 20px; font-size: 0.9rem; }
 }
 .cta-btn:hover {
   filter: brightness(1.08);

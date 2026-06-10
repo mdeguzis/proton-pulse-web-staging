@@ -1,7 +1,7 @@
 // Entry point for the app page: bootstraps routing and search wiring.
 // (Replaces the inline bootstrap that lived at the top/bottom of app.js.)
-import { route } from './router.js?v=16145a4d';
-import { wireSearch } from './components/search.js?v=e3b6d217';
+import { route } from './router.js?v=c67b1a10';
+import { wireSearch } from './components/search.js?v=2167c57d';
 
 window.addEventListener('hashchange', () => route());
 window.addEventListener('popstate', () => route());
