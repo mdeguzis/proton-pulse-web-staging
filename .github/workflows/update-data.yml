@@ -28,6 +28,11 @@ on:
         description: "Max matching apps to process for coverage-backfill. Use 0 for no limit."
         required: false
         default: "0"
+      staging_only:
+        description: "Deploy shell files to staging site only (no production deploy). Use to preview changes before pushing to prod."
+        required: false
+        default: false
+        type: boolean
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -323,6 +328,12 @@ jobs:
           git commit -m "Deploy: $(date +%F)"
           git push origin gh-pages-new:gh-pages --force
 
+      - name: Sync to staging
+        if: ${{ secrets.STAGING_DEPLOY_TOKEN != '' }}
+        run: |
+          git remote add staging https://x-access-token:${{ secrets.STAGING_DEPLOY_TOKEN }}@github.com/mdeguzis/proton-pulse-web-staging.git
+          git push staging gh-pages-new:gh-pages --force
+
   # ── Pages-only redeploy: refresh app/index shell files on gh-pages ─────────
   pages-only:
     if: inputs.pages_only == true
@@ -379,6 +390,13 @@ jobs:
           fi
           git commit -m "Pages shell refresh: $(date +%F)"
           git push origin gh-pages
+
+      - name: Sync to staging
+        if: ${{ secrets.STAGING_DEPLOY_TOKEN != '' }}
+        run: |
+          cd gh-pages-data
+          git remote add staging https://x-access-token:${{ secrets.STAGING_DEPLOY_TOKEN }}@github.com/mdeguzis/proton-pulse-web-staging.git
+          git push staging HEAD:gh-pages --force
 
   # ── Targeted backfill: just backfill specific IDs and publish ──────
   targeted-backfill:
@@ -788,3 +806,50 @@ jobs:
       - name: Fail if any job failed
         if: contains(needs.*.result, 'failure')
         run: exit 1
+
+  # ── Staging-only preview: deploy shell files to staging, skip production ──
+  staging-preview:
+    if: inputs.staging_only == true
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout current gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-data
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Build staging copy
+        run: |
+          cd gh-pages-data
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          cp ../repo/gh-pages-manifest.txt ./gh-pages-manifest.txt
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            case "$path" in \#*) continue ;; esac
+            if [ -f "../repo/$path" ]; then
+              mkdir -p "$(dirname "$path")"
+              cp "../repo/$path" "./$path"
+            fi
+          done < gh-pages-manifest.txt
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o ./scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o ./form-schema.json
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes vs current staging."
+          else
+            git add -A
+            git commit -m "Staging preview: $(date +%F)"
+          fi
+
+      - name: Push to staging
+        run: |
+          cd gh-pages-data
+          git remote add staging https://x-access-token:${{ secrets.STAGING_DEPLOY_TOKEN }}@github.com/mdeguzis/proton-pulse-web-staging.git
+          git push staging HEAD:gh-pages --force

@@ -9,7 +9,7 @@ WATCH_INTERVAL ?= 10
 WATCH_ALL_WORKFLOWS ?= true
 
 .PHONY: help setup install install-pg test test-js lint lint-py lint-pylint lint-sh test-py init-submodules fetch-steam-catalog backup-supabase install-docker \
-	gh-run gh-pages-only gh-backfill-apps gh-coverage-backfill gh-run-watch gh-check \
+	gh-run gh-pages-only gh-staging gh-backfill-apps gh-coverage-backfill gh-run-watch gh-check \
 	build serve smoke smoke-live pre-push
 
 build:
@@ -62,6 +62,7 @@ help:
 	@echo "  gh-check            Verify gh is installed and authenticated"
 	@echo "  gh-run              Trigger the full GitHub Actions update-data workflow via gh"
 	@echo "  gh-pages-only       Trigger the Pages-only publish workflow path via gh"
+	@echo "  gh-staging          Deploy shell files to staging only (no prod deploy) for preview"
 	@echo "  gh-backfill-apps    Trigger targeted app backfill"
 	@echo "                      Usage: make gh-backfill-apps BACKFILL_APP_IDS=1145350,2358720"
 	@echo "  gh-coverage-backfill Trigger coverage-based backfill"
@@ -164,6 +165,10 @@ gh-run: gh-check
 gh-pages-only: gh-check
 	gh workflow run $(GITHUB_WORKFLOW) --field pages_only=true
 	@echo "Triggered $(GITHUB_WORKFLOW) with pages_only=true"
+
+gh-staging: gh-check
+	gh workflow run $(GITHUB_WORKFLOW) --field staging_only=true
+	@echo "Triggered $(GITHUB_WORKFLOW) with staging_only=true -- preview at https://mdeguzis.github.io/proton-pulse-web-staging/"
 
 gh-backfill-apps: gh-check
 	@if [ -z "$(BACKFILL_APP_IDS)" ]; then \

@@ -358,6 +358,8 @@
     if (document.querySelector('.topbar')) return; // page already has it (e.g. inlined for SSR)
     // sprite first so the <use href="#..."> refs in the banner resolve immediately
     document.body.insertAdjacentHTML('afterbegin', SPRITE + BANNER_AND_NAV);
+    // pauseSmilAnimations() in initMotion() runs before the SVG exists; re-apply now
+    if (motionDisabled()) pauseSmilAnimations();
     markActive();
     wireMobileDrawer();
     wireSearchDropdown();
