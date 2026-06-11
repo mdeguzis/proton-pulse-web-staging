@@ -1,16 +1,16 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=7c5d0e92';
-import { loadSearchIndex, searchIndex } from './search.js?v=6c404624';
+import { loadSearchIndex, searchIndex } from './search.js?v=8da085b1';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=f75c43ba';
 import { daysAgo, latestPerApp } from '../utils.js?v=d4fea298';
-import { renderGameCard } from '../lib/card.js?v=47333258';
+import { renderGameCard } from '../lib/card.js?v=9b7180ee';
 
 const LIMIT = 25;
 
 function _popularSub(g) {
   const total = (g.protondbCount || 0) + (g.pulseCount || 0);
-  return total > 0 ? `${total.toLocaleString()} compatibility report${total === 1 ? '' : 's'}` : 'Popular on Steam';
+  return total > 0 ? `${total.toLocaleString()} compatibility report${total === 1 ? '' : 's'}` : '';
 }
 
 export async function renderHomePage() {
@@ -32,8 +32,6 @@ export async function renderHomePage() {
       for (const g of (Array.isArray(mostPlayed) ? mostPlayed : [])) {
         if (pulseReports.length + popularCards.length >= LIMIT) break;
         if (seenIds.has(String(g.appId))) continue;
-        const popChips = ['<span class="source-badge steam-game">Steam</span>'];
-        if ((g.protondbCount || 0) > 0) popChips.push('<span class="source-badge protondb">ProtonDB</span>');
         popularCards.push(renderGameCard({
           href: `#/app/${g.appId}`,
           appId: g.appId,
@@ -41,7 +39,7 @@ export async function renderHomePage() {
           title: g.title,
           sub: _popularSub(g),
           tier: String(g.rating || '').toLowerCase() || undefined,
-          chips: popChips,
+          sourceLabel: 'Steam',
         }));
       }
     }
@@ -105,14 +103,13 @@ export function renderActivityCard(kind, row) {
     isNonSteam = cfg.isNonSteam === true || isNonSteamAppId(appId);
   }
   const rating = isReport ? String(row.rating || '').toLowerCase() : '';
-  const sourceBadge = isNonSteam ? '<span class="source-badge non-steam-game">Non-Steam</span>' : '<span class="source-badge steam-game">Steam</span>';
   return renderGameCard({
     href: `#/app/${appId}`,
     appId,
     title,
     sub: `${hwLine}${hwLine && age ? ' \u00b7 ' : ''}${age}`,
     tier: rating || undefined,
-    chips: [sourceBadge],
+    sourceLabel: isNonSteam ? 'Non-Steam' : 'Steam',
   });
 }
 
