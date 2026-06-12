@@ -7,11 +7,11 @@ import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=366b4c73';
 import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=9ede0a56';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=20f46ed5';
-import { enhanceAuthorBlocks } from './author.js?v=91f74572';
+import { enhanceAuthorBlocks } from './author.js?v=c9e5c5e4';
 import { renderConfigCard } from './config-cards.js?v=c95d3721';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=15100cc6';
-import { renderCard } from './report-card.js?v=6779320f';
-import { loadSearchIndex, searchIndex } from './search.js?v=d43c4eea';
+import { renderCard } from './report-card.js?v=ac0fda7e';
+import { loadSearchIndex, searchIndex } from './search.js?v=4e80d1b1';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, STEAM_IMG, dataFilesHref } from '../config.js?v=9970759a';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=d4fea298';
 
