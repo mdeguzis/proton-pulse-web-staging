@@ -19,6 +19,10 @@ dev = [
 [tool.uv]
 default-groups = ["dev"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=scripts/pipeline --cov-fail-under=90"
+
 [tool.pylint.main]
 py-version = "3.12"
 

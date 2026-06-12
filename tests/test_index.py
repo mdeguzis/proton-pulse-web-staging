@@ -652,3 +652,18 @@ def test_probe_protondb_app_ids_unlimited_when_limit_zero():
 
 def test_probe_limit_default_is_zero():
     assert get_protondb_probe_limit(env={}) == 0
+
+
+def test_generate_coverage_report_bad_app_id_flag(tmp_path):
+    """Non-digit app ID from signal catalog gets 'bad-appid' flag (line 800)."""
+    from scripts.pipeline.finalize import generate_coverage_report
+    (tmp_path / "data").mkdir()
+    generate_coverage_report(
+        index_keys=set(),
+        backfilled_keys=set(),
+        data_output_path=tmp_path / "data",
+        output_path=tmp_path,
+        protondb_signal_catalog={"not-a-number": "Bad Game"},
+    )
+    out = (tmp_path / "coverage.html").read_text()
+    assert "bad-appid" in out

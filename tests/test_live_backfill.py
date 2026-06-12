@@ -478,7 +478,7 @@ def test_backfilled_keys_flow_into_app_index_and_main_index(tmp_path):
     assert json.loads((data_dir / "2561580" / "index.json").read_text()) == ["2025"]
     html = (tmp_path / "data-index.html").read_text()
     assert '["2561580","","2561580/",["2025"]]' in html
-    assert 'data/${appId}/${year}.json' in html
+    assert "function loadYear(appId, file)" in html
 
 
 def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, monkeypatch):
@@ -534,7 +534,7 @@ def test_run_backfill_and_finalize_include_backfilled_apps_in_indexes(tmp_path, 
     html = (tmp_path / "data-index.html").read_text()
     assert '["730","","730/",["2024"]]' in html
     assert '"2561580"' in html and '["2025"]' in html
-    assert 'const latestHref=`data/${appId}/latest.json`;' in html
+    assert "function loadYear(appId, file)" in html
     assert read_app_metadata(data_dir, "2561580")["protondb_live"] is True
 
 
@@ -549,7 +549,9 @@ def test_update_app_metadata_preserves_multiple_provenance_flags(tmp_path):
     }
 
 
-def test_seed_official_dump_metadata_repairs_existing_live_metadata(tmp_path):
+def test_seed_official_dump_metadata_repairs_existing_live_metadata(tmp_path, monkeypatch):
+    import scripts.pipeline.process as process_module
+
     reports_dir = tmp_path / "reports"
     reports_dir.mkdir()
     (reports_dir / "sample.json").write_text(
@@ -562,6 +564,12 @@ def test_seed_official_dump_metadata_repairs_existing_live_metadata(tmp_path):
     data_dir = tmp_path / "out" / "data"
     data_dir.mkdir(parents=True)
     update_app_metadata(data_dir, "730", protondb_live=True)
+
+    monkeypatch.setattr(
+        process_module,
+        "_iter_app_ids_from_stream",
+        lambda _fh: iter(["730", "570"]),
+    )
 
     seed_official_dump_metadata(reports_dir, tmp_path / "out")
 
