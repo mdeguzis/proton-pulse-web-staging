@@ -2,10 +2,10 @@
 
 import { estimateScore } from '../../shared/scoring.js?v=2787ec1d';
 import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../api/reports.js?v=9052e252';
-import { renderGamePage } from './game-page.js?v=4acaebae';
+import { renderGamePage } from './game-page.js?v=f0502a48';
 import { STEAM_IMG } from '../config.js?v=9970759a';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=d4fea298';
-import { renderGameCard } from '../lib/card.js?v=1b522924';
+import { renderGameCard } from '../lib/card.js?v=9d469496';
 
 // Search index + results UX -- factored out of app.js.
 // Loaded as a classic script BEFORE app.js so its globals

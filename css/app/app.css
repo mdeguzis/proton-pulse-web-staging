@@ -561,9 +561,11 @@
    both pills had the same width - they blurred into one visual band */
 .source-summary-tier-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
 }
 .source-summary-conf {
   display: inline-flex;
