@@ -563,6 +563,8 @@
 .source-summary-tier-row > * {
   flex: 1;
 }
+.source-summary-tier-row > :first-child { justify-content: flex-end; }
+.source-summary-tier-row > :last-child  { justify-content: flex-start; }
 .source-summary-conf {
   display: inline-flex;
   align-items: center;
