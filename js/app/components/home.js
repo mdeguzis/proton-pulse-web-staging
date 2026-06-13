@@ -1,10 +1,10 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=9052e252';
-import { loadSearchIndex, searchIndex } from './search.js?v=427012ed';
+import { loadSearchIndex, searchIndex } from './search.js?v=c06fc038';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=9970759a';
 import { daysAgo, latestPerApp } from '../utils.js?v=d4fea298';
-import { renderGameCard } from '../lib/card.js?v=abc955ba';
+import { renderGameCard } from '../lib/card.js?v=1b522924';
 
 const PAGE_SIZE = 10;
 
