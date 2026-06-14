@@ -2,6 +2,12 @@
 
 import { CDN } from '../config.js?v=9970759a';
 
+/**
+ * Fetch the latest ProtonDB CDN report bundle for a game.
+ * Hits `${CDN}/${appId}/latest.json` (static JSON hosted on CDN).
+ * @param {string|number} appId - Steam app ID.
+ * @returns {Promise<Array<object>>} Array of report objects, or empty array on failure.
+ */
 export async function fetchCdn(appId) {
   try {
     const r = await fetch(`${CDN}/${appId}/latest.json`);
@@ -17,6 +23,15 @@ export const _protonDbLiveCache = new Map();
 // User-triggered live check: fetches ProtonDB public API for a single game.
 // NOT called automatically -- must be triggered by the user clicking the
 // "Check ProtonDB Live" button to avoid hammering their API on every page load.
+/**
+ * Fetch a live ProtonDB summary for a single game from the public ProtonDB API.
+ * Results are cached in `_protonDbLiveCache` for the session lifetime.
+ * NOT called automatically -- must be user-triggered to avoid rate-limiting their API.
+ * Hits `https://www.protondb.com/api/v1/reports/summaries/${appId}.json`.
+ * @param {string|number} appId - Steam app ID.
+ * @returns {Promise<Array<{appId: string|number, tier: string, total: number, trendingTier: string, score: number, source: string, _liveOnly: boolean}>>}
+ *   Single-element array with the summary, or empty array on failure or missing data.
+ */
 export async function fetchProtonDbLive(appId) {
   const key = String(appId);
   if (_protonDbLiveCache.has(key)) return _protonDbLiveCache.get(key);

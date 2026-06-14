@@ -6,6 +6,16 @@ import {
   WEB_CLIENT_ID_KEY, FIELD_LABELS,
 } from './config.js?v=87cd0f3d';
 
+/**
+ * Extracts the Steam ID from a Supabase session object.
+ *
+ * Checks `user_metadata.steam_id` first (preferred), then `provider_id` and
+ * `sub` as fallbacks to handle variation between the edge function flow and
+ * the standard OAuth flow.
+ *
+ * @param {Object|null} session - Supabase session object.
+ * @returns {string|null} Steam ID string, or null if not found.
+ */
 export function getSteamIdFromSession(session) {
   // Steam openid sub is like "https://steamcommunity.com/openid/id/76561198000000000".
   // The Supabase edge function stores it under user_metadata.steam_id (preferred) or
@@ -14,6 +24,12 @@ export function getSteamIdFromSession(session) {
   return meta.steam_id || meta.provider_id || meta.sub || null;
 }
 
+/**
+ * Returns the Proton Pulse (Supabase) user UUID from a session object.
+ *
+ * @param {Object|null} session - Supabase session object.
+ * @returns {string|null} UUID string, or null if the session is missing or lacks a user.
+ */
 export function getProtonPulseUserIdFromSession(session) {
   return session?.user?.id || null;
 }
@@ -21,6 +37,15 @@ export function getProtonPulseUserIdFromSession(session) {
 // localStorage is the fast local read; Supabase user_metadata is the
 // authoritative cross-device source. getShowUsername reads local only;
 // showUser() syncs the authoritative value down on sign-in.
+/**
+ * Reads the show-username preference from localStorage.
+ *
+ * Defaults to `true` when the key is absent: a user who linked their Steam
+ * account is assumed to want their username visible. The stored value is the
+ * literal string 'true' or 'false'.
+ *
+ * @returns {boolean}
+ */
 export function getShowUsername() {
   // Default to true for signed-in Pulse accounts: if the user took the
   // step of linking their Steam account, the assumption is they want their
@@ -31,6 +56,11 @@ export function getShowUsername() {
   return v === 'true';
 }
 
+/**
+ * Persists the show-username preference to localStorage.
+ *
+ * @param {boolean} val
+ */
 export function setShowUsername(val) {
   localStorage.setItem(SHOW_USERNAME_KEY, val ? 'true' : 'false');
 }
@@ -49,6 +79,20 @@ export function cleanUnknown(s) {
   return /^unknown$/i.test(t) ? '' : t;
 }
 
+/**
+ * Parses a Steam "System Information" text dump into structured hardware fields.
+ *
+ * Matches the format produced by Steam -> Help -> System Information. Compatible
+ * with the ProtonDB browser extension's input format. The parser is intentionally
+ * lenient: partial matches populate whatever fields are present. Literal "Unknown"
+ * values (case-insensitive) are treated as absent via {@link cleanUnknown}.
+ *
+ * Extracted fields: `cpu`, `os`, `manufacturer`, `model`, `kernel`, `gpu`,
+ * `gpuDriver`, `vramMb`, `ram`.
+ *
+ * @param {string} text - Raw Steam System Information text.
+ * @returns {Object} Parsed hardware fields as key-value pairs.
+ */
 export function parseSteamSystemInfo(text) {
   const out = {};
   if (!text || typeof text !== 'string') return out;
@@ -138,6 +182,16 @@ export function parseSteamSystemInfo(text) {
 // Linux GPU strings can mention multiple vendors at once (e.g. an NVIDIA card
 // on an Intel CPU sometimes shows both "Intel" and "NVIDIA" in the sysinfo).
 // Decide which takes priority.
+/**
+ * Infers GPU vendor from a free-text GPU string.
+ *
+ * Priority: NVIDIA > AMD > Intel. This order matters because some Linux sysinfo
+ * outputs mention multiple vendors (e.g. NVIDIA card on an Intel CPU), so the
+ * discrete GPU vendor is checked first.
+ *
+ * @param {string} gpuString - Free-text GPU description.
+ * @returns {'nvidia'|'amd'|'intel'|''} Vendor key, or '' if unrecognized.
+ */
 export function inferGpuVendor(gpuString) {
   const s = (gpuString || '').toString().toLowerCase();
   if (!s) return '';
@@ -147,6 +201,12 @@ export function inferGpuVendor(gpuString) {
   return '';
 }
 
+/**
+ * Parses a hardware row's `sysinfo_text` field and backfills `gpuVendor` if absent.
+ *
+ * @param {Object} row - Row object with an optional `sysinfo_text` string.
+ * @returns {Object} Parsed hardware fields, same shape as {@link parseSteamSystemInfo}.
+ */
 export function parseUploadedSystem(row) {
   const parsed = parseSteamSystemInfo(row?.sysinfo_text || '');
   if (parsed.gpu && !parsed.gpuVendor) {
@@ -155,6 +215,13 @@ export function parseUploadedSystem(row) {
   return parsed;
 }
 
+/**
+ * Returns true when a system label is a generic placeholder (empty, 'unknown',
+ * 'unnamed', 'system', 'uploaded system', etc.) rather than a meaningful name.
+ *
+ * @param {string|null|undefined} label
+ * @returns {boolean}
+ */
 export function isGenericSystemLabel(label) {
   const s = (label || '').toString().trim().toLowerCase();
   return !s
@@ -170,6 +237,19 @@ export function isGenericSystemLabel(label) {
 //   1) Steam Deck when board or APU identifies it
 //   2) "{OS}-{VENDOR}-{GPU_MODEL}" as a generic hardware-derived fallback
 //   3) 'Uploaded system' when there's literally nothing to go on
+/**
+ * Infers a short human-readable label for a hardware system.
+ *
+ * Priority order (matches the Decky plugin's `generateLabel`):
+ *   1. Steam Deck model name (LCD/OLED) via board manufacturer+model, or APU chipset hints.
+ *   2. 'OS-VENDOR-GPU' dash-joined fallback using available parsed fields.
+ *   3. 'Uploaded system' when nothing parseable is found.
+ *
+ * Accepts either a raw DB row (with `sysinfo_text`) or an already-parsed object.
+ *
+ * @param {Object} rowOrParsed - DB row or pre-parsed hardware object.
+ * @returns {string} Short system label.
+ */
 export function inferSystemLabel(rowOrParsed) {
   const parsed = rowOrParsed?.sysinfo_text !== undefined ? parseUploadedSystem(rowOrParsed) : (rowOrParsed || {});
 
@@ -197,10 +277,23 @@ export function inferSystemLabel(rowOrParsed) {
   return 'Uploaded system';
 }
 
+/**
+ * Builds a one-line bullet-separated hardware summary from parsed system fields.
+ *
+ * @param {Object} parsed - Parsed hardware object (from {@link parseSteamSystemInfo}).
+ * @returns {string} Summary string, e.g. 'Arch Linux • AMD Ryzen 7 5800X3D • 32 GB',
+ *   or a fallback message when no fields are present.
+ */
 export function summarizeSystem(parsed) {
   const bits = [parsed.os, parsed.cpu || parsed.gpu, parsed.ram].filter(Boolean);
   return bits.length ? bits.join(' • ') : 'No parsed hardware summary available yet.';
 }
+/**
+ * Reads the hardware-source metadata object from localStorage. Returns null on
+ * missing key or parse failure.
+ *
+ * @returns {Object|null}
+ */
 export function getMyHwSourceMeta() {
   try {
     const raw = localStorage.getItem(MYHW_SOURCE_META_KEY);
@@ -210,6 +303,12 @@ export function getMyHwSourceMeta() {
   }
 }
 
+/**
+ * Persists hardware-source metadata to localStorage, or removes the key when
+ * `meta` is null/undefined.
+ *
+ * @param {Object|null} meta
+ */
 export function setMyHwSourceMeta(meta) {
   if (!meta) {
     localStorage.removeItem(MYHW_SOURCE_META_KEY);
@@ -218,6 +317,12 @@ export function setMyHwSourceMeta(meta) {
   localStorage.setItem(MYHW_SOURCE_META_KEY, JSON.stringify(meta));
 }
 
+/**
+ * Reads the per-field origin map from localStorage. Returns an empty object on
+ * missing key or parse failure.
+ *
+ * @returns {Object} Map of field name to origin string.
+ */
 export function getMyHwFieldOrigins() {
   try {
     const raw = localStorage.getItem(MYHW_FIELD_ORIGINS_KEY);
@@ -227,6 +332,12 @@ export function getMyHwFieldOrigins() {
   }
 }
 
+/**
+ * Persists the full field-origins map to localStorage, or removes the key when
+ * the map is empty or falsy.
+ *
+ * @param {Object|null} origins
+ */
 export function setMyHwFieldOrigins(origins) {
   if (!origins || Object.keys(origins).length === 0) {
     localStorage.removeItem(MYHW_FIELD_ORIGINS_KEY);
@@ -235,6 +346,13 @@ export function setMyHwFieldOrigins(origins) {
   localStorage.setItem(MYHW_FIELD_ORIGINS_KEY, JSON.stringify(origins));
 }
 
+/**
+ * Sets or clears the origin for a single hardware field in the persisted map.
+ * Passing a falsy `origin` removes the field from the map.
+ *
+ * @param {string} field - Field name key.
+ * @param {string|null|undefined} origin - Origin label, or falsy to delete.
+ */
 export function setMyHwFieldOrigin(field, origin) {
   const cur = getMyHwFieldOrigins();
   if (!origin) delete cur[field];
@@ -255,6 +373,15 @@ export function escapeHtml(s) {
 // lenient (null -> epoch, '' -> Invalid Date, neither throws), so we guard
 // falsy inputs with a dash and fall back to the raw string on unparseable
 // input so the UI never shows "Invalid Date"
+/**
+ * Formats an ISO timestamp string for display using the user's locale.
+ *
+ * Returns '-' for falsy input, the raw string if it cannot be parsed, and a
+ * locale-formatted datetime string otherwise. Never throws.
+ *
+ * @param {string|null|undefined} ts - ISO 8601 timestamp string.
+ * @returns {string}
+ */
 export function formatSystemUpdated(ts) {
   if (!ts) return '-';
   try {
@@ -265,6 +392,12 @@ export function formatSystemUpdated(ts) {
     return ts;
   }
 }
+/**
+ * Returns a stable web client UUID for the profile page, generating and
+ * persisting one via localStorage if none exists yet.
+ *
+ * @returns {string} UUID string.
+ */
 export function getWebClientIdProfile() {
   let id = localStorage.getItem(WEB_CLIENT_ID_KEY);
   if (!id) {
@@ -273,11 +406,25 @@ export function getWebClientIdProfile() {
   }
   return id;
 }
+/**
+ * Serializes an environment-variable map to a newline-delimited 'KEY=VALUE' string
+ * for display in a textarea.
+ *
+ * @param {Object|null} vars - Map of env var names to values.
+ * @returns {string}
+ */
 export function enabledVarsToText(vars) {
   if (!vars || typeof vars !== 'object') return '';
   return Object.entries(vars).map(([k, v]) => `${k}=${v}`).join('\n');
 }
 
+/**
+ * Parses a newline-delimited 'KEY=VALUE' string back into an object.
+ * Lines without an '=' or with an empty key are skipped.
+ *
+ * @param {string} text - Multi-line textarea content.
+ * @returns {Object} Map of env var names to values.
+ */
 export function textToEnabledVars(text) {
   const result = {};
   for (const line of text.split('\n')) {
@@ -289,6 +436,12 @@ export function textToEnabledVars(text) {
   }
   return result;
 }
+/**
+ * Derives the list of status badge descriptors for a user's report row.
+ *
+ * @param {Object} row - Report row with boolean flags: `cloud`, `published`, `unpublished`, `flagged`.
+ * @returns {Array<{label: string, tone: string}>} Badge descriptors in display order.
+ */
 export function getMyReportBadges(row) {
   const badges = [];
   if (row.cloud) badges.push({ label: 'Cloud', tone: 'cloud' });
@@ -297,6 +450,17 @@ export function getMyReportBadges(row) {
   if (row.flagged) badges.push({ label: 'Flagged', tone: 'flagged' });
   return badges;
 }
+/**
+ * Returns an HTML string explaining why a report was flagged, tailored to the
+ * flag reason prefix.
+ *
+ * Handles 'wordlist:<word> in <field>' and 'openai:<category,category>' prefixes.
+ * Falls back to a generic message for unknown reason formats or a missing reason.
+ * Includes an inline Discord link for user recourse.
+ *
+ * @param {string|null} flaggedReason - The `flagged_reason` value from the report row.
+ * @returns {string} HTML message string (contains an anchor tag).
+ */
 export function flaggedMessageHtml(flaggedReason) {
   if (!flaggedReason) return 'This report was flagged for review. Edit and resubmit to have it restored.';
 
@@ -318,6 +482,19 @@ export function flaggedMessageHtml(flaggedReason) {
 
   return `This report was flagged for review. Edit and resubmit to have it restored. If you think this is a mistake, reach out on ${discordLink}.`;
 }
+/**
+ * Merges published report rows and cloud-saved rows into a single deduplicated
+ * list keyed by `app_id`.
+ *
+ * Each merged row carries combined status flags: `cloud`, `published`,
+ * `unpublished` (cloud-saved but never published), and `flagged`. A row is
+ * `unpublished` only when it exists in the cloud but has never been published
+ * and is not currently published. The result is sorted by `updated_at` descending.
+ *
+ * @param {Array<Object>} publishedRows - Rows from the published-reports source.
+ * @param {Array<Object>} cloudRows - Rows from the cloud-saves source.
+ * @returns {Array<Object>} Merged, deduplicated, sorted report rows.
+ */
 export function mergeMyReportRows(publishedRows, cloudRows) {
   const merged = new Map();
 
@@ -379,6 +556,16 @@ export function mergeMyReportRows(publishedRows, cloudRows) {
     return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
   });
 }
+/**
+ * Extracts the `pluginLinkCode` query param from a location object.
+ *
+ * Checks both the normal query string and the query string embedded inside the
+ * hash fragment (e.g. `#/path?pluginLinkCode=abc`), since the profile page uses
+ * hash-based routing which can obscure standard query params.
+ *
+ * @param {Location} [loc=window.location] - Location object to parse.
+ * @returns {string|null} The link code, or null if absent.
+ */
 export function getPluginLinkCodeFromLocation(loc = window.location) {
   const searchCode = new URLSearchParams(loc.search || '').get('pluginLinkCode');
   if (searchCode) return searchCode;

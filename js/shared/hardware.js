@@ -37,6 +37,13 @@ export const HW_STORAGE_KEYS = {
 // Read the viewer's saved hardware; if none, return the Steam Deck preview
 // with _isPreview: true so callers can render the banner. Returns null only
 // if localStorage itself is unavailable (eg. private browsing edge case).
+/**
+ * Read the viewer's saved hardware specs from localStorage.
+ * Falls back to `STEAM_DECK_HW` (with `_isPreview: true`) if no specs are saved
+ * or if `localStorage` is unavailable (e.g. private browsing).
+ * Requires at least `gpu` or `os` to be present to consider the profile saved.
+ * @returns {{cpu: string, gpu: string, gpuVendor: string, os: string, kernel: string, _isPreview: boolean}}
+ */
 export function loadMyHardware() {
   try {
     const saved = {
@@ -58,6 +65,11 @@ export function loadMyHardware() {
   }
 }
 
+/**
+ * Check whether a hardware object is the Steam Deck preview fallback rather than the user's own saved specs.
+ * @param {{_isPreview?: boolean}} hw - Hardware object returned by `loadMyHardware`.
+ * @returns {boolean} True if `hw._isPreview` is set.
+ */
 export function isPreviewHardware(hw) {
   return !!(hw && hw._isPreview);
 }
@@ -65,6 +77,11 @@ export function isPreviewHardware(hw) {
 // Small inline banner shown when the page is rendering with the Steam Deck
 // preview hardware fallback. Keeps the user informed without bothering
 // people who already saved their own specs.
+/**
+ * Render an inline info banner shown when the page is using the Steam Deck preview hardware fallback.
+ * Includes a link to the profile page so the user can save their own specs.
+ * @returns {string} HTML string for the banner element.
+ */
 export function renderPreviewHardwareBanner() {
   return `
     <div class="hw-preview-banner" style="

@@ -10,9 +10,16 @@
 // exported from the plugin's src/lib/scoring.ts. Single source of truth.
 
 // --- scoringInfo state ---
+/** Cached scoring config loaded from scoring-info.json. Null until loadScoringInfo resolves. */
 export let scoringInfo     = null;   // loaded from scoring-info.json
 
 // --- loadScoringInfo ---
+/**
+ * Fetches and caches the scoring config from scoring-info.json.
+ * Returns the parsed object on success, or null if the fetch fails.
+ * Subsequent calls return the cached value without re-fetching.
+ * @returns {Promise<object|null>}
+ */
 export async function loadScoringInfo() {
   if (scoringInfo) return scoringInfo;
   try {
@@ -23,12 +30,21 @@ export async function loadScoringInfo() {
 }
 
 // --- FAULT_KEYS_WEB ---
+/** Form field keys that represent fault questions in a Pulse report. */
 export const FAULT_KEYS_WEB = [
   'performanceFaults', 'graphicalFaults', 'windowingFaults', 'audioFaults',
   'inputFaults', 'stabilityFaults', 'saveGameFaults', 'significantBugs',
 ];
 
 // --- deriveRatingFromState ---
+/**
+ * Derives a Pulse tier string from a report form state object.
+ * Counts active fault keys to pick between bronze/silver/gold, then
+ * uses tinkering method presence to distinguish gold from platinum.
+ * Returns null if the state has no verdict yet.
+ * @param {object} s - Form state with canInstall, canStart, canPlay, verdict, faults, tinkeringMethods, verdictOob.
+ * @returns {'platinum'|'gold'|'silver'|'bronze'|'borked'|null}
+ */
 export function deriveRatingFromState(s) {
   if (s.canInstall === 'no' || s.canStart === 'no' || s.canPlay === 'no') return 'borked';
   if (!s.verdict) return null;
@@ -49,6 +65,11 @@ export function deriveRatingFromState(s) {
 }
 
 // --- inferProtonType ---
+/**
+ * Classifies a Proton version string as 'ge', 'native', 'current', or null.
+ * @param {string} version - Raw Proton version string from a report.
+ * @returns {'ge'|'native'|'current'|null}
+ */
 export function inferProtonType(version) {
   const v = (version || '').toLowerCase();
   if (v.includes('ge-proton') || v.includes('proton-ge')) return 'ge';
@@ -58,6 +79,12 @@ export function inferProtonType(version) {
 }
 
 // --- populateScoringTooltip ---
+/**
+ * Populates the #rating-info-content element inside el with scoring methodology HTML.
+ * Fetches scoring-info.json once (idempotent via dataset.loaded flag).
+ * @param {HTMLElement} el - Container element that holds #rating-info-content.
+ * @returns {Promise<void>}
+ */
 export async function populateScoringTooltip(el) {
   const container = el.querySelector('#rating-info-content');
   if (!container || container.dataset.loaded) return;
@@ -136,6 +163,12 @@ export async function populateScoringTooltip(el) {
 }
 
 // --- tierFromReports ---
+/**
+ * Returns the highest tier present in a set of reports using the canonical
+ * platinum > gold > silver > bronze > borked order. Returns 'pending' if empty.
+ * @param {Array<{rating: string}>} reports
+ * @returns {'platinum'|'gold'|'silver'|'bronze'|'borked'|'pending'}
+ */
 export function tierFromReports(reports) {
   const order = ['platinum','gold','silver','bronze','borked'];
   const counts = {};
@@ -145,6 +178,14 @@ export function tierFromReports(reports) {
 }
 
 // --- pulseTierFromReports ---
+/**
+ * Computes a weighted aggregate tier and confidence level for a game.
+ * Pulse reports are recency-weighted (full weight) and ProtonDB report count
+ * contributes fractionally (0.2x) to the confidence calculation only.
+ * @param {Array<{rating: string, timestamp: number}>} nativeReports - Pulse reports for the game.
+ * @param {number} [protonDbCount=0] - Number of ProtonDB reports for the game (count only, no detail).
+ * @returns {{ tier: string, count: number, confidence: string, confidencePct?: number, confidenceNote: string }}
+ */
 export function pulseTierFromReports(nativeReports, protonDbCount = 0) {
   if (!nativeReports.length) {
     return { tier: 'pending', count: 0, confidence: 'none', confidenceNote: protonDbCount > 0 ? 'No Pulse reports yet' : 'No Pulse data yet' };
@@ -179,15 +220,24 @@ export function pulseTierFromReports(nativeReports, protonDbCount = 0) {
 }
 
 // --- estimateScore ---
+/**
+ * Returns a single numeric relevance score (0-100) for a report.
+ * Convenience wrapper around estimateScoreBreakdown.
+ * @param {object} r - Report object with at least .rating and .timestamp.
+ * @returns {number}
+ */
 export function estimateScore(r) {
   return estimateScoreBreakdown(r).total;
 }
 
-// Same math as estimateScore but also returns the per-factor contributions
-// so the confidence-breakdown page can render exactly why a report scored
-// the way it did. Keep this in sync with the plugin's computeConfidence -
-// the webui currently runs a simplified subset since we don't have the
-// viewer's hardware info to do GPU/OS/kernel match factors.
+/**
+ * Same math as estimateScore but also returns per-factor contributions.
+ * Used by the confidence-breakdown page to explain why a report scored as it did.
+ * Runs a simplified subset of the plugin's computeConfidence (no GPU/OS/kernel match,
+ * since the web viewer lacks local hardware info).
+ * @param {object} r - Report object with at least .rating and .timestamp.
+ * @returns {{ total: number, factors: Array<{label: string, detail: string, value: number}>, meta: object }}
+ */
 export function estimateScoreBreakdown(r) {
   const RATING_BASE = { platinum: 60, gold: 48, silver: 36, bronze: 24, borked: 0 };
   const base = RATING_BASE[r.rating] ?? 30;

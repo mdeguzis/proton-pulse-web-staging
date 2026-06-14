@@ -7,6 +7,15 @@ export const DECK_DISPLAY_MAP = { 4: true, 3: null, 2: false };
 // cache fetched deck compat so we dont re-fetch on every render
 export const _deckCache = {};
 
+/**
+ * Fetch the Steam Deck compatibility status for a game from the Steam store API.
+ * Results are cached in `_deckCache` by appId for the page lifetime.
+ * Hits `https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport?nAppID=`.
+ * @param {string|number} appId - Steam app ID.
+ * @returns {Promise<{status: string, criteria: Array<boolean|null>|null}>}
+ *   `status` is one of `'unknown'|'unsupported'|'playable'|'verified'`.
+ *   `criteria` is an array of 4 pass/fail/info values mapped from `resolved_items`, or null if unavailable.
+ */
 export async function fetchDeckStatusForApp(appId) {
   if (!appId) return { status: 'unknown', criteria: null };
   if (_deckCache[appId]) return _deckCache[appId];
@@ -33,6 +42,12 @@ export async function fetchDeckStatusForApp(appId) {
 }
 
 // synchronous fallback used for initial render before the async fetch returns
+/**
+ * Synchronous cache read for Deck compatibility status. Returns cached data if available,
+ * or a default `'unknown'` result if the async fetch has not yet completed.
+ * @param {string|number} appId - Steam app ID.
+ * @returns {{status: string, criteria: Array<boolean|null>|null}}
+ */
 export function getDeckStatusForApp(appId) {
   return _deckCache[appId] || { status: 'unknown', criteria: null };
 }
@@ -40,6 +55,14 @@ export function getDeckStatusForApp(appId) {
 // cache fetched system requirements
 export const _reqsCache = {};
 
+/**
+ * Fetch the PC minimum and recommended system requirements for a game from the Steam store API.
+ * Results are cached in `_reqsCache` by appId for the page lifetime.
+ * Hits `https://store.steampowered.com/api/appdetails?appids=&filters=basic`.
+ * @param {string|number} appId - Steam app ID.
+ * @returns {Promise<{minimum: string|null, recommended: string|null}|null>}
+ *   Requirement strings (raw HTML from Steam), or null if unavailable or on failure.
+ */
 export async function fetchMinRequirements(appId) {
   if (!appId) return null;
   if (_reqsCache[appId] !== undefined) return _reqsCache[appId];

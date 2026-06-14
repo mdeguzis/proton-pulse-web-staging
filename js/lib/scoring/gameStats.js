@@ -17,8 +17,11 @@
 
 // --- constants ---
 
+/** Numeric value assigned to each rating tier, used for averaging and variance calculations. */
 export const RATING_VAL = { platinum: 5, gold: 4, silver: 3, bronze: 2, borked: 1 };
+/** Tiers considered a successful compatibility outcome. */
 export const POSITIVE_TIERS = ['platinum', 'gold', 'silver'];
+/** Tiers considered a failed or degraded compatibility outcome. */
 export const NEGATIVE_TIERS = ['bronze', 'borked'];
 
 // Stale threshold: a game with no recent reports is "stale". We pick 365d
@@ -30,14 +33,30 @@ export const PRIOR_WINDOW_DAYS = 270;  // 90-270d is the prior bucket for trend
 
 // --- helpers ---
 
+/**
+ * Returns true if rating is a positive compatibility outcome (platinum, gold, silver).
+ * @param {string} rating
+ * @returns {boolean}
+ */
 export function isPositive(rating) {
   return POSITIVE_TIERS.includes(rating);
 }
 
+/**
+ * Returns true if rating is a negative compatibility outcome (bronze, borked).
+ * @param {string} rating
+ * @returns {boolean}
+ */
 export function isNegative(rating) {
   return NEGATIVE_TIERS.includes(rating);
 }
 
+/**
+ * Returns the age of a Unix timestamp in whole days relative to now, or null if ts is falsy.
+ * @param {number|null} ts - Unix timestamp in seconds.
+ * @param {number} now - Current time in seconds.
+ * @returns {number|null}
+ */
 export function ageDays(ts, now) {
   /* istanbul ignore next */
   if (!ts) return null;
@@ -46,6 +65,12 @@ export function ageDays(ts, now) {
 
 // --- per-month report counts for the chart (positive vs negative) ---
 
+/**
+ * Buckets reports by calendar month and counts positive vs negative ratings.
+ * Returns an array sorted chronologically, one entry per month that has at least one report.
+ * @param {Array<{rating: string, timestamp: number}>} allReports
+ * @returns {Array<{month: string, positive: number, negative: number}>}
+ */
 export function computeMonthlyReports(allReports) {
   // bucket YYYY-MM -> { positive, negative }
   const buckets = {};
@@ -65,6 +90,14 @@ export function computeMonthlyReports(allReports) {
 // --- working status (binary: is it working RIGHT NOW based on recent data) ---
 // Heuristic: look at last RECENT_DAYS of reports. If >=60% positive => working,
 // if >=60% negative => not_working, else unknown.
+/**
+ * Determines whether a game is currently working based on recent reports.
+ * Uses the last RECENT_DAYS window (90d). Sets recently_broken if the last 30d
+ * flipped negative while the broader 90d window was mostly positive.
+ * @param {Array<{rating: string, timestamp: number}>} allReports
+ * @param {number} now - Current time in seconds.
+ * @returns {{ status: 'working'|'not_working'|'mixed'|'unknown', confidence: 'high'|'medium'|'low', recently_broken: boolean, timeframe_days: number, last_positive_report_age: number|null }}
+ */
 export function computeWorkingStatus(allReports, now) {
   const recent = allReports.filter(r => r.timestamp && now - r.timestamp < RECENT_DAYS * 86400);
   if (recent.length === 0) {
@@ -114,6 +147,13 @@ export function computeWorkingStatus(allReports, now) {
 }
 
 // --- freshness (how recent is the latest data) ---
+/**
+ * Returns a human-readable freshness label and the age of the most recent report.
+ * Labels: 'Very fresh' (<30d), 'Fresh' (<90d), 'Aging' (<180d), 'Old' (<365d), 'Stale' (>=365d).
+ * @param {Array<{timestamp: number}>} allReports
+ * @param {number} now - Current time in seconds.
+ * @returns {{ label: string, latest_report_age: number|null, is_stale: boolean }}
+ */
 export function computeFreshness(allReports, now) {
   const withTs = allReports.filter(r => r.timestamp).sort((a, b) => b.timestamp - a.timestamp);
   if (withTs.length === 0) {
@@ -132,6 +172,14 @@ export function computeFreshness(allReports, now) {
 // --- settings tips: common launch options from positive reports only ---
 // Different from "launch flags frequency" because we only count tokens from
 // reports that are platinum/gold/silver. Surfaces the tweaks that actually work
+/**
+ * Extracts the most common launch option flags from positive reports and configs.
+ * Only platinum/gold/silver reports are included, so the output reflects tweaks
+ * that correlate with success. Returns at most 15 entries sorted by frequency.
+ * @param {Array<{rating: string, launchOptions?: string}>} allReports
+ * @param {Array<{launchOptions?: string, launch_options?: string}>} configs
+ * @returns {Array<{flag: string, cnt: number, pct: number}>}
+ */
 export function computeSettingsTips(allReports, configs) {
   const positiveSources = [
     ...allReports.filter(r => isPositive(r.rating)),
@@ -163,6 +211,16 @@ export function computeSettingsTips(allReports, configs) {
 // Combines the original per-game stats (confidence, trend, version stats,
 // rating distribution) with protondb-decky-inspired metrics (working status,
 // freshness, monthly chart, settings tips).
+/**
+ * Main entry point. Computes the full per-game compatibility stats object.
+ * Aggregates rating distribution, confidence score (sample size + tier consistency +
+ * freshness), trend direction (recent 90d vs prior 90-270d window), per-Proton-version
+ * success percentages, launch flag frequency, and the new working-status/freshness/
+ * monthly-chart/settings-tips metrics.
+ * @param {Array<{rating: string, timestamp: number, protonVersion?: string, launchOptions?: string}>} allReports
+ * @param {Array<{launchOptions?: string, launch_options?: string}>} configs
+ * @returns {{ confidencePct: number, confFactors: Array, trendDir: string, trendDiff: number, recentPositiveRatio: number|null, olderPositiveRatio: number|null, recentCount: number, priorCount: number, versionStats: Array, launchFlags: Array, ratingCounts: object, totalReports: number, monthly: Array, workingStatus: object, freshness: object, settingsTips: Array }}
+ */
 export function computeGameStats(allReports, configs) {
   const now = Date.now() / 1000;
   const n = allReports.length;

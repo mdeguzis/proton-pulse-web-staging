@@ -29,6 +29,13 @@ if (typeof window._ppSubmitGlobalsReady === 'undefined') {
 // lightweight sysinfo parser for the system picker. profile.js has the
 // full version, but that file only loads on profile.html. keep this
 // self-contained so the submit form works on app.html without it
+/**
+ * Parse a Steam system info text block into structured hardware fields.
+ * Extracts cpu, gpu, gpuDriver, ram (GB string), vramMb (number), os, kernel, gpuVendor, and gpuArch.
+ * Infers gpuVendor from GPU name patterns and gpuArch via `detectGpuArch`.
+ * @param {string} text - Raw text from Steam's "Help > System Information" dialog.
+ * @returns {{cpu?: string, gpu?: string, gpuDriver?: string, ram?: string, vramMb?: number, os?: string, kernel?: string, gpuVendor?: string, gpuArch?: string}}
+ */
 export function parseSteamSystemInfo(text) {
   const out = {};
   if (!text) return out;
@@ -61,6 +68,11 @@ export function parseSteamSystemInfo(text) {
   return out;
 }
 
+/**
+ * Get or create a persistent anonymous client ID stored in localStorage.
+ * Used to deduplicate reports from the same browser when no user account exists.
+ * @returns {string} UUID string from localStorage key `proton-pulse:web-client-id`.
+ */
 export function getWebClientId() {
   const key = 'proton-pulse:web-client-id';
   let id = localStorage.getItem(key);
@@ -68,10 +80,19 @@ export function getWebClientId() {
   return id;
 }
 
+/**
+ * Extract the Supabase user ID from a Supabase auth session object.
+ * @param {object|null} session - Supabase session returned by `SupaAuth.getSession()`.
+ * @returns {string|null} The user's UUID, or null if not authenticated.
+ */
 export function getProtonPulseUserIdFromSession(session) {
   return session?.user?.id || null;
 }
 
+/**
+ * Detect the platform the user is submitting from based on the browser user agent.
+ * @returns {'web-steamdeck'|'web-linux'|'web-windows'|'web-macos'|'web'} Platform identifier string.
+ */
 export function getWebSource() {
   const ua = navigator.userAgent || '';
   if (/SteamGamepad|SteamDeck/.test(ua) || (/Linux/.test(ua) && /Valve/.test(ua))) return 'web-steamdeck';
@@ -83,6 +104,11 @@ export function getWebSource() {
 
 export let formSchema      = null;   // loaded from form-schema.json
 
+/**
+ * Load and cache the form schema from `form-schema.json`.
+ * Subsequent calls return the cached value without a network request.
+ * @returns {Promise<object|null>} Parsed schema object, or null if the fetch fails.
+ */
 export async function loadFormSchema() {
   if (formSchema) return formSchema;
   try {
@@ -92,6 +118,13 @@ export async function loadFormSchema() {
   return formSchema;
 }
 
+/**
+ * Normalize a RAM string to a canonical `"N GB"` format.
+ * Strips non-digit characters, parses the number, and appends " GB".
+ * Returns the trimmed raw string unchanged if parsing fails.
+ * @param {string} raw - Raw RAM value (e.g. "16 GB", "16384 MB", "32").
+ * @returns {string} Normalized string like `"16 GB"`, or the original trimmed string on parse failure.
+ */
 export function normalizeRam(raw) {
   const n = parseInt((raw || '').replace(/[^\d]/g, ''), 10);
   return isNaN(n) ? raw.trim() : `${n} GB`;
@@ -100,6 +133,18 @@ export function normalizeRam(raw) {
 
 
 
+/**
+ * Validate and submit (or update) a Pulse compatibility report to the `user_configs` Supabase table.
+ * Requires an active Supabase session; returns an error object if the user is not signed in.
+ * Uses `PATCH` for edits (`editReportId` set) or `POST` with `on_conflict=client_id,app_id` for new reports.
+ * Derives the rating from form state via `deriveRatingFromState`; rejects if a rating cannot be inferred.
+ * Hits Supabase REST: `user_configs`.
+ * @param {number|string} appId - Steam app ID.
+ * @param {string} title - Game title fallback (used if the form's gameTitle field is empty).
+ * @param {HTMLFormElement & {_formState?: object}} form - The submit form element with `_formState` attached.
+ * @param {string|null} [editReportId=null] - Existing report ID to update, or null for a new submission.
+ * @returns {Promise<{ok: true}|{ok: false, error: string}>}
+ */
 export async function submitReport(appId, title, form, editReportId = null) {
   const session = await SupaAuth.getSession();
   if (!session) return { ok: false, error: 'Sign in with Steam to submit a report.' };
@@ -255,6 +300,13 @@ export const MYHW_FORM_MAP = {
 // You may want to think about whether to dispatch an 'input' event after
 // setting — right now no listeners care, but it's a cheap habit that avoids
 // surprises later.
+/**
+ * Pre-fill hardware fields in the submit form from the user's saved My Hardware localStorage values.
+ * Only fills fields that are currently empty, so in-progress drafts are not overwritten.
+ * Reads from localStorage keys defined in `MYHW_FORM_MAP`.
+ * @param {Element} el - Container element that holds `#submit-report-form`.
+ * @returns {void}
+ */
 export function prefillSubmitFormFromMyHardware(el) {
   const form = el.querySelector('#submit-report-form');
   if (!form) return;
@@ -266,6 +318,16 @@ export function prefillSubmitFormFromMyHardware(el) {
   }
 }
 
+/**
+ * Render and wire the full "Submit a Pulse Report" form into a container element.
+ * Loads `form-schema.json` for OS list, GPU vendors, and known Proton versions,
+ * then fetches recent GE-Proton and official Proton releases from GitHub to extend the datalist.
+ * Populates the system picker from `user_systems` (Supabase) if the user is signed in.
+ * Attaches all progressive-reveal radio/checkbox listeners and the live rating badge.
+ * No-ops if the container already has `data-loaded="1"`.
+ * @param {Element} el - Wrapper element containing `#submit-form-content`.
+ * @returns {Promise<void>}
+ */
 export async function populateSubmitForm(el) {
   const container = el.querySelector('#submit-form-content');
   if (!container || container.dataset.loaded) return;
