@@ -1,7 +1,7 @@
 // Entry point for the app page: bootstraps routing and search wiring.
 // (Replaces the inline bootstrap that lived at the top/bottom of app.js.)
-import { route } from './router.js?v=c304442e';
-import { wireSearch } from './components/search.js?v=f476d6e5';
+import { route } from './router.js?v=740b3e34';
+import { wireSearch } from './components/search.js?v=0b8cef0e';
 
 window.addEventListener('hashchange', () => route());
 window.addEventListener('popstate', () => route());
@@ -16,7 +16,7 @@ route();
 
 // Signal icon click popup. Called via inline onclick on each .signal-icon span.
 window.__showSignalPopup = function (icon) {
-  const label = icon.getAttribute('title') || '';
+  const label = icon.getAttribute('data-tip') || '';
   if (!label) return;
   let p = document.getElementById('__signal_popup');
   if (!p) {

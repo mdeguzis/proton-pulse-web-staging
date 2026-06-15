@@ -17,10 +17,20 @@ export const SIGNAL_ICON_SVG = {
   framegen:'<path fill="currentColor" d="M7 21h2v-6H7v6zm4 0h2V9h-2v12zm4 0h2v-9h-2v9zM5 3v18h2V5h12V3H5z"/>',
 };
 
+const SIGNAL_DESC = {
+  install:   'Did the game install successfully through Steam?',
+  start:     'Did the game launch without immediately crashing?',
+  play:      'Was the game playable to a reasonable degree?',
+  verdict:   'Would the reporter recommend this setup to others?',
+  verdict_no:'Would the reporter recommend this setup to others?',
+  oob:       'Did the game work without any tweaks or custom launch options?',
+  tinker:    'Were launch options or workarounds needed to get it running?',
+  deck:      'Was this report submitted from a Steam Deck?',
+  owns:      'Did the reporter confirm they own this game on Steam?',
+  framegen:  'Was frame generation required for smooth gameplay?',
+};
+
 // Build one signal icon square. value is 'yes' | 'no' | null/undefined.
-// `whenYes` and `whenNo` control which side counts as "positive" - for most
-// signals yes is good (green), but for tinker required the "no" answer to
-// verdictOob (didn't work OOB) is what triggers the amber wrench
 export function renderSignalIcon(iconKey, value, label, opts = {}) {
   const negative = opts.negative || 'no';
   const resolvedKey = (value === negative && opts.iconKeyNegative) ? opts.iconKeyNegative : iconKey;
@@ -32,12 +42,11 @@ export function renderSignalIcon(iconKey, value, label, opts = {}) {
   else if (value === negative) state = opts.negativeState || 'bad';
   const yesLabel = opts.yesLabel || 'Yes';
   const noLabel  = opts.noLabel  || 'No';
-  // Owns icon (and any signal flagged anonymous-unverifiable) should explain
-  // *why* the answer is missing - anonymous ProtonDB reports cannot be
-  // verified ownership, distinct from "user just didn't answer"
   const neutralLabel = opts.neutralLabel || 'Not answered';
   const stateLabel = value === positive ? yesLabel : value === negative ? noLabel : neutralLabel;
-  return `<span class="signal-icon signal-${state}" title="${label}: ${stateLabel}" onclick="window.__showSignalPopup(this)">
+  const desc = SIGNAL_DESC[iconKey] || '';
+  const tip = `${label}: ${stateLabel}${desc ? '. ' + desc : ''}`;
+  return `<span class="signal-icon signal-${state}" data-tip="${tip}" onclick="window.__showSignalPopup(this)">
     <svg viewBox="0 0 24 24">${path}</svg>
   </span>`;
 }

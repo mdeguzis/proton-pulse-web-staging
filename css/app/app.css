@@ -1171,8 +1171,26 @@ a.card:active { transform: translateY(1px); }
   color: var(--muted);
   transition: transform .08s;
   cursor: pointer;
+  position: relative;
 }
 .signal-icon:hover { transform: scale(1.08); }
+.signal-icon[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
 .signal-icon svg { width: 20px; height: 20px; }
 /* state variants - good (Steam install green), bad (red), warn (amber),
    info (accent blue), neutral (muted gray, dim) */
