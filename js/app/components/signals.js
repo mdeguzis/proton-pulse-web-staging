@@ -45,8 +45,8 @@ export function renderSignalIcon(iconKey, value, label, opts = {}) {
   const neutralLabel = opts.neutralLabel || 'Not answered';
   const stateLabel = value === positive ? yesLabel : value === negative ? noLabel : neutralLabel;
   const desc = SIGNAL_DESC[iconKey] || '';
-  const tip = `${label}: ${stateLabel}${desc ? '&#10;Explanation: ' + desc : ''}`;
-  return `<span class="signal-icon signal-${state}" data-tip="${tip}">
+  const tipState = `${label}: ${stateLabel}`;
+  return `<span class="signal-icon signal-${state}" data-tip-state="${tipState}" data-tip-desc="${desc}" onmouseenter="window.__showSignalTooltip(this)" onmouseleave="window.__hideSignalTooltip()">
     <svg viewBox="0 0 24 24">${path}</svg>
   </span>`;
 }
