@@ -1,7 +1,7 @@
 // Entry point for the app page: bootstraps routing and search wiring.
 // (Replaces the inline bootstrap that lived at the top/bottom of app.js.)
-import { route } from './router.js?v=293b10f8';
-import { wireSearch } from './components/search.js?v=5c6a3aef';
+import { route } from './router.js?v=854f0504';
+import { wireSearch } from './components/search.js?v=521cd65c';
 
 window.addEventListener('hashchange', () => route());
 window.addEventListener('popstate', () => route());
@@ -55,3 +55,10 @@ route();
     p.style.top = top + 'px';
   }, true);
 }());
+
+// Close the filter panel when clicking outside it.
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.filter-wrap')) {
+    document.getElementById('filterPanel')?.classList.remove('open');
+  }
+});

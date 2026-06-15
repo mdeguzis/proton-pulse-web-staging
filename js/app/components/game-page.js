@@ -7,11 +7,11 @@ import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=7ad8fd16';
 import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=3052bd1b';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=cb7b4c5e';
-import { enhanceAuthorBlocks } from './author.js?v=69a4a8fa';
+import { enhanceAuthorBlocks } from './author.js?v=10d5fefc';
 import { renderConfigCard } from './config-cards.js?v=60f932da';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=2b40ff03';
-import { renderCard } from './report-card.js?v=04b9c060';
-import { loadSearchIndex, searchIndex } from './search.js?v=158ea979';
+import { renderCard } from './report-card.js?v=cdadc456';
+import { loadSearchIndex, searchIndex } from './search.js?v=91416ef2';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, STEAM_IMG, dataFilesHref } from '../config.js?v=9970759a';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=5184cce6';
@@ -147,13 +147,18 @@ export async function renderGamePage(appId) {
   function saveFiltersIfEnabled() {
     if (!persistFilters) return;
     try {
-      const snapshot = { gpu: filterGpu, arch: filterArch, os: filterOs, rating: filterRating, device: filterDevice, minPlaytime: filterMinPlaytime };
+      const snapshot = { gpu: filterGpu, arch: filterArch, os: filterOs, rating: filterRating, device: filterDevice, minPlaytime: filterMinPlaytime, source: filterSource };
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(snapshot));
     } catch { /* quota / disabled - ignore */ }
   }
   // Unified source filter across configs + reports: 'pulse-config', 'pulse-report',
   // 'protondb', or '' for any
-  let filterSource = localStorage.getItem('proton-pulse:config-type') || '';
+  let filterSource = (() => {
+    const raw = persistedFilters.source || localStorage.getItem('proton-pulse:config-type') || '';
+    if (raw === 'pulse-config' || raw === 'pulse-report') return 'pulse';
+    if (raw === 'protondb-edited') return 'protondb';
+    return raw;
+  })();
 
   const gpuVendor = g => {
     if (!g) return '';
@@ -220,7 +225,9 @@ export async function renderGamePage(appId) {
     // Rating filter only makes sense for reports. Configs don't carry a rating,
     // so drop them when the user explicitly narrows by rating
     if (filterRating) arr = arr.filter(r => r._kind === 'report' && r.rating === filterRating);
-    if (filterSource) arr = arr.filter(r => r._bucket === filterSource);
+    if (filterSource === 'protondb') arr = arr.filter(r => r._bucket === 'protondb' || r._bucket === 'protondb-edited');
+    else if (filterSource === 'pulse') arr = arr.filter(r => r._bucket === 'pulse-config' || r._bucket === 'pulse-report');
+    else if (filterSource) arr = arr.filter(r => r._bucket === filterSource);
     return arr;
   };
 
@@ -398,16 +405,9 @@ export async function renderGamePage(appId) {
         </div>
       </div>
 
-      <div class="filter-bar">
+      <div class="filter-wrap">
         ${(() => {
           const GPU_LABEL = { nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' };
-          const SRC_LABEL = {
-            'pulse-config': 'Pulse',
-            'pulse-report': 'Pulse Report',
-            'protondb': 'ProtonDB',
-            'protondb-edited': 'ProtonDB (edited)',
-          };
-          const SRC_ORDER = ['pulse-config', 'pulse-report', 'protondb', 'protondb-edited'];
           const RATING_LABEL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
           const RATING_ORDER = ['platinum','gold','silver','bronze','borked'];
 
@@ -415,77 +415,97 @@ export async function renderGamePage(appId) {
           const availArchs   = [...new Set(combined.map(r => gpuArch(r)).filter(Boolean))].sort();
           const availOs      = [...new Set(combined.map(r => osBase(r.os)).filter(Boolean))].sort();
           const availRatings = RATING_ORDER.filter(rt => taggedReports.some(r => r.rating === rt));
-          const availSrcs    = SRC_ORDER.filter(b => combined.some(r => r._bucket === b));
 
-          const gpuSel    = availGpus.length > 0 ? `
-            <label>GPU</label>
-            <select id="fGpu">
-              <option value="">Any</option>
-              ${availGpus.map(v => `<option value="${v}" ${filterGpu===v?'selected':''}>${GPU_LABEL[v]||v}</option>`).join('')}
-            </select>` : '';
-          const archSel   = availArchs.length > 1 ? `
-            <label>Architecture</label>
-            <select id="fArch">
-              <option value="">Any</option>
-              ${availArchs.map(v => `<option value="${esc(v)}" ${filterArch===v?'selected':''}>${esc(v)}</option>`).join('')}
-            </select>` : '';
-          const osSel     = availOs.length > 0 ? `
-            <label>OS</label>
-            <select id="fOs">
-              <option value="">Any</option>
-              ${availOs.map(v => `<option value="${esc(v)}" ${filterOs===v?'selected':''}>${esc(v)}</option>`).join('')}
-            </select>` : '';
+          const gpuSel = availGpus.length > 0 ? `
+            <div class="filter-item">
+              <label for="fGpu">GPU</label>
+              <select id="fGpu">
+                <option value="">Any</option>
+                ${availGpus.map(v => `<option value="${v}" ${filterGpu===v?'selected':''}>${GPU_LABEL[v]||v}</option>`).join('')}
+              </select>
+            </div>` : '';
+          const archSel = availArchs.length > 1 ? `
+            <div class="filter-item">
+              <label for="fArch">Architecture</label>
+              <select id="fArch">
+                <option value="">Any</option>
+                ${availArchs.map(v => `<option value="${esc(v)}" ${filterArch===v?'selected':''}>${esc(v)}</option>`).join('')}
+              </select>
+            </div>` : '';
+          const osSel = availOs.length > 0 ? `
+            <div class="filter-item">
+              <label for="fOs">OS</label>
+              <select id="fOs">
+                <option value="">Any</option>
+                ${availOs.map(v => `<option value="${esc(v)}" ${filterOs===v?'selected':''}>${esc(v)}</option>`).join('')}
+              </select>
+            </div>` : '';
           const ratingSel = availRatings.length > 0 ? `
-            <label>Rating</label>
-            <select id="fRating">
-              <option value="">Any</option>
-              ${availRatings.map(v => `<option value="${v}" ${filterRating===v?'selected':''}>${RATING_LABEL[v]||v}</option>`).join('')}
-            </select>` : '';
-          const srcSel    = availSrcs.length > 1 ? `
-            <label>Source</label>
-            <select id="fSource">
-              <option value="">Any</option>
-              ${availSrcs.map(v => `<option value="${v}" ${filterSource===v?'selected':''}>${SRC_LABEL[v]||v}</option>`).join('')}
-            </select>` : '';
-
-          // Steam Deck device filter. Only show if at least one report on this
-          // game is on a Deck, otherwise the dropdown is meaningless noise
+            <div class="filter-item">
+              <label for="fRating">Rating</label>
+              <select id="fRating">
+                <option value="">Any</option>
+                ${availRatings.map(v => `<option value="${v}" ${filterRating===v?'selected':''}>${RATING_LABEL[v]||v}</option>`).join('')}
+              </select>
+            </div>` : '';
+          const srcSel = `
+            <div class="filter-item">
+              <label for="fSource">Source</label>
+              <select id="fSource">
+                <option value="">All</option>
+                <option value="protondb" ${filterSource==='protondb'?'selected':''}>ProtonDB</option>
+                <option value="pulse" ${filterSource==='pulse'?'selected':''}>Pulse</option>
+              </select>
+            </div>`;
           const hasDeck = combined.some(r => {
             const h = `${r.cpu || ''} ${r.gpu || ''}`;
             return _DECK_LCD_RE.test(h) || _DECK_OLED_RE.test(h);
           });
           const deviceSel = hasDeck ? `
-            <label>Device</label>
-            <select id="fDevice">
-              <option value="">Any</option>
-              <option value="deck-any"  ${filterDevice==='deck-any'?'selected':''}>Steam Deck (any)</option>
-              <option value="deck-lcd"  ${filterDevice==='deck-lcd'?'selected':''}>Steam Deck LCD</option>
-              <option value="deck-oled" ${filterDevice==='deck-oled'?'selected':''}>Steam Deck OLED</option>
-              <option value="desktop"   ${filterDevice==='desktop'?'selected':''}>Desktop / other</option>
-            </select>` : '';
-
-          // Playtime threshold filter. Buckets match the values stored on
-          // existing reports so the dropdown reads predictably (e.g. "2h+"
-          // matches reports tagged oneToFourHours and up)
+            <div class="filter-item">
+              <label for="fDevice">Device</label>
+              <select id="fDevice">
+                <option value="">Any</option>
+                <option value="deck-any"  ${filterDevice==='deck-any'?'selected':''}>Steam Deck (any)</option>
+                <option value="deck-lcd"  ${filterDevice==='deck-lcd'?'selected':''}>Steam Deck LCD</option>
+                <option value="deck-oled" ${filterDevice==='deck-oled'?'selected':''}>Steam Deck OLED</option>
+                <option value="desktop"   ${filterDevice==='desktop'?'selected':''}>Desktop / other</option>
+              </select>
+            </div>` : '';
           const playtimeSel = `
-            <label>Min playtime</label>
-            <select id="fPlaytime">
-              <option value="0"    ${filterMinPlaytime===0?'selected':''}>Any</option>
-              <option value="60"   ${filterMinPlaytime===60?'selected':''}>1h+</option>
-              <option value="120"  ${filterMinPlaytime===120?'selected':''}>2h+</option>
-              <option value="240"  ${filterMinPlaytime===240?'selected':''}>4h+</option>
-              <option value="600"  ${filterMinPlaytime===600?'selected':''}>10h+</option>
-            </select>`;
+            <div class="filter-item">
+              <label for="fPlaytime">Min playtime</label>
+              <select id="fPlaytime">
+                <option value="0"   ${filterMinPlaytime===0?'selected':''}>Any</option>
+                <option value="60"  ${filterMinPlaytime===60?'selected':''}>1h+</option>
+                <option value="120" ${filterMinPlaytime===120?'selected':''}>2h+</option>
+                <option value="240" ${filterMinPlaytime===240?'selected':''}>4h+</option>
+                <option value="600" ${filterMinPlaytime===600?'selected':''}>10h+</option>
+              </select>
+            </div>`;
 
-          const persistChk = `
-            <label class="filter-persist" title="Save these filters so they apply next time you visit a game page">
-              <input type="checkbox" id="fPersist" ${persistFilters ? 'checked' : ''}>
-              <span>Save filters</span>
-            </label>`;
+          const activeCount = [filterGpu, filterArch, filterOs, filterRating, filterSource, filterDevice, filterMinPlaytime > 0 ? '1' : ''].filter(Boolean).length;
+          const anyActive = activeCount > 0;
 
-          const anyActive = filterGpu || filterArch || filterOs || filterRating || filterSource || filterDevice || filterMinPlaytime;
-          return gpuSel + archSel + osSel + ratingSel + srcSel + deviceSel + playtimeSel + persistChk +
-            (anyActive ? `<span class="filter-count">${reps.length} of ${combined.length}</span>` : '');
+          return `
+            <button class="filter-toggle-btn${activeCount > 0 ? ' has-filters' : ''}" id="filterToggle">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 18h4v-2h-4v2zm-7-14v2h18V4H3zm3 7h12v-2H6v2z"/></svg>
+              Filters${activeCount > 0 ? ` <span class="filter-badge">${activeCount}</span>` : ''}
+            </button>
+            ${anyActive ? `<span class="filter-count">${reps.length} of ${combined.length} shown</span>` : ''}
+            <div class="filter-panel" id="filterPanel">
+              <div class="filter-panel-grid">
+                ${gpuSel}${archSel}${osSel}${srcSel}${ratingSel}${deviceSel}${playtimeSel}
+              </div>
+              <div class="filter-panel-footer">
+                <label class="filter-persist" title="Save these filters so they apply next time you visit a game page">
+                  <input type="checkbox" id="fPersist" ${persistFilters ? 'checked' : ''}>
+                  <span>Save filters</span>
+                </label>
+                ${anyActive ? '<button class="filter-clear-btn" id="filterClear">Clear all</button>' : ''}
+              </div>
+            </div>
+          `;
         })()}
       </div>
 
@@ -524,13 +544,22 @@ export async function renderGamePage(appId) {
       tip?.classList.toggle('open');
       if (tip?.classList.contains('open')) await populateScoringTooltip(el);
     });
-    el.querySelector('#fGpu')?.addEventListener('change', e => { filterGpu    = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fArch')?.addEventListener('change', e => { filterArch   = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fOs')?.addEventListener('change',  e => { filterOs     = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fRating')?.addEventListener('change', e => { filterRating = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fSource')?.addEventListener('change', e => { filterSource = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fDevice')?.addEventListener('change', e => { filterDevice = e.target.value; saveFiltersIfEnabled(); render(); });
-    el.querySelector('#fPlaytime')?.addEventListener('change', e => { filterMinPlaytime = parseInt(e.target.value, 10) || 0; saveFiltersIfEnabled(); render(); });
+    el.querySelector('#fGpu')?.addEventListener('change', e => { filterGpu    = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fArch')?.addEventListener('change', e => { filterArch   = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fOs')?.addEventListener('change',  e => { filterOs     = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fRating')?.addEventListener('change', e => { filterRating = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fSource')?.addEventListener('change', e => { filterSource = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#filterToggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.querySelector('#filterPanel')?.classList.toggle('open');
+    });
+    el.querySelector('#filterClear')?.addEventListener('click', () => {
+      filterGpu = ''; filterArch = ''; filterOs = ''; filterRating = '';
+      filterSource = ''; filterDevice = ''; filterMinPlaytime = 0;
+      saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open');
+    });
+    el.querySelector('#fDevice')?.addEventListener('change', e => { filterDevice = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fPlaytime')?.addEventListener('change', e => { filterMinPlaytime = parseInt(e.target.value, 10) || 0; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
     el.querySelector('#fPersist')?.addEventListener('change', e => {
       persistFilters = e.target.checked;
       try {

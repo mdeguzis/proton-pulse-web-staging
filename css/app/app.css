@@ -937,39 +937,103 @@
 .sort-bar button.active { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
 
 /* filter bar */
-.filter-bar {
+.filter-wrap {
+  position: relative;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px;
-  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.filter-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.filter-toggle-btn:hover { background: var(--s2); color: var(--text); }
+.filter-toggle-btn.has-filters { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
+.filter-badge {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.filter-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
   background: var(--s1);
   border: 1px solid var(--border);
-  margin-bottom: 12px;
-  font-size: 0.76rem;
+  border-radius: 8px;
+  padding: 14px;
+  min-width: 280px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
-.filter-bar label {
-  font-size: 0.68rem;
+.filter-panel.open { display: block; }
+.filter-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 14px;
+}
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.filter-item label {
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
-.filter-bar select {
+.filter-item select {
   background: var(--bg);
   border: 1px solid var(--border2);
   color: var(--text);
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: 0.76rem;
   font-family: inherit;
   outline: none;
   cursor: pointer;
+  border-radius: 4px;
   transition: border-color .1s;
 }
-.filter-bar select:focus { border-color: var(--accent); }
-.filter-count { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
-/* Persist checkbox - opt-in toggle that saves filter state to localStorage.
-   When signed in this can later be mirrored to the user_configs row so
-   filters follow the user across devices */
+.filter-item select:focus { border-color: var(--accent); }
+.filter-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.filter-clear-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .1s, border-color .1s;
+}
+.filter-clear-btn:hover { color: var(--text); border-color: var(--text); }
+.filter-count { font-size: 0.72rem; color: var(--muted); }
 .filter-persist {
   display: inline-flex;
   align-items: center;
@@ -977,8 +1041,6 @@
   font-size: 0.74rem;
   color: var(--muted);
   cursor: pointer;
-  text-transform: none;
-  letter-spacing: 0;
   user-select: none;
 }
 .filter-persist:hover { color: var(--text); }
@@ -1725,7 +1787,6 @@ a.card:hover { text-decoration: none; }
   .card-footer { flex-wrap: wrap; justify-content: flex-start; }
   .card-summary .row { flex-direction: column; gap: 2px; }
   .reports-section-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .filter-bar { gap: 6px; }
   .hub-links { gap: 4px; }
   .hub-link { font-size: 0.72rem; padding: 4px 8px; }
   .config-row { flex-direction: column; gap: 2px; }
