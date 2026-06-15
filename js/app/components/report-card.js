@@ -3,9 +3,9 @@
 import { estimateScore } from '../../shared/scoring.js?v=0dae1257';
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
-import { renderAuthorBlock } from './author.js?v=56bc02a9';
+import { renderAuthorBlock } from './author.js?v=c9854b5f';
 import { buildFormRows } from './config-cards.js?v=60f932da';
-import { renderSignalStrip } from './signals.js?v=4a38a36c';
+import { renderSignalStrip } from './signals.js?v=2b7b82c3';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=9970759a';
 import { confColor, confTextColor, configKey, daysAgo, esc, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=5184cce6';
 

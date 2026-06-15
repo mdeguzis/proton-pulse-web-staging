@@ -1130,6 +1130,22 @@ a.card:hover { text-decoration: none; }
   opacity: 0.35;
 }
 
+.signal-popup {
+  position: fixed;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  color: var(--text);
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  display: none;
+}
+.signal-popup.visible { display: block; }
+
 /* --- Permalink button (right column) --- */
 .permalink-btn {
   margin-top: 4px;
