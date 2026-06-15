@@ -7,11 +7,11 @@ import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=7ad8fd16';
 import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=3052bd1b';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=cb7b4c5e';
-import { enhanceAuthorBlocks } from './author.js?v=10d5fefc';
+import { enhanceAuthorBlocks } from './author.js?v=f904255f';
 import { renderConfigCard } from './config-cards.js?v=60f932da';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=2b40ff03';
-import { renderCard } from './report-card.js?v=cdadc456';
-import { loadSearchIndex, searchIndex } from './search.js?v=91416ef2';
+import { renderCard } from './report-card.js?v=f4e15498';
+import { loadSearchIndex, searchIndex } from './search.js?v=521cd65c';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, STEAM_IMG, dataFilesHref } from '../config.js?v=9970759a';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=5184cce6';
@@ -399,13 +399,12 @@ export async function renderGamePage(appId) {
         <div class="reports-section-copy">
           <span class="reports-section-title">Community Configs &amp; Reports</span>
         </div>
-        <div class="sort-bar">
-          <button class="${sortMode==='recent'?'active':''}" data-sort="recent">Recent</button>
-          <button class="${sortMode==='votes'?'active':''}" data-sort="votes">Top Voted</button>
-        </div>
-      </div>
-
-      <div class="filter-wrap">
+        <div class="sort-filter-row">
+          <div class="sort-bar">
+            <button class="${sortMode==='recent'?'active':''}" data-sort="recent">Recent</button>
+            <button class="${sortMode==='votes'?'active':''}" data-sort="votes">Top Voted</button>
+          </div>
+          <div class="filter-wrap">
         ${(() => {
           const GPU_LABEL = { nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' };
           const RATING_LABEL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
@@ -507,6 +506,8 @@ export async function renderGamePage(appId) {
             </div>
           `;
         })()}
+          </div>
+        </div>
       </div>
 
       <div class="cards">
