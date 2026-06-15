@@ -1,7 +1,7 @@
 // Entry point for the app page: bootstraps routing and search wiring.
 // (Replaces the inline bootstrap that lived at the top/bottom of app.js.)
-import { route } from './router.js?v=c341edb8';
-import { wireSearch } from './components/search.js?v=6322780f';
+import { route } from './router.js?v=c304442e';
+import { wireSearch } from './components/search.js?v=f476d6e5';
 
 window.addEventListener('hashchange', () => route());
 window.addEventListener('popstate', () => route());
@@ -13,6 +13,31 @@ if (document.readyState === 'loading') {
 }
 
 route();
+
+// Signal icon click popup. Called via inline onclick on each .signal-icon span.
+window.__showSignalPopup = function (icon) {
+  const label = icon.getAttribute('title') || '';
+  if (!label) return;
+  let p = document.getElementById('__signal_popup');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = '__signal_popup';
+    p.className = 'signal-popup';
+    document.body.appendChild(p);
+  }
+  p.textContent = label;
+  p.classList.add('visible');
+  const rect = icon.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const w = p.offsetWidth || 180;
+  const h = p.offsetHeight || 30;
+  let left = rect.left + rect.width / 2 - w / 2;
+  left = Math.max(8, Math.min(left, vw - w - 8));
+  const topBelow = rect.bottom + 6;
+  p.style.left = left + 'px';
+  p.style.top = (topBelow + h > vh ? rect.top - h - 6 : topBelow) + 'px';
+};
 
 // Dismiss signal popup and filter panel when clicking outside them.
 document.addEventListener('click', function (e) {

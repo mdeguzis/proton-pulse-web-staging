@@ -1170,6 +1170,7 @@ a.card:active { transform: translateY(1px); }
   background: rgba(11,17,22,0.5);
   color: var(--muted);
   transition: transform .08s;
+  cursor: pointer;
 }
 .signal-icon:hover { transform: scale(1.08); }
 .signal-icon svg { width: 20px; height: 20px; }

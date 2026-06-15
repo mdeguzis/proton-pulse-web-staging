@@ -37,7 +37,7 @@ export function renderSignalIcon(iconKey, value, label, opts = {}) {
   // verified ownership, distinct from "user just didn't answer"
   const neutralLabel = opts.neutralLabel || 'Not answered';
   const stateLabel = value === positive ? yesLabel : value === negative ? noLabel : neutralLabel;
-  return `<span class="signal-icon signal-${state}" title="${label}: ${stateLabel}">
+  return `<span class="signal-icon signal-${state}" title="${label}: ${stateLabel}" onclick="window.__showSignalPopup(this)">
     <svg viewBox="0 0 24 24">${path}</svg>
   </span>`;
 }
