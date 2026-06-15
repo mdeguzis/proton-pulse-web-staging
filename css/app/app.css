@@ -235,6 +235,7 @@
   width: 100%;
   height: auto;
   aspect-ratio: 460 / 215;
+  max-height: 190px;
   object-fit: cover;
   border: 1px solid var(--border);
 }

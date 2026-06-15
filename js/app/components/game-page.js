@@ -1,20 +1,20 @@
 // game-page (components) for the app page. Relocated from app.js.
 
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
-import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=2787ec1d';
-import { getWebClientId } from '../../shared/submit.js?v=4543b1fc';
-import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=50bed91c';
-import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=366b4c73';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=9ede0a56';
-import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=20f46ed5';
-import { enhanceAuthorBlocks } from './author.js?v=22ba4dee';
-import { renderConfigCard } from './config-cards.js?v=c95d3721';
-import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=15100cc6';
-import { renderCard } from './report-card.js?v=b33a1317';
-import { loadSearchIndex, searchIndex } from './search.js?v=276dd70a';
+import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=0dae1257';
+import { getWebClientId } from '../../shared/submit.js?v=09904778';
+import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=64d7ee9d';
+import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=7ad8fd16';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=3052bd1b';
+import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=cb7b4c5e';
+import { enhanceAuthorBlocks } from './author.js?v=d1d4e90f';
+import { renderConfigCard } from './config-cards.js?v=60f932da';
+import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=2b40ff03';
+import { renderCard } from './report-card.js?v=8d8df53a';
+import { loadSearchIndex, searchIndex } from './search.js?v=27d9ffa3';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, STEAM_IMG, dataFilesHref } from '../config.js?v=9970759a';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
-import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=d4fea298';
+import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=5184cce6';
 
 export function trendSummary(reps) {
   if (reps.length < 2) return '';
@@ -346,7 +346,6 @@ export async function renderGamePage(appId) {
     el.innerHTML = `
       <div class="game-header">
         <div class="game-header-main">
-          <img src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
           <div class="game-header-info">
             <div class="game-title">${esc(title)}</div>
             <div class="game-meta">
@@ -358,6 +357,7 @@ export async function renderGamePage(appId) {
             </div>
             ${myStatusBadge}
           </div>
+          <img src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
         </div>
         <div class="game-header-side">
           ${sourceTiles}
