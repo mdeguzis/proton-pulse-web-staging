@@ -273,12 +273,8 @@
 .admin-uid {
   font-size: 0.7rem;
   color: var(--muted);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
+  word-break: break-all;
+  display: inline;
 }
 
 .admin-role-badge {
@@ -405,6 +401,11 @@
 
 .user-detail-copy-btn {
   flex-shrink: 0;
+  padding: 3px 6px;
+  line-height: 1;
+  background: none;
+  border-color: rgba(255,255,255,0.1);
+  color: var(--text-muted, #888);
 }
 
 .user-detail-timeline {
