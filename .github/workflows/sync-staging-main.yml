@@ -3,6 +3,8 @@ name: Sync main branch to staging repo
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '0 4 * * *'  # daily at 04:00 UTC -- catches any direct commits to staging repo
 
 jobs:
   sync:
