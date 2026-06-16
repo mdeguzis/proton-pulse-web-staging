@@ -2,7 +2,7 @@
 
 # proton-pulse-web
 
-> Website: **<https://www.proton-pulse.com/>** — the site and JSON data are now served from this custom domain. Old `mdeguzis.github.io/proton-pulse-web/*` URLs still redirect, but please update bookmarks and any automation to the new host.
+> Website: **<https://www.proton-pulse.com/>** - the site and JSON data are now served from this custom domain. Old `mdeguzis.github.io/proton-pulse-web/*` URLs still redirect, but please update bookmarks and any automation to the new host.
 
 Monthly GitHub Pages mirror for ProtonDB per-game community reports.
 It is used by the [decky-proton-pulse](https://github.com/mdeguzis/decky-proton-pulse) plugin.
@@ -22,24 +22,24 @@ GET https://www.proton-pulse.com/app.html?appid={appId}
 
 Static pages deployed to GitHub Pages alongside the data files:
 
-**[Home](https://www.proton-pulse.com/) (`index.html`) — Splash/landing page**
+**[Home](https://www.proton-pulse.com/) (`index.html`) - Splash/landing page**
 Project landing page with links to all tools and repos.
 
-**[Game Search App](https://www.proton-pulse.com/app.html) (`app.html`) — Game page**
+**[Game Search App](https://www.proton-pulse.com/app.html) (`app.html`) - Game page**
 Per-game report viewer. Pass an `appid` query parameter (e.g. `app.html?appid=730`) to load community reports for that game. Features include:
-- Report cards with extended fields (CPU, GPU, kernel, Proton version, OS, RAM, notes) — always visible, no tap required
+- Report cards with extended fields (CPU, GPU, kernel, Proton version, OS, RAM, notes) - always visible, no tap required
 - Hardware filters to narrow results by GPU, OS, and rating
 - Native Pulse reports (submitted from the plugin) shown alongside ProtonDB community reports
 - Pulse config cards showing saved launch option profiles per game
 - Mobile-friendly layout with a collapsible left-side hamburger menu
 
-**[Data Index](https://www.proton-pulse.com/data-index.html) (`data-index.html`) — Coverage dashboard**
+**[Data Index](https://www.proton-pulse.com/data-index.html) (`data-index.html`) - Coverage dashboard**
 Lists all games with ProtonDB data available in this mirror, along with Steam catalog coverage stats.
 
 **[Coverage Report](https://www.proton-pulse.com/coverage.html) (`coverage.html`)**
 Steam catalog coverage statistics.
 
-**[Admin Panel](https://www.proton-pulse.com/admin.html) (`admin.html`) — Moderation tools**
+**[Admin Panel](https://www.proton-pulse.com/admin.html) (`admin.html`) - Moderation tools**
 Restricted to admins (Steam auth required). Provides:
 - Flagged report review with sort, filter by type and date range, and search
 - Reinstate, delete, or ban user actions per report

@@ -26,6 +26,15 @@ const TYPE         = process.env.BACKUP_TYPE || 'all';
 const SITE_DIR     = process.env.SITE_DIR || '';
 const OUT_DIR      = process.env.OUT_DIR || '.';
 
+if (!HMAC_SECRET) {
+  console.error('FATAL: BACKUP_HMAC_SECRET is not set. Refusing to run without a pseudonymization key.');
+  process.exit(1);
+}
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('FATAL: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set.');
+  process.exit(1);
+}
+
 const HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -35,6 +44,18 @@ const HEADERS = {
 function hmac(value) {
   if (!value) return null;
   return createHmac('sha256', HMAC_SECRET).update(String(value)).digest('hex');
+}
+
+// Strip common PII patterns from free-text fields (email, URLs, file paths, Steam IDs).
+function sanitizeNotes(str) {
+  if (!str) return str;
+  return str
+    .replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, '[email redacted]')
+    .replace(/https?:\/\/[^\s]+/gi, '[url redacted]')
+    .replace(/\b7656119\d{10}\b/g, '[steamid redacted]')
+    .replace(/\/home\/[^/\s]+/g, '/home/[redacted]')
+    .replace(/\/Users\/[^/\s]+/g, '/Users/[redacted]')
+    .replace(/C:\\Users\\[^\\\s]+/gi, 'C:\\Users\\[redacted]');
 }
 
 // Redact anything that looks like an absolute file path to avoid leaking OS usernames.
@@ -110,7 +131,7 @@ function sanitizeUserConfig(row) {
     vram_mb: row.vram_mb,
     os: row.os,
     kernel: row.kernel,
-    notes: row.notes,
+    notes: sanitizeNotes(row.notes),
     form_responses: row.form_responses,
     duration: row.duration,
     duration_minutes: row.duration_minutes,
