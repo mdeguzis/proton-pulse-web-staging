@@ -384,11 +384,12 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
     if (!uid) return;
     navigator.clipboard?.writeText(uid).then(() => {
       copyBtn.classList.add('copied');
-      if (copyLabel) copyLabel.textContent = 'Copied!';
-      setTimeout(() => {
-        copyBtn.classList.remove('copied');
-        if (copyLabel) copyLabel.textContent = 'Copy';
-      }, 1500);
+      const tip = document.createElement('span');
+      tip.className = 'copy-tooltip';
+      tip.textContent = 'Copied';
+      copyBtn.appendChild(tip);
+      requestAnimationFrame(() => tip.classList.add('copy-tooltip--show'));
+      setTimeout(() => { tip.remove(); copyBtn.classList.remove('copied'); }, 1000);
     }).catch(() => {});
   });
 

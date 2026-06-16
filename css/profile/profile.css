@@ -237,6 +237,7 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: color .1s, border-color .1s;
+  position: relative;
 }
 .profile-copy:hover { color: var(--accent); border-color: var(--accent); }
 .profile-copy.copied { color: var(--green); border-color: var(--green); }

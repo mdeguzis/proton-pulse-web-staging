@@ -409,26 +409,7 @@
   position: relative;
 }
 
-.copy-tooltip {
-  position: absolute;
-  bottom: calc(100% + 5px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(30,30,46,0.95);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 4px;
-  color: #eee;
-  font-size: 0.72rem;
-  padding: 2px 7px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-
-.copy-tooltip--show {
-  opacity: 1;
-}
+/* .copy-tooltip lives in css/shared/site.css */
 
 .user-detail-timeline {
   display: flex;
