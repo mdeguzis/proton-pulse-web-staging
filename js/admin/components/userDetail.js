@@ -32,7 +32,7 @@ function renderReportsTable(reports) {
     const title      = escapeHtml(r.title || r.app_id || '—');
     const rating     = escapeHtml(r.rating || '—');
     const proton     = escapeHtml(r.proton_version || '—');
-    const date       = escapeHtml(fmtDate(r.created_at));
+    const date       = escapeHtml(fmtDateTime(r.created_at));
     const source     = escapeHtml(r.source || '—');
     const hidden     = r.is_hidden  ? '<span class="user-detail-flag user-detail-flag--warn">hidden</span>'  : '';
     const flagged    = r.is_flagged ? '<span class="user-detail-flag user-detail-flag--danger">flagged</span>' : '';
@@ -86,6 +86,7 @@ export function renderUserDetail(user, reports, authEvents, { onBack, onBan, cur
         data-userid="${escapeHtml(user.proton_pulse_user_id || '')}"
         data-clientid="${escapeHtml(user.client_id || '')}"
         data-username="${name}">Ban</button>`;
+  const exportBtn  = `<button class="admin-btn admin-btn--ghost admin-btn--sm" type="button" data-action="export-user-json">Export JSON</button>`;
 
   const since = memberSince(reports);
 
@@ -98,7 +99,7 @@ export function renderUserDetail(user, reports, authEvents, { onBack, onBan, cur
     <div class="user-detail-header">
       <span class="user-detail-name">${name}</span>
       ${rolePill}
-      <div class="user-detail-header-actions">${banBtn}</div>
+      <div class="user-detail-header-actions">${exportBtn}${banBtn}</div>
     </div>
 
     <div class="user-detail-section">
@@ -142,5 +143,29 @@ export function renderUserDetail(user, reports, authEvents, { onBack, onBan, cur
         setTimeout(() => { btn.textContent = orig; }, 1200);
       }).catch(() => {});
     });
+  });
+
+  // Export JSON download.
+  el.querySelector('[data-action="export-user-json"]')?.addEventListener('click', () => {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      user: {
+        proton_pulse_user_id: user.proton_pulse_user_id || null,
+        client_id: user.client_id || null,
+        display_name: user.display_name || null,
+        role: user.role || null,
+        last_login: user.last_login || null,
+        last_active: user.last_active || null,
+      },
+      reports,
+      auth_events: authEvents || [],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const safeName = (user.display_name || user.proton_pulse_user_id || 'user').replace(/[^a-z0-9_-]/gi, '_');
+    a.download = `user-${safeName}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
 }

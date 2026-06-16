@@ -12,7 +12,7 @@ import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPh
 import { renderPhrases } from './components/phrases.js?v=79051c31';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
 import { fetchUserReports, fetchUserAuthEvents } from './api/userDetail.js?v=3098b2f6';
-import { renderUserDetail } from './components/userDetail.js?v=f67336d4';
+import { renderUserDetail } from './components/userDetail.js?v=62e61212';
 import { fetchAnalytics } from './api/analytics.js?v=1b3f4599';
 import { renderAnalytics } from './components/analytics.js?v=b796a4f0';
 
