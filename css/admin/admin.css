@@ -273,10 +273,12 @@
 .admin-uid {
   font-size: 0.7rem;
   color: var(--muted);
-  word-break: break-all;
-  /* 38ch fits a 36-char UUID on one line; longer 64-char hash IDs still wrap */
-  max-width: 38ch;
-  display: inline-block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .admin-role-badge {
@@ -387,7 +389,6 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
-  flex-wrap: wrap;
 }
 
 .user-detail-id-empty {
