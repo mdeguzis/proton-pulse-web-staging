@@ -3,9 +3,9 @@
 import { estimateScore } from '../../shared/scoring.js?v=0dae1257';
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
-import { renderAuthorBlock } from './author.js?v=7c817f18';
+import { renderAuthorBlock } from './author.js?v=ee5b304c';
 import { buildFormRows } from './config-cards.js?v=60f932da';
-import { renderSignalStrip } from './signals.js?v=66181878';
+import { renderSignalStrip } from './signals.js?v=cdea451a';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=9970759a';
 import { confColor, confTextColor, configKey, daysAgo, esc, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=5184cce6';
 
@@ -98,7 +98,7 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
            Permalink, JSON. Delete only shows for the report owner. -->
       <div class="card-footer">
         ${(() => { const fr = buildFormRows(r); return fr ? `<button class="action-btn" onclick="const p=this.closest('.card-summary').querySelector('.fr-panel');p.classList.toggle('open');this.textContent=p.classList.contains('open')?'Hide Report Responses':'Show Report Responses'">Show Report Responses</button>` : ''; })()}
-        <button class="action-btn" onclick="this.closest('.card-summary').querySelector('.hw-details-panel').classList.toggle('open');this.textContent=this.closest('.card-summary').querySelector('.hw-details-panel').classList.contains('open')?'Hide Hardware Details':'All Hardware Details'">All Hardware Details</button>
+        <button class="action-btn" onclick="this.closest('.card-summary').querySelector('.hw-details-panel').classList.toggle('open');this.textContent=this.closest('.card-summary').querySelector('.hw-details-panel').classList.contains('open')?'Hide details':'All details'">All details</button>
         <button class="action-btn action-btn-icon" data-report-json='${JSON.stringify(r).replace(/'/g,"&#39;")}' title="Download as JSON"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-14 9v2h14v-2H5z"/></svg></button>
         ${renderPermalink(r)}
         ${r.clientId && r.clientId === getWebClientId() ? `<button class="action-btn action-btn-danger delete-report-btn" data-app-id="${r.appId || ''}" title="Delete your report">Delete</button>` : ''}
