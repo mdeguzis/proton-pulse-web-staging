@@ -135,6 +135,9 @@ async function loadPhrases() {
 }
 
 async function loadUserDetail(user) {
+  // Push history so the browser back button/swipe returns to the users tab.
+  history.pushState({ adminView: 'user-detail' }, '');
+
   // Show the detail section and hide all tab sections.
   document.querySelectorAll('.admin-section').forEach(sec => { sec.hidden = true; });
   const detailSection = document.getElementById('tab-user-detail');
@@ -377,6 +380,12 @@ function wireEvents() {
   document.getElementById('ban-cancel-btn').addEventListener('click', closeBanModal);
   document.getElementById('ban-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeBanModal();
+  });
+
+  // Browser back button / swipe back from detail screen.
+  window.addEventListener('popstate', e => {
+    const detailVisible = !document.getElementById('tab-user-detail').hidden;
+    if (detailVisible) activateTab('users');
   });
 
   // Add admin form
