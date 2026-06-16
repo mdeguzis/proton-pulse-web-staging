@@ -1,4 +1,4 @@
-// userDetail (api) for the admin page - fetches a single user's submitted reports.
+// userDetail (api) for the admin page - fetches and manages a single user's data.
 
 import { SUPABASE_URL } from '../config.js?v=ffed3d84';
 import { supabaseHeaders } from '../utils.js?v=86489fcb';
@@ -22,6 +22,32 @@ export async function fetchUserReports(session, { userId, clientId }) {
   const rows = await res.json();
   console.debug('[userDetail] fetchUserReports', { userId, clientId, count: rows.length, source: 'user_configs', filter });
   return rows;
+}
+
+export async function deleteUserReport(session, id) {
+  const url = `${SUPABASE_URL}/rest/v1/user_configs?id=eq.${id}`;
+  const res = await fetch(url, { method: 'DELETE', headers: supabaseHeaders(session, { Prefer: 'return=minimal' }) });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
+export async function hideUserReport(session, id, hidden) {
+  const url = `${SUPABASE_URL}/rest/v1/user_configs?id=eq.${id}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: supabaseHeaders(session, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ is_hidden: hidden }),
+  });
+  if (!res.ok) throw new Error(`Hide failed: ${res.status}`);
+}
+
+export async function editUserReport(session, id, fields) {
+  const url = `${SUPABASE_URL}/rest/v1/user_configs?id=eq.${id}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: supabaseHeaders(session, { Prefer: 'return=minimal' }),
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw new Error(`Edit failed: ${res.status}`);
 }
 
 export async function fetchUserActivity(session, { userId }) {

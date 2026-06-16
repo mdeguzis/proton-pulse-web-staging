@@ -1,6 +1,7 @@
 // userDetail (component) for the admin page - renders the full user detail screen.
 
 import { escapeHtml, fmtDate, fmtDateTime, ROLE_LABELS, roleLabel } from '../utils.js?v=86489fcb';
+import { deleteUserReport, hideUserReport, editUserReport } from '../api/userDetail.js?v=916aedfc';
 
 function idRow(label, value) {
   if (!value) {
@@ -29,34 +30,39 @@ function renderReportsTable(reports) {
     return `<p class="admin-empty" style="padding:8px 0">No reports submitted yet.</p>`;
   }
   const rows = reports.map(r => {
+    const id         = escapeHtml(String(r.id));
     const title      = escapeHtml(r.title || r.app_id || '—');
     const rating     = escapeHtml(r.rating || '—');
     const proton     = escapeHtml(r.proton_version || '—');
     const date       = escapeHtml(fmtDateTime(r.created_at));
     const source     = escapeHtml(r.source || '—');
-    const hidden     = r.is_hidden  ? '<span class="user-detail-flag user-detail-flag--warn">hidden</span>'  : '';
+    const hiddenFlag = r.is_hidden  ? '<span class="user-detail-flag user-detail-flag--warn">hidden</span>'  : '';
     const flagged    = r.is_flagged ? '<span class="user-detail-flag user-detail-flag--danger">flagged</span>' : '';
     const appId      = escapeHtml(String(r.app_id || ''));
     const gameLink   = r.app_id
       ? `<a class="admin-link" href="/app.html#/app/${appId}" target="_blank">${title}</a>`
       : title;
-    return `<tr>
+    const hideLabel  = r.is_hidden ? 'Restore' : 'Hide';
+    const hideClass  = r.is_hidden ? 'admin-btn--ok' : 'admin-btn--warn';
+    return `<tr data-report-id="${id}">
       <td>${gameLink}</td>
       <td>${rating}</td>
       <td>${proton}</td>
       <td>${date}</td>
       <td>${source}</td>
-      <td>${hidden}${flagged}</td>
+      <td>${hiddenFlag}${flagged}</td>
+      <td class="admin-col-actions">
+        <button class="admin-btn admin-btn--sm" data-action="edit-report" data-id="${id}"
+          data-rating="${escapeHtml(r.rating||'')}" data-proton="${escapeHtml(r.proton_version||'')}"
+          data-launch="${escapeHtml(r.launch_options||'')}" data-notes="${escapeHtml(r.notes||'')}">Edit</button>
+        <button class="admin-btn admin-btn--sm ${hideClass}" data-action="hide-report" data-id="${id}" data-hidden="${r.is_hidden ? '1' : '0'}">${hideLabel}</button>
+        <button class="admin-btn admin-btn--sm admin-btn--danger" data-action="delete-report" data-id="${id}">Delete</button>
+      </td>
     </tr>`;
   }).join('');
   return `<table class="admin-table user-detail-table">
     <thead><tr>
-      <th>Game</th>
-      <th>Rating</th>
-      <th>Proton</th>
-      <th>Date</th>
-      <th>Source</th>
-      <th>Flags</th>
+      <th>Game</th><th>Rating</th><th>Proton</th><th>Date</th><th>Source</th><th>Flags</th><th>Actions</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -92,7 +98,7 @@ function renderActivitySection(el, allActivity, filter) {
   el.querySelector('#ud-activity-count').textContent = `(${filtered.length})`;
 }
 
-export function renderUserDetail(user, reports, authEvents, { onBack, onBan, currentUserId } = {}) {
+export function renderUserDetail(user, reports, authEvents, { session, onBack, onBan, currentUserId } = {}) {
   const name       = escapeHtml(user.display_name || '(anonymous)');
   const roleMod    = ROLE_LABELS[user.role] ? ` admin-role-badge--${user.role}` : '';
   const rolePill   = `<span class="admin-role-badge${roleMod}">${escapeHtml(roleLabel(user.role))}</span>`;
@@ -160,7 +166,35 @@ export function renderUserDetail(user, reports, authEvents, { onBack, onBan, cur
 
     <div class="user-detail-section">
       <div class="user-detail-section-title">Reports <span class="user-detail-count">(${reports.length})</span></div>
-      ${renderReportsTable(reports)}
+      <div id="ud-reports-wrap">${renderReportsTable(reports)}</div>
+    </div>
+
+    <div id="ud-edit-modal" class="admin-modal-backdrop" hidden>
+      <div class="admin-modal">
+        <div class="admin-modal-title">Edit report</div>
+        <label class="admin-label">Rating
+          <select id="ud-edit-rating" class="admin-select">
+            <option value="platinum">Platinum</option>
+            <option value="gold">Gold</option>
+            <option value="silver">Silver</option>
+            <option value="bronze">Bronze</option>
+            <option value="borked">Borked</option>
+          </select>
+        </label>
+        <label class="admin-label">Proton version
+          <input id="ud-edit-proton" class="admin-input" type="text">
+        </label>
+        <label class="admin-label">Launch options
+          <input id="ud-edit-launch" class="admin-input" type="text">
+        </label>
+        <label class="admin-label">Notes
+          <textarea id="ud-edit-notes" class="admin-input" rows="3" style="resize:vertical"></textarea>
+        </label>
+        <div class="admin-modal-actions">
+          <button class="admin-btn" id="ud-edit-save">Save</button>
+          <button class="admin-btn admin-btn--ghost" id="ud-edit-cancel">Cancel</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -174,6 +208,104 @@ export function renderUserDetail(user, reports, authEvents, { onBack, onBan, cur
         setTimeout(() => { btn.textContent = orig; }, 1200);
       }).catch(() => {});
     });
+  });
+
+  // Report actions (delegated on the reports wrap).
+  let editingId = null;
+  const reportsWrap = el.querySelector('#ud-reports-wrap');
+  const editModal   = el.querySelector('#ud-edit-modal');
+
+  reportsWrap?.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+
+    if (action === 'delete-report') {
+      if (!confirm('Delete this report permanently?')) return;
+      btn.disabled = true;
+      try {
+        await deleteUserReport(session, id);
+        btn.closest('tr').remove();
+        const remaining = reportsWrap.querySelectorAll('tbody tr').length;
+        el.querySelector('.user-detail-section:last-of-type .user-detail-count').textContent = `(${remaining})`;
+      } catch (err) {
+        btn.disabled = false;
+        alert(err.message);
+      }
+    }
+
+    if (action === 'hide-report') {
+      const hide = btn.dataset.hidden !== '1';
+      btn.disabled = true;
+      try {
+        await hideUserReport(session, id, hide);
+        btn.dataset.hidden = hide ? '1' : '0';
+        btn.textContent = hide ? 'Restore' : 'Hide';
+        btn.className = `admin-btn admin-btn--sm ${hide ? 'admin-btn--ok' : 'admin-btn--warn'}`;
+        const flagCell = btn.closest('tr').querySelector('td:nth-child(6)');
+        if (flagCell) {
+          const existing = flagCell.querySelector('.user-detail-flag--warn');
+          if (hide && !existing) {
+            flagCell.insertAdjacentHTML('afterbegin', '<span class="user-detail-flag user-detail-flag--warn">hidden</span>');
+          } else if (!hide && existing) {
+            existing.remove();
+          }
+        }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    if (action === 'edit-report') {
+      editingId = id;
+      el.querySelector('#ud-edit-rating').value  = btn.dataset.rating  || 'platinum';
+      el.querySelector('#ud-edit-proton').value  = btn.dataset.proton  || '';
+      el.querySelector('#ud-edit-launch').value  = btn.dataset.launch  || '';
+      el.querySelector('#ud-edit-notes').value   = btn.dataset.notes   || '';
+      editModal.hidden = false;
+    }
+  });
+
+  el.querySelector('#ud-edit-cancel')?.addEventListener('click', () => {
+    editModal.hidden = true;
+    editingId = null;
+  });
+  editModal?.addEventListener('click', e => { if (e.target === editModal) { editModal.hidden = true; editingId = null; } });
+
+  el.querySelector('#ud-edit-save')?.addEventListener('click', async () => {
+    if (!editingId) return;
+    const saveBtn = el.querySelector('#ud-edit-save');
+    saveBtn.disabled = true;
+    const fields = {
+      rating:          el.querySelector('#ud-edit-rating').value,
+      proton_version:  el.querySelector('#ud-edit-proton').value.trim(),
+      launch_options:  el.querySelector('#ud-edit-launch').value.trim(),
+      notes:           el.querySelector('#ud-edit-notes').value.trim(),
+    };
+    try {
+      await editUserReport(session, editingId, fields);
+      // Update the edit button's data attrs so re-opening shows current values.
+      const editBtn = reportsWrap.querySelector(`[data-action="edit-report"][data-id="${editingId}"]`);
+      if (editBtn) {
+        editBtn.dataset.rating  = fields.rating;
+        editBtn.dataset.proton  = fields.proton_version;
+        editBtn.dataset.launch  = fields.launch_options;
+        editBtn.dataset.notes   = fields.notes;
+        const row = editBtn.closest('tr');
+        if (row) {
+          row.querySelector('td:nth-child(2)').textContent = fields.rating;
+          row.querySelector('td:nth-child(3)').textContent = fields.proton_version;
+        }
+      }
+      editModal.hidden = true;
+      editingId = null;
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      saveBtn.disabled = false;
+    }
   });
 
   // Activity filter dropdown.

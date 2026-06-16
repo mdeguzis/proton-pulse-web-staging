@@ -11,8 +11,8 @@ import { renderAdmins } from './components/admins.js?v=0956f8c4';
 import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPhrase } from './api/phrases.js?v=ca024bd3';
 import { renderPhrases } from './components/phrases.js?v=79051c31';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
-import { fetchUserReports, fetchUserActivity } from './api/userDetail.js?v=b79d4b40';
-import { renderUserDetail } from './components/userDetail.js?v=275afd73';
+import { fetchUserReports, fetchUserActivity } from './api/userDetail.js?v=916aedfc';
+import { renderUserDetail } from './components/userDetail.js?v=fb6530a7';
 import { fetchAnalytics } from './api/analytics.js?v=1b3f4599';
 import { renderAnalytics } from './components/analytics.js?v=b796a4f0';
 
@@ -162,6 +162,7 @@ async function loadUserDetail(user) {
       fetchUserActivity(currentSession, { userId: user.proton_pulse_user_id || null }),
     ]);
     renderUserDetail(user, reports, authEvents, {
+      session: currentSession,
       currentUserId: currentSession?.user?.id,
     });
   } catch (e) {
