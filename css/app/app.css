@@ -1940,6 +1940,7 @@ a.card:active { transform: translateY(1px); }
 .home-tier-chip[data-tier="silver"].active { color: #aaa; border-color: #aaa; background: rgba(170,170,170,0.08); }
 .home-tier-chip[data-tier="bronze"].active { color: #cd7f32; border-color: #cd7f32; background: rgba(205,127,50,0.08); }
 .home-tier-chip[data-tier="borked"].active { color: #e05; border-color: #e05; background: rgba(238,0,85,0.08); }
+.home-results-note { font-size: 0.72rem; color: var(--muted); text-align: center; margin: 8px 0 4px; }
 .home-cards-list { gap: 2px !important; }
 .home-list-row {
   display: flex;

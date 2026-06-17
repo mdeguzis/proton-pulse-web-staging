@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=ab9bb0d8';
-import { loadSearchIndex, searchIndex } from './search.js?v=60dadb4c';
+import { loadSearchIndex, searchIndex } from './search.js?v=35c6b620';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=9970759a';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=ae6042a4';
@@ -49,6 +49,10 @@ function _popularSub(g) {
 
 function _loadMoreBtn(sectionId) {
   return `<button class="load-more-btn" data-section="${sectionId}">Load more</button>`;
+}
+
+function _allShownNote(count) {
+  return `<p class="home-results-note">Showing all ${count} result${count === 1 ? '' : 's'}</p>`;
 }
 
 function _appendCards(sectionId, queue) {
@@ -191,8 +195,12 @@ export async function renderHomePage() {
         tier: String(g.rating || '').toLowerCase() || undefined, sourceLabel: 'Steam',
       })).join('') || '<div class="state-box">No games match the current filters.</div>';
       if (loadMoreEl) {
-        loadMoreEl.innerHTML = newQueue.length ? _loadMoreBtn('popular') : '';
-        loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('popular', newQueue));
+        if (newQueue.length) {
+          loadMoreEl.innerHTML = _loadMoreBtn('popular');
+          loadMoreEl.querySelector('button').addEventListener('click', () => _appendCards('popular', newQueue));
+        } else {
+          loadMoreEl.innerHTML = initial.length ? _allShownNote(filtered.length) : '';
+        }
       }
     }
 
@@ -205,8 +213,12 @@ export async function renderHomePage() {
       const initial = filtered.slice(0, PAGE_SIZE);
       cardsEl.innerHTML = initial.map(renderFn).join('') || '<div class="state-box">No reports found.</div>';
       if (loadMoreEl) {
-        loadMoreEl.innerHTML = queue.length ? _loadMoreBtn('recent') : '';
-        loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('recent', queue));
+        if (queue.length) {
+          loadMoreEl.innerHTML = _loadMoreBtn('recent');
+          loadMoreEl.querySelector('button').addEventListener('click', () => _appendCards('recent', queue));
+        } else {
+          loadMoreEl.innerHTML = filtered.length ? _allShownNote(filtered.length) : '';
+        }
       }
     }
 
