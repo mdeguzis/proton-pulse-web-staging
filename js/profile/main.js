@@ -20,18 +20,20 @@ import {
   clearDefaultSystem, updateSystemLabel, deleteSystem,
 } from './api/systems.js?v=fcfc95e6';
 import {
-  fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
-} from './api/configs.js?v=709d8dfa';
+  fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere, deleteAllMyData,
+} from './api/configs.js?v=9b2b9982';
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=59c9f51e';
-import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=4aaa703f';
+import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=075bec61';
 
 (async function () {
   const signedIn  = document.getElementById('profile-signed-in');
   const signedOut = document.getElementById('profile-signed-out');
   const loginBtn  = document.getElementById('profile-login-btn');
   const signoutBtn = document.getElementById('profile-signout-btn');
+  const deleteDataBtn = document.getElementById('profile-delete-data-btn');
+  const deleteDataStatus = document.getElementById('profile-delete-data-status');
   const copyBtn   = document.getElementById('copy-uid-btn');
   const copyLabel = document.getElementById('copy-uid-label');
   const usernameToggle = document.getElementById('show-username-toggle');
@@ -377,6 +379,32 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
   signoutBtn?.addEventListener('click', async () => {
     await SupaAuth.logout();
     showSignedOut();
+  });
+
+  deleteDataBtn?.addEventListener('click', async () => {
+    const confirmed = window.confirm(
+      'This will permanently delete all your reports, cloud configs, hardware systems, votes, and display name. This cannot be undone.\n\nAre you sure?'
+    );
+    if (!confirmed) return;
+    const s = await SupaAuth.getSession();
+    const protonPulseUserId = getProtonPulseUserIdFromSession(s);
+    const cid = getWebClientIdProfile();
+    if (!protonPulseUserId && !cid) {
+      if (deleteDataStatus) { deleteDataStatus.textContent = 'No account data found to delete.'; deleteDataStatus.style.display = ''; }
+      return;
+    }
+    if (deleteDataBtn) deleteDataBtn.disabled = true;
+    if (deleteDataStatus) { deleteDataStatus.textContent = 'Deleting...'; deleteDataStatus.style.display = ''; }
+    try {
+      await deleteAllMyData(protonPulseUserId, cid, s);
+      if (deleteDataStatus) deleteDataStatus.textContent = 'All account data deleted. Signing out...';
+      await SupaAuth.logout();
+      showSignedOut();
+    } catch (e) {
+      console.error('[profile] deleteAllMyData error', e);
+      if (deleteDataStatus) deleteDataStatus.textContent = e.message || 'Delete failed.';
+      if (deleteDataBtn) deleteDataBtn.disabled = false;
+    }
   });
 
   copyBtn?.addEventListener('click', () => {

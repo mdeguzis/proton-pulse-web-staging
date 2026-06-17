@@ -292,6 +292,9 @@
   transition: background .1s, border-color .1s, color .1s;
 }
 .profile-signout-btn:hover { background: rgba(200,80,80,0.1); border-color: #c85050; color: #e07070; }
+.profile-delete-data-btn { border-color: rgba(200,50,50,0.6); color: #c83030; }
+.profile-delete-data-btn:hover { background: rgba(200,50,50,0.15); border-color: #c83030; color: #e04040; }
+.profile-delete-data-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .profile-toggle {
   position: relative;

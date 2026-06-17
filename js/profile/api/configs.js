@@ -128,6 +128,29 @@ export async function fetchCloudConfig(protonPulseUserId, appId, session) {
   return rows[0] ?? null;
 }
 
+export async function deleteAllMyData(protonPulseUserId, clientId, session) {
+  const headers = { ...supabaseHeaders(session), Prefer: 'return=minimal' };
+  const deletes = [];
+  if (protonPulseUserId) {
+    const uid = encodeURIComponent(protonPulseUserId);
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_configs?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_proton_configs?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_systems?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/report_votes?voter_id=eq.${uid}`, { method: 'DELETE', headers }));
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
+  }
+  if (clientId) {
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_configs?client_id=eq.${encodeURIComponent(clientId)}`, { method: 'DELETE', headers }));
+  }
+  const results = await Promise.all(deletes);
+  const failed = results.find((r) => !r.ok);
+  if (failed) {
+    const body = await failed.text().catch(() => '');
+    console.error('[profile] deleteAllMyData failed', { status: failed.status, body });
+    throw new Error(`Delete failed: HTTP ${failed.status}`);
+  }
+}
+
 export async function patchCloudConfig(protonPulseUserId, appId, configPatch, session) {
   const url = `${SUPABASE_URL}/rest/v1/user_proton_configs`
     + `?proton_pulse_user_id=eq.${encodeURIComponent(protonPulseUserId)}`
