@@ -1,30 +1,32 @@
 """Generate game-images.json: correct Steam header image URLs for games where
 the standard /header.jpg path is hashed (newer Steam releases).
 
-The front-end STEAM_IMG() function generates the non-hashed URL which works
-for older games but 404s for titles released after Steam started requiring
-per-asset hashes. This pipeline step fetches the real URL from the Steam store
-API (server-side, no CORS issue) and writes a small lookup map.
+Uses a unified cache (game-images-cache.json) tracking status + probe date per app ID:
+  - status "ok":      standard CDN URL works, no frontend override needed.
+  - status "hashed":  standard URL 404s; real URL stored and written to game-images.json.
+  - status "missing": Steam API returned no header image.
 
-Covers: ALL app IDs found in the data/ directory, with two persistent caches:
-  - game-images.json: IDs where standard URL 404s, mapped to the real URL.
-  - game-images-skip.json: IDs where the standard URL is confirmed OK.
+Hot games (visible in recent-reports.json + most_played.json) are always probed
+first and re-probed when their cache entry is older than STALE_DAYS. Backlog
+entries (all other app IDs with ProtonDB data) are only probed when uncached,
+capped at PROBE_CAP per run.
 
-Daily runs probe only uncached IDs (cap: PROBE_CAP per run) so the full
-backfill completes incrementally without timing out in CI.
+On first run after this format change, legacy game-images.json and
+game-images-skip.json entries are migrated into the unified cache automatically.
 """
 
 import json
 import time
-import urllib.error
 import urllib.request
+from datetime import date, timedelta
 from pathlib import Path
 
 from .common import log
 
 STEAM_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails?appids={appid}&filters=basic"
-REQUEST_DELAY = 0.3  # seconds between Steam API calls to avoid rate limiting
-PROBE_CAP = 500      # max new IDs to probe per pipeline run
+REQUEST_DELAY = 0.3   # seconds between Steam API calls
+PROBE_CAP = 500       # max backlog IDs to probe per run (hot IDs are uncapped)
+STALE_DAYS = 30       # re-probe hot games whose cache entry is older than this
 
 
 def _standard_header_url(app_id: str) -> str:
@@ -56,7 +58,6 @@ def _fetch_steam_header(app_id: str, timeout: int = 10) -> str | None:
 
 
 def _collect_all_app_ids(data_dir: Path) -> list[str]:
-    """Return all numeric app IDs found as subdirectories under data_dir."""
     ids: set[str] = set()
     if data_dir.is_dir():
         for entry in data_dir.iterdir():
@@ -65,104 +66,135 @@ def _collect_all_app_ids(data_dir: Path) -> list[str]:
     return sorted(ids, key=lambda x: int(x))
 
 
-def _load_json_map(path: Path) -> dict:
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            log(f"[game-images] WARN: could not load {path.name}: {exc}")
-    return {}
-
-
 def _hot_app_ids(output_dir: Path) -> list[str]:
-    """Return app IDs visible to users right now: recent-reports + most_played."""
+    """App IDs currently visible on the site (recent-reports + most_played), deduplicated."""
     ids: list[str] = []
+    seen: set[str] = set()
     for fname in ("recent-reports.json", "most_played.json"):
         p = output_dir / fname
         if not p.exists():
             continue
         try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-            for entry in data:
+            for entry in json.loads(p.read_text(encoding="utf-8")):
                 aid = str(entry.get("appId", entry.get("app_id", ""))).strip()
-                if aid.isdigit():
+                if aid.isdigit() and aid not in seen:
+                    seen.add(aid)
                     ids.append(aid)
         except Exception as exc:
             log(f"[game-images] WARN: could not read {fname}: {exc}")
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for aid in ids:
-        if aid not in seen:
-            seen.add(aid)
-            deduped.append(aid)
-    return deduped
+    return ids
+
+
+def _load_cache(path: Path) -> dict:
+    """Load unified cache: { appId: {status, url?, probed_at} }"""
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            log(f"[game-images] WARN: could not load cache {path.name}: {exc}")
+    return {}
+
+
+def _migrate_legacy(output_dir: Path, cache: dict) -> None:
+    """One-time import of old game-images.json + game-images-skip.json into unified cache."""
+    today = date.today().isoformat()
+    migrated = 0
+
+    overrides_path = output_dir / "game-images.json"
+    if overrides_path.exists():
+        try:
+            old = json.loads(overrides_path.read_text(encoding="utf-8"))
+            for aid, val in old.items():
+                if aid not in cache and isinstance(val, str):
+                    cache[aid] = {"status": "hashed", "url": val, "probed_at": today}
+                    migrated += 1
+        except Exception:
+            pass
+
+    skip_path = output_dir / "game-images-skip.json"
+    if skip_path.exists():
+        try:
+            old = json.loads(skip_path.read_text(encoding="utf-8"))
+            for aid in old.get("ids", []):
+                if aid not in cache:
+                    cache[aid] = {"status": "ok", "probed_at": today}
+                    migrated += 1
+        except Exception:
+            pass
+
+    if migrated:
+        log(f"[game-images] migrated {migrated} entries from legacy cache files")
+
+
+def _is_stale(entry: dict) -> bool:
+    try:
+        probed = date.fromisoformat(entry["probed_at"])
+        return (date.today() - probed) > timedelta(days=STALE_DAYS)
+    except Exception:
+        return True
 
 
 def build_game_images(output_dir) -> dict[str, str]:
-    """Write game-images.json and game-images-skip.json, return the overrides map.
+    """Write game-images-cache.json (unified) and game-images.json (frontend).
 
-    game-images.json  -- app IDs where standard URL 404s, mapped to real URL.
-    game-images-skip.json -- app IDs where standard URL is confirmed OK.
-
-    Visible games (recent-reports + most_played) are always probed first so
-    newly released high-ID games don't wait months in the numeric backlog.
-    Remaining uncached IDs are appended up to PROBE_CAP per run.
+    Returns the frontend override map: { appId: url } for hashed entries only.
     """
     output_dir = Path(output_dir)
     data_dir = output_dir / "data"
+    cache_path = output_dir / "game-images-cache.json"
 
-    overrides_path = output_dir / "game-images.json"
-    skip_path = output_dir / "game-images-skip.json"
-
-    overrides: dict[str, str] = _load_json_map(overrides_path)
-    skip_set: set[str] = set(_load_json_map(skip_path).get("ids", []))
+    cache = _load_cache(cache_path)
+    if not cache:
+        _migrate_legacy(output_dir, cache)
 
     all_ids = _collect_all_app_ids(data_dir)
-    cached = set(overrides.keys()) | skip_set
+    hot_ids = _hot_app_ids(output_dir)
+    hot_set = set(hot_ids)
 
-    hot = [a for a in _hot_app_ids(output_dir) if a not in cached]
-    hot_set = set(hot)
-    rest = [a for a in all_ids if a not in cached and a not in hot_set]
-    to_probe = hot + rest
+    # Hot: probe if uncached or stale
+    hot_to_probe = [a for a in hot_ids if a not in cache or _is_stale(cache[a])]
+    # Backlog: probe only if uncached, cap applies
+    backlog_to_probe = [a for a in all_ids if a not in cache and a not in hot_set]
 
     log(
-        f"[game-images] {len(all_ids)} total app IDs | "
-        f"{len(overrides)} override cache | {len(skip_set)} skip cache | "
-        f"{len(hot)} hot uncached (all will probe) | {len(rest)} backlog uncached (cap {PROBE_CAP})"
+        f"[game-images] {len(all_ids)} total app IDs | cache: {len(cache)} | "
+        f"hot: {len(hot_to_probe)} to probe | backlog: {len(backlog_to_probe)} uncached (cap {PROBE_CAP})"
     )
 
-    probed = 0  # total for logging
+    today = date.today().isoformat()
     backlog_probed = 0
-    for app_id in to_probe:
+
+    for app_id in hot_to_probe + backlog_to_probe:
         is_backlog = app_id not in hot_set
-        if is_backlog and backlog_probed >= PROBE_CAP:
-            log(f"[game-images] hit backlog cap ({PROBE_CAP}), deferring {len(rest) - backlog_probed} to next run")
-            break
+        if is_backlog:
+            if backlog_probed >= PROBE_CAP:
+                log(f"[game-images] hit backlog cap ({PROBE_CAP}), deferring {len(backlog_to_probe) - backlog_probed}")
+                break
+            backlog_probed += 1
+
         standard_url = _standard_header_url(app_id)
         if _url_is_ok(standard_url):
             log(f"[game-images] {app_id}: standard URL ok", debug=True)
-            skip_set.add(app_id)
+            cache[app_id] = {"status": "ok", "probed_at": today}
         else:
             log(f"[game-images] {app_id}: standard URL 404, fetching from Steam API")
             real_url = _fetch_steam_header(app_id)
             if real_url:
-                overrides[app_id] = real_url.split("?")[0]
-                log(f"[game-images] {app_id}: resolved to {overrides[app_id]}")
+                url_clean = real_url.split("?")[0]
+                cache[app_id] = {"status": "hashed", "url": url_clean, "probed_at": today}
+                log(f"[game-images] {app_id}: hashed URL -> {url_clean}")
             else:
-                log(f"[game-images] {app_id}: no header image found via Steam API, marking skip")
-                skip_set.add(app_id)
-        probed += 1
-        if is_backlog:
-            backlog_probed += 1
+                cache[app_id] = {"status": "missing", "probed_at": today}
+                log(f"[game-images] {app_id}: no image found via Steam API")
         time.sleep(REQUEST_DELAY)
 
-    overrides_path.write_text(json.dumps(overrides, indent=2) + "\n", encoding="utf-8")
-    log(f"[game-images] wrote {len(overrides)} override URL(s) to {overrides_path}")
+    cache_path.write_text(json.dumps(cache, indent=2) + "\n", encoding="utf-8")
+    log(f"[game-images] wrote unified cache ({len(cache)} entries) to {cache_path.name}")
 
-    skip_path.write_text(
-        json.dumps({"ids": sorted(skip_set, key=lambda x: int(x) if x.isdigit() else 0)}, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    log(f"[game-images] wrote {len(skip_set)} skip-cache entries to {skip_path}")
+    # Derive frontend game-images.json: hashed entries only, { appId: url }
+    frontend = {aid: e["url"] for aid, e in cache.items() if e.get("status") == "hashed"}
+    frontend_path = output_dir / "game-images.json"
+    frontend_path.write_text(json.dumps(frontend, indent=2) + "\n", encoding="utf-8")
+    log(f"[game-images] wrote {len(frontend)} hashed URL(s) to {frontend_path.name}")
 
-    return overrides
+    return frontend
