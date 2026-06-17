@@ -280,6 +280,11 @@
         <div class="profile-section-title">Danger Zone</div>
         <p class="profile-danger-note">Signing out will clear your session from this browser. Your data remains stored.</p>
         <button class="profile-signout-btn" id="profile-signout-btn">Sign out</button>
+        <p class="profile-danger-note" style="margin-top:12px">Download a copy of all your data across every table.</p>
+        <button class="profile-signout-btn" id="profile-download-data-btn">Download my data</button>
+        <p class="profile-danger-note" style="margin-top:12px">Check whether any data tied to your account still exists.</p>
+        <button class="profile-signout-btn" id="profile-check-data-btn">Check if data exists</button>
+        <div id="profile-check-data-status" class="profile-field-hint" style="margin:4px 16px 8px;display:none"></div>
         <p class="profile-danger-note" style="margin-top:12px">Delete all data associated with your account from every table -- reports, cloud configs, hardware systems, votes, and display name. This cannot be undone.</p>
         <button class="profile-signout-btn profile-delete-data-btn" id="profile-delete-data-btn">Delete my account data</button>
         <div id="profile-delete-data-status" class="profile-field-hint" style="margin:4px 16px 8px;display:none"></div>
@@ -301,6 +306,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/lib/supabase-client.js?v=04813aa1"></script>
 <script src="js/lib/topbar.js?v=e210caf6"></script>
-<script type="module" src="js/profile/main.js?v=0ace83fb"></script>
+<script type="module" src="js/profile/main.js?v=eb411da9"></script>
 </body>
 </html>

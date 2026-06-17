@@ -20,12 +20,13 @@ import {
   clearDefaultSystem, updateSystemLabel, deleteSystem,
 } from './api/systems.js?v=fcfc95e6';
 import {
-  fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere, deleteAllMyData,
-} from './api/configs.js?v=9b2b9982';
+  fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
+  deleteAllMyData, fetchAllMyData, checkMyDataExists,
+} from './api/configs.js?v=7de3eb21';
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=59c9f51e';
-import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=075bec61';
+import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=297a8286';
 
 (async function () {
   const signedIn  = document.getElementById('profile-signed-in');
@@ -34,6 +35,9 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
   const signoutBtn = document.getElementById('profile-signout-btn');
   const deleteDataBtn = document.getElementById('profile-delete-data-btn');
   const deleteDataStatus = document.getElementById('profile-delete-data-status');
+  const downloadDataBtn = document.getElementById('profile-download-data-btn');
+  const checkDataBtn = document.getElementById('profile-check-data-btn');
+  const checkDataStatus = document.getElementById('profile-check-data-status');
   const copyBtn   = document.getElementById('copy-uid-btn');
   const copyLabel = document.getElementById('copy-uid-label');
   const usernameToggle = document.getElementById('show-username-toggle');
@@ -404,6 +408,50 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
       console.error('[profile] deleteAllMyData error', e);
       if (deleteDataStatus) deleteDataStatus.textContent = e.message || 'Delete failed.';
       if (deleteDataBtn) deleteDataBtn.disabled = false;
+    }
+  });
+
+  downloadDataBtn?.addEventListener('click', async () => {
+    const s = await SupaAuth.getSession();
+    const protonPulseUserId = getProtonPulseUserIdFromSession(s);
+    const cid = getWebClientIdProfile();
+    if (downloadDataBtn) downloadDataBtn.disabled = true;
+    try {
+      const data = await fetchAllMyData(protonPulseUserId, cid, s);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `proton-pulse-data-${(protonPulseUserId || cid || 'export').slice(0, 8)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('[profile] fetchAllMyData error', e);
+    } finally {
+      if (downloadDataBtn) downloadDataBtn.disabled = false;
+    }
+  });
+
+  checkDataBtn?.addEventListener('click', async () => {
+    const s = await SupaAuth.getSession();
+    const protonPulseUserId = getProtonPulseUserIdFromSession(s);
+    const cid = getWebClientIdProfile();
+    if (checkDataBtn) checkDataBtn.disabled = true;
+    if (checkDataStatus) { checkDataStatus.textContent = 'Checking...'; checkDataStatus.style.display = ''; }
+    try {
+      const counts = await checkMyDataExists(protonPulseUserId, cid, s);
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+      const lines = Object.entries(counts).map(([t, n]) => `${t}: ${n}`).join(', ');
+      if (checkDataStatus) {
+        checkDataStatus.textContent = total === 0 ? `No data found. (${lines})` : `Data found -- ${lines}`;
+        checkDataStatus.style.color = total === 0 ? 'var(--green)' : 'var(--red)';
+      }
+    } catch (e) {
+      if (checkDataStatus) checkDataStatus.textContent = e.message || 'Check failed.';
+    } finally {
+      if (checkDataBtn) checkDataBtn.disabled = false;
     }
   });
 

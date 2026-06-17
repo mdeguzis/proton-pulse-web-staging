@@ -128,6 +128,37 @@ export async function fetchCloudConfig(protonPulseUserId, appId, session) {
   return rows[0] ?? null;
 }
 
+export async function fetchAllMyData(protonPulseUserId, clientId, session) {
+  const h = supabaseHeaders(session);
+  const uid = protonPulseUserId ? encodeURIComponent(protonPulseUserId) : null;
+  const cid = clientId ? encodeURIComponent(clientId) : null;
+  const get = (url) => fetch(url, { headers: h }).then((r) => r.ok ? r.json() : []);
+  const [configs, protonConfigs, systems, votes, avatar, configsByClient] = await Promise.all([
+    uid ? get(`${SUPABASE_URL}/rest/v1/user_configs?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    uid ? get(`${SUPABASE_URL}/rest/v1/user_proton_configs?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    uid ? get(`${SUPABASE_URL}/rest/v1/user_systems?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    uid ? get(`${SUPABASE_URL}/rest/v1/report_votes?voter_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    uid ? get(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    cid ? get(`${SUPABASE_URL}/rest/v1/user_configs?client_id=eq.${cid}&select=*`) : Promise.resolve([]),
+  ]);
+  const mergedConfigs = [...configs];
+  for (const row of configsByClient) {
+    if (!mergedConfigs.some((r) => r.id === row.id)) mergedConfigs.push(row);
+  }
+  return { user_configs: mergedConfigs, user_proton_configs: protonConfigs, user_systems: systems, report_votes: votes, author_avatars: avatar };
+}
+
+export async function checkMyDataExists(protonPulseUserId, clientId, session) {
+  const data = await fetchAllMyData(protonPulseUserId, clientId, session);
+  return {
+    user_configs: data.user_configs.length,
+    user_proton_configs: data.user_proton_configs.length,
+    user_systems: data.user_systems.length,
+    report_votes: data.report_votes.length,
+    author_avatars: data.author_avatars.length,
+  };
+}
+
 export async function deleteAllMyData(protonPulseUserId, clientId, session) {
   const headers = { ...supabaseHeaders(session), Prefer: 'return=minimal' };
   const deletes = [];
