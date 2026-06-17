@@ -51,7 +51,7 @@ const USER_FACING_TABLES = [
   'user_systems',
 ];
 
-async function queryDB(sql, retries = 2) {
+async function queryDB(sql, retries = 4) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     const res = await fetch(MGMT_QUERY_URL, {
       method: 'POST',
@@ -63,8 +63,8 @@ async function queryDB(sql, retries = 2) {
     });
     if (res.ok) return res.json();
     const body = await res.text();
-    if (res.status >= 500 && attempt < retries) {
-      await new Promise(r => setTimeout(r, 3000 * attempt));
+    if (attempt < retries) {
+      await new Promise(r => setTimeout(r, 5000 * attempt));
       continue;
     }
     throw new Error(`Management API error: ${res.status} ${body}`);
@@ -125,19 +125,19 @@ describeIfCreds('Supabase admin table RLS smoke', () => {
   test('admins SELECT returns results without error for authenticated user', async () => {
     const rows = await queryAsAuth('SELECT proton_pulse_user_id FROM public.admins LIMIT 1;');
     expect(Array.isArray(rows)).toBe(true);
-  }, 30000);
+  }, 90000);
 
   test('is_current_user_admin() is callable and returns a boolean', async () => {
     const rows = await queryAsAuth('SELECT public.is_current_user_admin() AS result;');
     expect(Array.isArray(rows)).toBe(true);
     expect(typeof rows[0].result).toBe('boolean');
-  }, 30000);
+  }, 90000);
 
   test('is_current_user_super_admin() is callable and returns a boolean', async () => {
     const rows = await queryAsAuth('SELECT public.is_current_user_super_admin() AS result;');
     expect(Array.isArray(rows)).toBe(true);
     expect(typeof rows[0].result).toBe('boolean');
-  }, 30000);
+  }, 90000);
 
   test('banned_users has no_self_ban CHECK constraint', async () => {
     const rows = await queryDB(`
@@ -147,7 +147,7 @@ describeIfCreds('Supabase admin table RLS smoke', () => {
         AND conname = 'no_self_ban';
     `);
     expect(rows).toHaveLength(1);
-  }, 30000);
+  }, 90000);
 
   test('self-ban insert is rejected by no_self_ban constraint', async () => {
     // proton_pulse_user_id = banned_by violates the constraint.
@@ -159,7 +159,7 @@ describeIfCreds('Supabase admin table RLS smoke', () => {
         'ci-self-ban-test'
       );
     `)).rejects.toThrow(/no_self_ban/);
-  }, 30000);
+  }, 90000);
 });
 
 describeIfCreds('Supabase live endpoint smoke', () => {
@@ -181,7 +181,7 @@ describeIfCreds('Supabase live endpoint smoke', () => {
       { headers },
     );
     expect(res.status).toBe(200);
-  }, 30000);
+  }, 90000);
 
   test('user_proton_configs SELECT returns 200 for anon', async () => {
     const res = await fetch(
@@ -191,7 +191,7 @@ describeIfCreds('Supabase live endpoint smoke', () => {
       { headers },
     );
     expect(res.status).toBe(200);
-  }, 30000);
+  }, 90000);
 
   test('user_configs SELECT returns 200 for authenticated user (simulated via DB)', async () => {
     // Run the SELECT as the `authenticated` role with fake-but-valid-format JWT
@@ -203,7 +203,7 @@ describeIfCreds('Supabase live endpoint smoke', () => {
     `);
     // If RLS evaluation errored, queryDB would have thrown. Reaching here means 200.
     expect(Array.isArray(rows)).toBe(true);
-  }, 30000);
+  }, 90000);
 
   test('user_proton_configs SELECT returns 200 for authenticated user (simulated via DB)', async () => {
     const rows = await queryDB(`
@@ -212,5 +212,5 @@ describeIfCreds('Supabase live endpoint smoke', () => {
       SELECT app_id FROM public.user_proton_configs LIMIT 1;
     `);
     expect(Array.isArray(rows)).toBe(true);
-  }, 30000);
+  }, 90000);
 });
