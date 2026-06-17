@@ -48,6 +48,15 @@
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   margin-bottom: 20px;
+  position: relative;
+}
+.profile-signout-topright {
+  margin: 0;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px 14px;
+  font-size: 0.75rem;
 }
 .profile-avatar {
   border-radius: 50%;
