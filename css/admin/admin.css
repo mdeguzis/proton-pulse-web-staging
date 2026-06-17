@@ -56,6 +56,26 @@
   outline: none;
 }
 
+/* "Your role & permissions" summary at the top of the panel. */
+.admin-perms-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+}
+.admin-perms-role {
+  font-weight: 600;
+  color: var(--text, #eee);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.admin-perms-caps {
+  color: var(--muted, #888);
+}
+
 /* Search box with an inline clear (X) button, shown only when there is text. */
 .admin-search-wrap {
   position: relative;

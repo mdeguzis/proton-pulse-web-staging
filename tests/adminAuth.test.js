@@ -24,6 +24,7 @@ const path = require('path');
 const ADMIN_MODULE_FILES = [
   'js/admin/config.js',
   'js/admin/utils.js',
+  'js/admin/permissions.js',
   'js/admin/api/wordlist.js',
   'js/admin/api/flagged.js',
   'js/admin/api/banned.js',
@@ -101,7 +102,7 @@ function makeCtx(fetchImpl) {
     var alert = ctx.alert;
     var confirm = ctx.confirm;
     ${ADMIN_SRC}
-    ctx.__isAdmin             = isAdmin;
+    ctx.__fetchAdminProfile   = fetchAdminProfile;
     ctx.__supabaseHeaders     = supabaseHeaders;
     ctx.__escapeHtml          = escapeHtml;
     ctx.__friendlyReason      = friendlyReason;
@@ -158,87 +159,88 @@ function failFetch(status = 403) {
 }
 
 // ---------------------------------------------------------------------------
-// isAdmin - auth gate correctness
+// fetchAdminProfile - auth gate correctness (returns the admin row or null)
 // ---------------------------------------------------------------------------
 
-describe('isAdmin - session validation', () => {
-  test('returns false for null session', async () => {
-    expect(await makeCtx(okFetch()).__isAdmin(null)).toBe(false);
+describe('fetchAdminProfile - session validation', () => {
+  test('returns null for null session', async () => {
+    expect(await makeCtx(okFetch()).__fetchAdminProfile(null)).toBeNull();
   });
 
-  test('returns false for empty object session', async () => {
-    expect(await makeCtx(okFetch()).__isAdmin({})).toBe(false);
+  test('returns null for empty object session', async () => {
+    expect(await makeCtx(okFetch()).__fetchAdminProfile({})).toBeNull();
   });
 
-  test('returns false when session.user is null', async () => {
-    expect(await makeCtx(okFetch()).__isAdmin({ user: null })).toBe(false);
+  test('returns null when session.user is null', async () => {
+    expect(await makeCtx(okFetch()).__fetchAdminProfile({ user: null })).toBeNull();
   });
 
-  test('returns false when session.user.id is undefined', async () => {
-    expect(await makeCtx(okFetch()).__isAdmin({ user: {} })).toBe(false);
+  test('returns null when session.user.id is undefined', async () => {
+    expect(await makeCtx(okFetch()).__fetchAdminProfile({ user: {} })).toBeNull();
   });
 
-  test('returns false when session.user.id is empty string', async () => {
-    expect(await makeCtx(okFetch()).__isAdmin({ user: { id: '' } })).toBe(false);
+  test('returns null when session.user.id is empty string', async () => {
+    expect(await makeCtx(okFetch()).__fetchAdminProfile({ user: { id: '' } })).toBeNull();
   });
 });
 
-describe('isAdmin - database response handling', () => {
-  test('returns false when admins table returns empty array', async () => {
+describe('fetchAdminProfile - database response handling', () => {
+  test('returns null when admins table returns empty array', async () => {
     const ctx = makeCtx(mockFetch([{ url: /admins/, body: [] }]));
-    expect(await ctx.__isAdmin({ user: { id: OTHER_USER_ID }, access_token: 'tok' })).toBe(false);
+    expect(await ctx.__fetchAdminProfile({ user: { id: OTHER_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 
-  test('returns true when admins table returns a matching row', async () => {
-    const ctx = makeCtx(mockFetch([{ url: /admins/, body: [{ proton_pulse_user_id: ADMIN_USER_ID }] }]));
-    expect(await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBe(true);
+  test('returns the admin row when a matching row exists', async () => {
+    const row = { role: 'super_admin', permissions: ['manage_admins'] };
+    const ctx = makeCtx(mockFetch([{ url: /admins/, body: [row] }]));
+    expect(await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toEqual(row);
   });
 
-  test('returns false on HTTP 403', async () => {
+  test('returns null on HTTP 403', async () => {
     const ctx = makeCtx(mockFetch([{ url: /admins/, status: 403, body: {} }]));
-    expect(await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBe(false);
+    expect(await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 
-  test('returns false on HTTP 500', async () => {
+  test('returns null on HTTP 500', async () => {
     const ctx = makeCtx(mockFetch([{ url: /admins/, status: 500, body: {} }]));
-    expect(await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBe(false);
+    expect(await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 
-  test('returns false when fetch throws (network error)', async () => {
+  test('returns null when fetch throws (network error)', async () => {
     const fetch = jest.fn(async () => { throw new Error('network error'); });
-    expect(await makeCtx(fetch).__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBe(false);
+    expect(await makeCtx(fetch).__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 
-  test('returns false when response body is null (handles gracefully)', async () => {
+  test('returns null when response body is null (handles gracefully)', async () => {
     const fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => null, text: async () => 'null' }));
-    expect(await makeCtx(fetch).__isAdmin({ user: { id: OTHER_USER_ID }, access_token: 'tok' })).toBe(false);
+    expect(await makeCtx(fetch).__fetchAdminProfile({ user: { id: OTHER_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 
-  test('returns false when response body is a non-array truthy value', async () => {
-    const fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ proton_pulse_user_id: ADMIN_USER_ID }), text: async () => '{}' }));
-    expect(await makeCtx(fetch).__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBe(false);
+  test('returns null when response body is a non-array truthy value', async () => {
+    const fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ role: 'super_admin' }), text: async () => '{}' }));
+    expect(await makeCtx(fetch).__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' })).toBeNull();
   });
 });
 
-describe('isAdmin - URL and header security', () => {
+describe('fetchAdminProfile - URL and header security', () => {
   test('sends user id in query string', async () => {
     const fetch = mockFetch([{ url: /admins/, body: [] }]);
     const ctx = makeCtx(fetch);
-    await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
+    await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
     expect(fetch.mock.calls[0][0]).toContain(ADMIN_USER_ID);
   });
 
   test('sends session access_token in Authorization header', async () => {
     const fetch = mockFetch([{ url: /admins/, body: [] }]);
     const ctx = makeCtx(fetch);
-    await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'my-secret-token' });
+    await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'my-secret-token' });
     expect(fetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer my-secret-token');
   });
 
   test('does not expose service role key (only uses session or anon key)', async () => {
     const fetch = mockFetch([{ url: /admins/, body: [] }]);
     const ctx = makeCtx(fetch);
-    await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
+    await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
     const headers = fetch.mock.calls[0][1].headers;
     expect(headers['Authorization']).not.toContain('service_role');
   });
@@ -246,9 +248,16 @@ describe('isAdmin - URL and header security', () => {
   test('queries /rest/v1/admins endpoint (not user_configs)', async () => {
     const fetch = mockFetch([{ body: [] }]);
     const ctx = makeCtx(fetch);
-    await ctx.__isAdmin({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
+    await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
     expect(fetch.mock.calls[0][0]).toContain('/admins');
     expect(fetch.mock.calls[0][0]).not.toContain('/user_configs');
+  });
+
+  test('selects role and permissions for the granular model', async () => {
+    const fetch = mockFetch([{ url: /admins/, body: [] }]);
+    const ctx = makeCtx(fetch);
+    await ctx.__fetchAdminProfile({ user: { id: ADMIN_USER_ID }, access_token: 'tok' });
+    expect(fetch.mock.calls[0][0]).toContain('select=role,permissions');
   });
 });
 

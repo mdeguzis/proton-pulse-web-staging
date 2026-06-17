@@ -2,7 +2,7 @@
 
 import { escapeHtml, fmtDate, ROLE_LABELS, roleLabel } from '../utils.js?v=86489fcb';
 
-export function renderUsers(rows, { currentUserId, counts } = {}) {
+export function renderUsers(rows, { currentUserId, counts, canBan = true } = {}) {
   const loading = document.getElementById('users-loading');
   const empty   = document.getElementById('users-empty');
   const table   = document.getElementById('users-table');
@@ -65,7 +65,9 @@ export function renderUsers(rows, { currentUserId, counts } = {}) {
     const roleCell = `<span class="admin-role-badge${roleMod}">${escapeHtml(roleLabel(r.role))}</span>`;
     const isSelf = currentUserId && r.proton_pulse_user_id === currentUserId;
     let banBtn;
-    if (isSelf) {
+    if (!canBan) {
+      banBtn = ''; // admin lacks ban_users; RLS would reject anyway
+    } else if (isSelf) {
       banBtn = `<button class="admin-btn admin-btn--danger admin-btn--sm" disabled title="Cannot ban yourself">Ban</button>`;
     } else if (r.is_banned) {
       banBtn = `<button class="admin-btn admin-btn--ok admin-btn--sm" data-action="unban-user"

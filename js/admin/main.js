@@ -1,11 +1,12 @@
 import { SupaAuth, SUPABASE_URL } from './config.js?v=ffed3d84';
-import { supabaseHeaders } from './utils.js?v=86489fcb';
+import { supabaseHeaders, escapeHtml } from './utils.js?v=86489fcb';
+import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMISSION_LABELS } from './permissions.js?v=334339c8';
 import { fetchFlaggedReports, reinstateReport, deleteReport } from './api/flagged.js?v=55433ab8';
 import { renderFlagged } from './components/flagged.js?v=b9c9f230';
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=aa9b6b53';
 import { renderBanned } from './components/banned.js?v=45d01d17';
 import { fetchAllUsers } from './api/users.js?v=718eb921';
-import { renderUsers } from './components/users.js?v=5af3a493';
+import { renderUsers } from './components/users.js?v=643eabd8';
 import { fetchAdmins, addAdmin, removeAdmin, updateAdminRole } from './api/admins.js?v=637a90b4';
 import { renderAdmins } from './components/admins.js?v=0956f8c4';
 import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPhrase } from './api/phrases.js?v=ca024bd3';
@@ -30,17 +31,51 @@ let sortDir = 'desc';
 // Supabase queries
 // ---------------------------------------------------------------------------
 
-async function isAdmin(session) {
-  if (!session?.user?.id) return false;
+// Fetch the signed-in user's admin row (role + granular permissions), or null
+// if they are not an admin. Drives both access and what the panel shows.
+async function fetchAdminProfile(session) {
+  if (!session?.user?.id) return null;
   try {
-    const url = `${SUPABASE_URL}/rest/v1/admins?proton_pulse_user_id=eq.${encodeURIComponent(session.user.id)}&select=proton_pulse_user_id&limit=1`;
+    const url = `${SUPABASE_URL}/rest/v1/admins?proton_pulse_user_id=eq.${encodeURIComponent(session.user.id)}&select=role,permissions&limit=1`;
     const res = await fetch(url, { headers: supabaseHeaders(session) });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const rows = await res.json();
-    return Array.isArray(rows) && rows.length > 0;
+    return Array.isArray(rows) && rows.length ? rows[0] : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+// The signed-in admin's effective capabilities. `can(perm)` is the front-end
+// mirror of the RLS helper current_user_has_permission(); RLS stays the real
+// gate, this just decides what to show.
+let currentAdmin = null; // { role, permissions }
+function can(perm) {
+  return currentAdmin ? hasPermission(currentAdmin.role, currentAdmin.permissions, perm) : false;
+}
+
+const ROLE_DISPLAY = { super_admin: 'Super Admin', moderator: 'Moderator', custom: 'Custom' };
+
+// Show the signed-in admin's role + what they can do at the top of the panel.
+function renderPermissionSummary() {
+  const el = document.getElementById('admin-perms-summary');
+  if (!el || !currentAdmin) return;
+  const label = resolveRoleLabel(currentAdmin.role, currentAdmin.permissions);
+  const caps = effectivePermissions(currentAdmin.role, currentAdmin.permissions)
+    .map(k => PERMISSION_LABELS[k] || k);
+  el.innerHTML =
+    `<span class="admin-perms-role">${escapeHtml(ROLE_DISPLAY[label] || label)}</span>` +
+    `<span class="admin-perms-caps">${caps.length ? escapeHtml(caps.join(' · ')) : 'no permissions'}</span>`;
+  el.hidden = false;
+}
+
+// Hide tab options the current admin cannot use (the real gate is RLS).
+function applyTabVisibility() {
+  const sel = document.getElementById('admin-tab-select');
+  if (!sel || !currentAdmin) return;
+  Array.from(sel.options).forEach(opt => {
+    opt.hidden = !canSeeTab(currentAdmin.role, currentAdmin.permissions, opt.value);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +143,7 @@ async function loadUsers() {
   err.hidden = true;
   try {
     const { rows, counts } = await fetchAllUsers(currentSession, { search });
-    renderUsers(rows, { currentUserId: currentSession?.user?.id, counts });
+    renderUsers(rows, { currentUserId: currentSession?.user?.id, counts, canBan: can('ban_users') });
   } catch (e) {
     loading.hidden = true;
     err.textContent = e.message;
@@ -239,6 +274,8 @@ const TAB_LOADERS = {
 // default landing tab).
 function activateTab(tabName, { updateUrl = true } = {}) {
   if (!TAB_LOADERS[tabName]) tabName = 'users';
+  // Never land on a tab this admin lacks access to (e.g. via a stale ?tab= URL).
+  if (currentAdmin && !canSeeTab(currentAdmin.role, currentAdmin.permissions, tabName)) tabName = 'users';
   switchTab(tabName);
   // ?search= is specific to the Users tab. When entering Users, restore the box
   // from the URL (so a bookmarked/refreshed ?search= filters on load). The input
@@ -654,13 +691,15 @@ async function init() {
     return;
   }
 
-  const admin = await isAdmin(session);
-  if (!admin) {
+  currentAdmin = await fetchAdminProfile(session);
+  if (!currentAdmin) {
     notAuth.hidden = false;
     return;
   }
 
   panel.hidden = false;
+  renderPermissionSummary();
+  applyTabVisibility();
   wireEvents();
 
   const params = new URLSearchParams(window.location.search);

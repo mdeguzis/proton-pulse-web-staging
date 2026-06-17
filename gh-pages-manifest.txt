@@ -57,6 +57,7 @@ admin.html
 css/admin/admin.css
 js/admin/config.js
 js/admin/utils.js
+js/admin/permissions.js
 js/admin/main.js
 js/admin/api/wordlist.js
 js/admin/api/flagged.js
