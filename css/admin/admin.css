@@ -76,6 +76,50 @@
   color: var(--muted, #888);
 }
 
+/* Granular permission editor: removable chips + an "add permission" dropdown. */
+.admin-perm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.perm-editor,
+.perm-editor-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.perm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text, #eee);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 1px 4px 1px 9px;
+}
+.perm-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted, #888);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.perm-chip-x:hover {
+  color: var(--red, #e06c75);
+}
+
 /* Search box with an inline clear (X) button, shown only when there is text. */
 .admin-search-wrap {
   position: relative;

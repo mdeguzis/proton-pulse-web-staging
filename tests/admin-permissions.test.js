@@ -81,6 +81,50 @@ describe('resolveRoleLabel', () => {
   });
 });
 
+describe('granular editing helpers', () => {
+  test('presetFor returns a copy of a known preset, empty for unknown', () => {
+    expect(P.presetFor('moderator')).toEqual(P.ROLE_PRESETS.moderator);
+    expect(P.presetFor('moderator')).not.toBe(P.ROLE_PRESETS.moderator); // copy
+    expect(P.presetFor('custom')).toEqual([]);
+    expect(P.presetFor('nope')).toEqual([]);
+  });
+
+  test('addPermission adds, dedupes, ignores unknown, and does not mutate', () => {
+    const base = ['ban_users'];
+    expect(P.addPermission(base, 'manage_reports').sort()).toEqual(['ban_users', 'manage_reports'].sort());
+    expect(P.addPermission(base, 'ban_users')).toEqual(['ban_users']); // dedupe
+    expect(P.addPermission(base, 'not_a_perm')).toEqual(['ban_users']); // unknown ignored
+    expect(base).toEqual(['ban_users']); // original untouched
+  });
+
+  test('removePermission removes without mutating', () => {
+    const base = ['ban_users', 'manage_reports'];
+    expect(P.removePermission(base, 'ban_users')).toEqual(['manage_reports']);
+    expect(P.removePermission(base, 'absent')).toEqual(base);
+    expect(base).toEqual(['ban_users', 'manage_reports']);
+  });
+
+  test('permissionsToAdd returns the unassigned keys in canonical order', () => {
+    expect(P.permissionsToAdd(P.ALL_PERMISSION_KEYS)).toEqual([]);
+    expect(P.permissionsToAdd(['manage_reports'])).toEqual(
+      P.ALL_PERMISSION_KEYS.filter(k => k !== 'manage_reports')
+    );
+  });
+
+  test('add then resolveRoleLabel flips a moderator set to custom', () => {
+    const perms = P.addPermission(P.ROLE_PRESETS.moderator, 'manage_admins');
+    expect(P.resolveRoleLabel('moderator', perms)).toBe('custom');
+  });
+
+  test('helpers tolerate non-array / null input', () => {
+    expect(P.addPermission(null, 'ban_users')).toEqual(['ban_users']);
+    expect(P.addPermission(undefined, 'nope')).toEqual([]);
+    expect(P.removePermission(null, 'ban_users')).toEqual([]);
+    expect(P.permissionsToAdd(null)).toEqual(P.ALL_PERMISSION_KEYS);
+    expect(P.resolveRoleLabel('custom', null)).toBe('custom');
+  });
+});
+
 describe('shape sanity', () => {
   test('every permission has a label', () => {
     for (const k of P.ALL_PERMISSION_KEYS) {

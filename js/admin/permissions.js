@@ -52,6 +52,29 @@ export function visibleTabs(role, permissions, allTabs) {
   return allTabs.filter(t => canSeeTab(role, permissions, t));
 }
 
+// Permission set for a role preset (empty for custom/unknown).
+export function presetFor(role) {
+  return (ROLE_PRESETS[role] || []).slice();
+}
+
+// Add a permission to a set (deduped, ignores unknown keys). Returns a new array.
+export function addPermission(permissions, key) {
+  const perms = Array.isArray(permissions) ? permissions : [];
+  if (!ALL_PERMISSION_KEYS.includes(key) || perms.includes(key)) return perms.slice();
+  return [...perms, key];
+}
+
+// Remove a permission from a set. Returns a new array.
+export function removePermission(permissions, key) {
+  return (Array.isArray(permissions) ? permissions : []).filter(k => k !== key);
+}
+
+// Permissions not yet in the set, in canonical order (what an "add" control offers).
+export function permissionsToAdd(permissions) {
+  const perms = Array.isArray(permissions) ? permissions : [];
+  return ALL_PERMISSION_KEYS.filter(k => !perms.includes(k));
+}
+
 // Display label for an admin's role: a preset name when the effective set
 // matches a preset exactly (order-insensitive), otherwise 'custom'.
 export function resolveRoleLabel(role, permissions) {

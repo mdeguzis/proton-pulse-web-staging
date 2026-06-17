@@ -863,25 +863,34 @@ describe('removeAdmin', () => {
 describe('updateAdminRole', () => {
   const session = { access_token: 'tok' };
 
-  test('PATCHes role on correct admin UUID', async () => {
+  test('PATCHes role + permissions on correct admin UUID', async () => {
     const ctx = makeCtx(okFetch());
-    await ctx.__updateAdminRole(session, OTHER_USER_ID, 'super_admin');
+    await ctx.__updateAdminRole(session, OTHER_USER_ID, { role: 'super_admin', permissions: ['manage_admins'] });
     const call = ctx.fetch.mock.calls[0];
     expect(call[0]).toContain(`proton_pulse_user_id=eq.${OTHER_USER_ID}`);
     expect(call[1].method).toBe('PATCH');
-    expect(JSON.parse(call[1].body).role).toBe('super_admin');
+    const body = JSON.parse(call[1].body);
+    expect(body.role).toBe('super_admin');
+    expect(body.permissions).toEqual(['manage_admins']);
   });
 
   test('PATCHes to moderator role', async () => {
     const ctx = makeCtx(okFetch());
-    await ctx.__updateAdminRole(session, OTHER_USER_ID, 'moderator');
+    await ctx.__updateAdminRole(session, OTHER_USER_ID, { role: 'moderator', permissions: [] });
     expect(JSON.parse(ctx.fetch.mock.calls[0][1].body).role).toBe('moderator');
+  });
+
+  test('omits fields that are not provided', async () => {
+    const ctx = makeCtx(okFetch());
+    await ctx.__updateAdminRole(session, OTHER_USER_ID, { permissions: ['ban_users'] });
+    const body = JSON.parse(ctx.fetch.mock.calls[0][1].body);
+    expect(body).toEqual({ permissions: ['ban_users'] });
   });
 
   test('throws on non-ok response', async () => {
     const ctx = makeCtx(failFetch(403));
-    await expect(ctx.__updateAdminRole(session, OTHER_USER_ID, 'moderator'))
-      .rejects.toThrow('Update role failed: 403');
+    await expect(ctx.__updateAdminRole(session, OTHER_USER_ID, { role: 'moderator' }))
+      .rejects.toThrow('Update admin failed: 403');
   });
 });
 

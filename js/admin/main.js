@@ -1,14 +1,14 @@
 import { SupaAuth, SUPABASE_URL } from './config.js?v=ffed3d84';
 import { supabaseHeaders, escapeHtml } from './utils.js?v=86489fcb';
-import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMISSION_LABELS } from './permissions.js?v=334339c8';
+import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMISSION_LABELS, presetFor, addPermission, removePermission } from './permissions.js?v=529eb059';
 import { fetchFlaggedReports, reinstateReport, deleteReport } from './api/flagged.js?v=55433ab8';
 import { renderFlagged } from './components/flagged.js?v=b9c9f230';
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=aa9b6b53';
 import { renderBanned } from './components/banned.js?v=45d01d17';
 import { fetchAllUsers } from './api/users.js?v=718eb921';
 import { renderUsers } from './components/users.js?v=643eabd8';
-import { fetchAdmins, addAdmin, removeAdmin, updateAdminRole } from './api/admins.js?v=637a90b4';
-import { renderAdmins } from './components/admins.js?v=0956f8c4';
+import { fetchAdmins, addAdmin, removeAdmin, updateAdminRole } from './api/admins.js?v=16a55837';
+import { renderAdmins, renderNewAdminEditor } from './components/admins.js?v=de3324f1';
 import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPhrase } from './api/phrases.js?v=ca024bd3';
 import { renderPhrases } from './components/phrases.js?v=79051c31';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
@@ -76,6 +76,37 @@ function applyTabVisibility() {
   Array.from(sel.options).forEach(opt => {
     opt.hidden = !canSeeTab(currentAdmin.role, currentAdmin.permissions, opt.value);
   });
+}
+
+// --- Admin role/permission assignment (Admins tab) ----------------------------
+// The add-admin form keeps a draft role + permission set; existing admins are
+// edited in-place and persisted immediately. uuid 'new' targets the draft.
+let newAdminRole = 'moderator';
+let newAdminPerms = presetFor('moderator');
+
+function syncNewAdminForm() {
+  const sel = document.getElementById('new-admin-role');
+  if (sel) sel.value = newAdminRole;
+  renderNewAdminEditor(newAdminRole, newAdminPerms);
+}
+
+// Current permission set for a uuid: draft state for 'new', else the row's data.
+function currentRowPerms(uuid) {
+  if (uuid === 'new') return newAdminPerms.slice();
+  const tr = document.querySelector(`#admins-tbody tr[data-uuid="${uuid}"]`);
+  return tr && tr.dataset.perms ? tr.dataset.perms.split(',').filter(Boolean) : [];
+}
+
+// Apply a (role, permissions) change: update draft for 'new', else persist + reload.
+async function applyAdminChange(uuid, role, permissions) {
+  if (uuid === 'new') {
+    newAdminRole = role;
+    newAdminPerms = permissions;
+    syncNewAdminForm();
+    return;
+  }
+  await updateAdminRole(currentSession, uuid, { role, permissions });
+  loadAdmins();
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +184,7 @@ async function loadUsers() {
 
 async function loadAdmins() {
   try {
+    syncNewAdminForm();
     const rows = await fetchAdmins(currentSession);
     renderAdmins(rows);
   } catch (e) {
@@ -537,15 +569,21 @@ function wireEvents() {
   document.getElementById('add-admin-btn').addEventListener('click', async () => {
     const uuid     = document.getElementById('new-admin-uuid').value.trim();
     const username = document.getElementById('new-admin-username').value.trim();
-    const role     = document.getElementById('new-admin-role').value;
     const status   = document.getElementById('add-admin-status');
     if (!uuid || !username) { status.textContent = 'UUID and username are required.'; status.style.color = 'var(--red)'; return; }
+    // super_admin always means all permissions; otherwise the role label is
+    // derived from the chosen permission set (moderator preset or custom).
+    const role = newAdminRole === 'super_admin' ? 'super_admin' : resolveRoleLabel('moderator', newAdminPerms);
+    const permissions = newAdminRole === 'super_admin' ? presetFor('super_admin') : newAdminPerms;
     try {
-      await addAdmin(currentSession, { uuid, username, role });
+      await addAdmin(currentSession, { uuid, username, role, permissions });
       status.textContent = `Added ${username}.`;
       status.style.color = 'var(--green)';
       document.getElementById('new-admin-uuid').value = '';
       document.getElementById('new-admin-username').value = '';
+      newAdminRole = 'moderator';
+      newAdminPerms = presetFor('moderator');
+      syncNewAdminForm();
       loadAdmins();
     } catch (e) {
       status.textContent = e.message;
@@ -553,31 +591,56 @@ function wireEvents() {
     }
   });
 
-  // Admins table: remove + role change (delegated)
-  document.getElementById('admins-tbody').addEventListener('click', async e => {
-    const btn = e.target.closest('[data-action="remove-admin"]');
-    if (!btn) return;
-    if (!confirm(`Remove ${btn.dataset.name} as admin?`)) return;
-    btn.disabled = true; btn.textContent = '...';
+  // Admins tab: role change + add/remove permission, for both existing rows and
+  // the add form (data-uuid="new"). Delegated on the whole section so it covers
+  // the re-rendered chips, the add dropdown, and the form's role select.
+  const adminsTab = document.getElementById('tab-admins');
+
+  adminsTab.addEventListener('change', async e => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const { action, uuid } = el.dataset;
     try {
-      await removeAdmin(currentSession, btn.dataset.uuid);
-      btn.closest('tr').remove();
+      if (action === 'change-role') {
+        const role = el.value;
+        let perms;
+        if (role === 'super_admin') perms = presetFor('super_admin');
+        else if (role === 'moderator') perms = presetFor('moderator');
+        else perms = currentRowPerms(uuid); // custom keeps the current set
+        await applyAdminChange(uuid, role, perms);
+      } else if (action === 'add-perm') {
+        if (!el.value) return;
+        const perms = addPermission(currentRowPerms(uuid), el.value);
+        await applyAdminChange(uuid, resolveRoleLabel('moderator', perms), perms);
+      }
     } catch (err) {
-      btn.disabled = false; btn.textContent = 'Remove';
       alert(`Error: ${err.message}`);
+      if (uuid !== 'new') loadAdmins();
     }
   });
 
-  document.getElementById('admins-tbody').addEventListener('change', async e => {
-    const sel = e.target.closest('[data-action="change-role"]');
-    if (!sel) return;
-    const origVal = sel.dataset.currentRole || sel.value;
-    try {
-      sel.dataset.currentRole = sel.value;
-      await updateAdminRole(currentSession, sel.dataset.uuid, sel.value);
-    } catch (err) {
-      sel.value = origVal;
-      alert(`Error: ${err.message}`);
+  adminsTab.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, uuid } = btn.dataset;
+    if (action === 'remove-admin') {
+      if (!confirm(`Remove ${btn.dataset.name} as admin?`)) return;
+      btn.disabled = true; btn.textContent = '...';
+      try {
+        await removeAdmin(currentSession, uuid);
+        loadAdmins();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Remove';
+        alert(`Error: ${err.message}`);
+      }
+    } else if (action === 'remove-perm') {
+      try {
+        const perms = removePermission(currentRowPerms(uuid), btn.dataset.perm);
+        await applyAdminChange(uuid, resolveRoleLabel('moderator', perms), perms);
+      } catch (err) {
+        alert(`Error: ${err.message}`);
+        if (uuid !== 'new') loadAdmins();
+      }
     }
   });
 
