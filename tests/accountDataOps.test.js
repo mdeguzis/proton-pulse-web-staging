@@ -60,6 +60,8 @@ const FAKE_PROTON   = { app_id: 730, proton_pulse_user_id: USER_ID };
 const FAKE_SYSTEM   = { device_id: 'dev-1', proton_pulse_user_id: USER_ID };
 const FAKE_VOTE     = { id: 'v-1', voter_id: USER_ID };
 const FAKE_AVATAR   = { proton_pulse_user_id: USER_ID, display_name: 'Tester' };
+const FAKE_EVENT    = { id: 'ev-1', proton_pulse_user_id: USER_ID, event_type: 'page_view' };
+const FAKE_HISTORY  = { id: 'h-1', proton_pulse_user_id: USER_ID, config_id: 'cfg-1' };
 
 function dataExistsFetch() {
   return mockFetch([
@@ -69,6 +71,8 @@ function dataExistsFetch() {
     { url: /user_systems/,                         body: [FAKE_SYSTEM] },
     { url: /report_votes/,                         body: [FAKE_VOTE] },
     { url: /author_avatars/,                       body: [FAKE_AVATAR] },
+    { url: /site_events/,                          body: [FAKE_EVENT] },
+    { url: /user_configs_history/,                 body: [FAKE_HISTORY] },
   ]);
 }
 
@@ -91,11 +95,15 @@ describe('fetchAllMyData', () => {
     expect(data.user_systems).toHaveLength(1);
     expect(data.report_votes).toHaveLength(1);
     expect(data.author_avatars).toHaveLength(1);
+    expect(data.site_events).toHaveLength(1);
+    expect(data.user_configs_history).toHaveLength(1);
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('user_configs'), expect.any(Object));
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('user_proton_configs'), expect.any(Object));
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('user_systems'), expect.any(Object));
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('report_votes'), expect.any(Object));
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('author_avatars'), expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('site_events'), expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('user_configs_history'), expect.any(Object));
   });
 
   test('also fetches user_configs by client_id when provided', async () => {
@@ -152,6 +160,8 @@ describe('checkMyDataExists', () => {
     expect(counts.user_systems).toBe(1);
     expect(counts.report_votes).toBe(1);
     expect(counts.author_avatars).toBe(1);
+    expect(counts.site_events).toBe(1);
+    expect(counts.user_configs_history).toBe(1);
   });
 
   test('returns all zeros when no rows exist', async () => {
@@ -167,30 +177,36 @@ describe('checkMyDataExists', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteAllMyData', () => {
-  test('sends DELETE to all five endpoints for protonPulseUserId', async () => {
-    const fetch = mockFetch();
+  test('sends DELETE to all six tables for protonPulseUserId, including history', async () => {
+    const fetch = mockFetch([
+      { url: /user_configs\?proton_pulse_user_id.*select=id/, body: [{ id: 'cfg-1' }] },
+    ]);
     const ctx = makeCtx(fetch);
     await ctx.deleteAllMyData(USER_ID, null, SESSION);
 
-    const calls = fetch.mock.calls.map(([u, o]) => ({ u, method: o.method }));
+    const calls = fetch.mock.calls.map(([u, o]) => ({ u, method: o?.method }));
     const deletes = calls.filter((c) => c.method === 'DELETE');
+    expect(deletes.some((c) => c.u.includes('user_configs_history') && c.u.includes('cfg-1'))).toBe(true);
     expect(deletes.some((c) => c.u.includes('user_configs') && c.u.includes(USER_ID))).toBe(true);
     expect(deletes.some((c) => c.u.includes('user_proton_configs') && c.u.includes(USER_ID))).toBe(true);
     expect(deletes.some((c) => c.u.includes('user_systems') && c.u.includes(USER_ID))).toBe(true);
     expect(deletes.some((c) => c.u.includes('report_votes') && c.u.includes(USER_ID))).toBe(true);
     expect(deletes.some((c) => c.u.includes('author_avatars') && c.u.includes(USER_ID))).toBe(true);
-    expect(deletes).toHaveLength(5);
+    expect(deletes.some((c) => c.u.includes('site_events') && c.u.includes(USER_ID))).toBe(true);
+    expect(deletes).toHaveLength(7);
   });
 
   test('also sends DELETE to user_configs by client_id when provided', async () => {
-    const fetch = mockFetch();
+    const fetch = mockFetch([
+      { url: /user_configs\?proton_pulse_user_id.*select=id/, body: [{ id: 'cfg-1' }] },
+    ]);
     const ctx = makeCtx(fetch);
     await ctx.deleteAllMyData(USER_ID, CLIENT_ID, SESSION);
 
-    const calls = fetch.mock.calls.map(([u, o]) => ({ u, method: o.method }));
+    const calls = fetch.mock.calls.map(([u, o]) => ({ u, method: o?.method }));
     const deletes = calls.filter((c) => c.method === 'DELETE');
     expect(deletes.some((c) => c.u.includes('user_configs') && c.u.includes(`client_id=eq.${CLIENT_ID}`))).toBe(true);
-    expect(deletes).toHaveLength(6);
+    expect(deletes).toHaveLength(8);
   });
 
   test('skips all deletes when no userId or clientId', async () => {
@@ -206,12 +222,14 @@ describe('deleteAllMyData', () => {
     await expect(ctx.deleteAllMyData(USER_ID, null, SESSION)).rejects.toThrow('Delete failed');
   });
 
-  test('sends Prefer: return=minimal header', async () => {
-    const fetch = mockFetch();
+  test('sends Prefer: return=minimal header on DELETE calls', async () => {
+    const fetch = mockFetch([
+      { url: /user_configs\?proton_pulse_user_id.*select=id/, body: [] },
+    ]);
     const ctx = makeCtx(fetch);
     await ctx.deleteAllMyData(USER_ID, null, SESSION);
-    const [, opts] = fetch.mock.calls[0];
-    expect(opts.headers.Prefer).toBe('return=minimal');
+    const firstDelete = fetch.mock.calls.find(([, o]) => o?.method === 'DELETE');
+    expect(firstDelete[1].headers.Prefer).toBe('return=minimal');
   });
 });
 

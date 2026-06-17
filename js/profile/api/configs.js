@@ -133,19 +133,27 @@ export async function fetchAllMyData(protonPulseUserId, clientId, session) {
   const uid = protonPulseUserId ? encodeURIComponent(protonPulseUserId) : null;
   const cid = clientId ? encodeURIComponent(clientId) : null;
   const get = (url) => fetch(url, { headers: h }).then((r) => r.ok ? r.json() : []);
-  const [configs, protonConfigs, systems, votes, avatar, configsByClient] = await Promise.all([
+  const [configs, protonConfigs, systems, votes, avatar, configsByClient, events, history] = await Promise.all([
     uid ? get(`${SUPABASE_URL}/rest/v1/user_configs?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
     uid ? get(`${SUPABASE_URL}/rest/v1/user_proton_configs?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
     uid ? get(`${SUPABASE_URL}/rest/v1/user_systems?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
     uid ? get(`${SUPABASE_URL}/rest/v1/report_votes?voter_id=eq.${uid}&select=*`) : Promise.resolve([]),
     uid ? get(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
     cid ? get(`${SUPABASE_URL}/rest/v1/user_configs?client_id=eq.${cid}&select=*`) : Promise.resolve([]),
+    uid ? get(`${SUPABASE_URL}/rest/v1/site_events?proton_pulse_user_id=eq.${uid}&select=*`) : Promise.resolve([]),
+    Promise.resolve([]),
   ]);
   const mergedConfigs = [...configs];
   for (const row of configsByClient) {
     if (!mergedConfigs.some((r) => r.id === row.id)) mergedConfigs.push(row);
   }
-  return { user_configs: mergedConfigs, user_proton_configs: protonConfigs, user_systems: systems, report_votes: votes, author_avatars: avatar };
+  // Fetch history for all user_configs rows (linked by config_id, not user_id)
+  let historyRows = [];
+  if (mergedConfigs.length) {
+    const ids = mergedConfigs.map((r) => r.id).join(',');
+    historyRows = await get(`${SUPABASE_URL}/rest/v1/user_configs_history?config_id=in.(${ids})&select=*`);
+  }
+  return { user_configs: mergedConfigs, user_proton_configs: protonConfigs, user_systems: systems, report_votes: votes, author_avatars: avatar, site_events: events, user_configs_history: historyRows };
 }
 
 export async function checkMyDataExists(protonPulseUserId, clientId, session) {
@@ -156,11 +164,30 @@ export async function checkMyDataExists(protonPulseUserId, clientId, session) {
     user_systems: data.user_systems.length,
     report_votes: data.report_votes.length,
     author_avatars: data.author_avatars.length,
+    site_events: data.site_events.length,
+    user_configs_history: data.user_configs_history.length,
   };
 }
 
 export async function deleteAllMyData(protonPulseUserId, clientId, session) {
   const headers = { ...supabaseHeaders(session), Prefer: 'return=minimal' };
+  // Delete history first (linked by config_id -- must happen before user_configs is deleted)
+  if (protonPulseUserId) {
+    const uid = encodeURIComponent(protonPulseUserId);
+    const idsResp = await fetch(`${SUPABASE_URL}/rest/v1/user_configs?proton_pulse_user_id=eq.${uid}&select=id`, { headers: supabaseHeaders(session) });
+    if (idsResp.ok) {
+      const rows = await idsResp.json();
+      if (rows.length) {
+        const ids = rows.map((r) => r.id).join(',');
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/user_configs_history?config_id=in.(${ids})`, { method: 'DELETE', headers });
+        if (!r.ok) {
+          const body = await r.text().catch(() => '');
+          console.error('[profile] deleteAllMyData history failed', { status: r.status, body });
+          throw new Error(`Delete history failed: HTTP ${r.status}`);
+        }
+      }
+    }
+  }
   const deletes = [];
   if (protonPulseUserId) {
     const uid = encodeURIComponent(protonPulseUserId);
@@ -169,6 +196,7 @@ export async function deleteAllMyData(protonPulseUserId, clientId, session) {
     deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_systems?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
     deletes.push(fetch(`${SUPABASE_URL}/rest/v1/report_votes?voter_id=eq.${uid}`, { method: 'DELETE', headers }));
     deletes.push(fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
+    deletes.push(fetch(`${SUPABASE_URL}/rest/v1/site_events?proton_pulse_user_id=eq.${uid}`, { method: 'DELETE', headers }));
   }
   if (clientId) {
     deletes.push(fetch(`${SUPABASE_URL}/rest/v1/user_configs?client_id=eq.${encodeURIComponent(clientId)}`, { method: 'DELETE', headers }));
