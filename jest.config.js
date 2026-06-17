@@ -6,6 +6,7 @@ module.exports = {
   },
   collectCoverageFrom: [
     'js/app/utils.js',
+    'js/admin/permissions.js',
   ],
   coverageThreshold: {
     global: {
