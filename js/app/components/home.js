@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=ab9bb0d8';
-import { loadSearchIndex, searchIndex } from './search.js?v=fd385d65';
+import { loadSearchIndex, searchIndex } from './search.js?v=60dadb4c';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=9970759a';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=ae6042a4';
@@ -54,7 +54,7 @@ function _loadMoreBtn(sectionId) {
 function _appendCards(sectionId, queue) {
   const cardsEl = document.getElementById(`cards-${sectionId}`);
   const btnEl = document.getElementById(`load-more-${sectionId}`);
-  if (!cardsEl || !queue.length) { if (btnEl) btnEl.remove(); return; }
+  if (!cardsEl || !queue.length) { if (btnEl) btnEl.innerHTML = ''; return; }
   const batch = queue.splice(0, PAGE_SIZE);
   const html = sectionId === 'recent'
     ? batch.map(_recentCardHtml).join('')
@@ -64,7 +64,7 @@ function _appendCards(sectionId, queue) {
         tier: String(g.rating || '').toLowerCase() || undefined, sourceLabel: 'Steam',
       })).join('');
   cardsEl.insertAdjacentHTML('beforeend', html);
-  if (!queue.length && btnEl) btnEl.remove();
+  if (!queue.length && btnEl) btnEl.innerHTML = '';
 }
 
 function _recentCardHtml(r) {
@@ -190,26 +190,23 @@ export async function renderHomePage() {
         title: g.title, sub: _popularSub(g),
         tier: String(g.rating || '').toLowerCase() || undefined, sourceLabel: 'Steam',
       })).join('') || '<div class="state-box">No games match the current filters.</div>';
-      loadMoreEl.innerHTML = newQueue.length ? _loadMoreBtn('popular') : '';
-      loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('popular', newQueue));
+      if (loadMoreEl) {
+        loadMoreEl.innerHTML = newQueue.length ? _loadMoreBtn('popular') : '';
+        loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('popular', newQueue));
+      }
     }
 
     function applyRecentFilters() {
       const filtered = _filterByType(_filterByTier(_sortReports(allRecentReports, currentSort), currentTier), currentType);
       const cardsEl = document.getElementById('cards-recent');
       const loadMoreEl = document.getElementById('load-more-recent');
-      const isDefault = currentSort === 'recent' && currentTier === 'all';
       const renderFn = currentLayout === 'list' ? _listRowHtml : _recentCardHtml;
-
-      if (isDefault && currentLayout === 'grid') {
-        const queue = filtered.slice(PAGE_SIZE);
-        const initial = filtered.slice(0, PAGE_SIZE);
-        cardsEl.innerHTML = initial.map(renderFn).join('') || '<div class="state-box">No reports yet.</div>';
+      const queue = filtered.slice(PAGE_SIZE);
+      const initial = filtered.slice(0, PAGE_SIZE);
+      cardsEl.innerHTML = initial.map(renderFn).join('') || '<div class="state-box">No reports found.</div>';
+      if (loadMoreEl) {
         loadMoreEl.innerHTML = queue.length ? _loadMoreBtn('recent') : '';
         loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('recent', queue));
-      } else {
-        cardsEl.innerHTML = filtered.map(renderFn).join('') || `<div class="state-box">No ${currentTier !== 'all' ? currentTier + ' ' : ''}reports found.</div>`;
-        loadMoreEl.innerHTML = '';
       }
     }
 
