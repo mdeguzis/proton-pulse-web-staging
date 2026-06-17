@@ -53,6 +53,11 @@
     <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
     </symbol>
+    <symbol id="icon-discord" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 7a14.9 14.9 0 0 0-4-1 10 10 0 0 0-.4 1 14 14 0 0 0-4.2 0A10 10 0 0 0 9 6a14.9 14.9 0 0 0-4 1C3 10.5 2.5 14 3 17a15 15 0 0 0 4.7 2.4l.6-1a9.5 9.5 0 0 1-1.3-.6l.3-.2a10.5 10.5 0 0 0 9.4 0l.3.2a9.4 9.4 0 0 1-1.3.6l.6 1A15 15 0 0 0 21 17c.5-3-.1-6.5-3-10z"/>
+      <circle cx="9.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="14.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
+    </symbol>
   </defs>
 </svg>`;
 
@@ -232,6 +237,10 @@
         <svg class="nav-icon" aria-hidden="true"><use href="#icon-contact"/></svg>
         <span>Contact</span>
       </a>
+      <a href="https://discord.gg/4p6e4X7xW" target="_blank" rel="noopener" title="Join the Proton Pulse Discord">
+        <svg class="nav-icon" aria-hidden="true"><use href="#icon-discord"/></svg>
+        <span>Discord</span>
+      </a>
       <!-- Admin link: hidden until checkIsAdmin confirms the signed-in user is an admin -->
       <a href="admin.html" id="topbar-admin-link" class="auth-admin-navlink" hidden>
         <span>Admin</span>
@@ -267,6 +276,7 @@
   <a href="https://github.com/mdeguzis/proton-pulse-web/issues/new/choose" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-contact"/></svg> Contact</a>
   <a href="https://github.com/mdeguzis/decky-proton-pulse" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-gamepad"/></svg> Decky Plugin</a>
   <a href="https://github.com/mdeguzis/proton-pulse-web" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-github"/></svg> GitHub</a>
+  <a href="https://discord.gg/4p6e4X7xW" target="_blank" rel="noopener"><svg class="nav-icon" aria-hidden="true"><use href="#icon-discord"/></svg> Discord</a>
   <a href="admin.html" id="mobile-admin-link" data-page="admin" hidden><svg class="nav-icon" aria-hidden="true"><use href="#icon-stats"/></svg> Admin</a>
 </div>`;
 
