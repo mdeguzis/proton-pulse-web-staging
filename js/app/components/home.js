@@ -1,13 +1,37 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=ab9bb0d8';
-import { loadSearchIndex, searchIndex } from './search.js?v=85b4ddf1';
+import { loadSearchIndex, searchIndex } from './search.js?v=9b0792b2';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=9970759a';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=ae6042a4';
 
 const PAGE_SIZE = 10;
 const KNOWN_TIERS = new Set(['platinum', 'gold', 'silver', 'bronze', 'borked']);
+const TIER_SCORE = { platinum: 5, gold: 4, silver: 3, bronze: 2, borked: 1 };
+
+function _sortReports(reports, sort) {
+  const copy = [...reports];
+  if (sort === 'best') {
+    copy.sort((a, b) =>
+      (TIER_SCORE[b.tier] || 0) - (TIER_SCORE[a.tier] || 0) ||
+      (b.lastReportDate || '').localeCompare(a.lastReportDate || ''));
+  } else if (sort === 'worst') {
+    copy.sort((a, b) =>
+      (TIER_SCORE[a.tier] || 99) - (TIER_SCORE[b.tier] || 99) ||
+      (b.lastReportDate || '').localeCompare(a.lastReportDate || ''));
+  } else if (sort === 'count') {
+    copy.sort((a, b) =>
+      ((b.protondbCount || 0) + (b.pulseCount || 0)) -
+      ((a.protondbCount || 0) + (a.pulseCount || 0)));
+  }
+  return copy;
+}
+
+function _filterByTier(reports, tier) {
+  if (!tier || tier === 'all') return reports;
+  return reports.filter(r => r.tier === tier);
+}
 
 function _popularSub(g) {
   const total = (g.protondbCount || 0) + (g.pulseCount || 0);
@@ -47,6 +71,10 @@ function _recentCardHtml(r) {
   });
 }
 
+function _tierChip(tier, label) {
+  return `<button class="home-tier-chip" data-tier="${tier}">${label}</button>`;
+}
+
 export async function renderHomePage() {
   const el = document.getElementById('content');
   el.innerHTML = '<div class="state-box">Loading recent reports...</div>';
@@ -56,16 +84,12 @@ export async function renderHomePage() {
       fetch('most_played.json').catch(() => null),
     ]);
 
-    let recentReports = [];
+    let allRecentReports = [];
     if (recentResp && recentResp.ok) {
-      recentReports = await recentResp.json().catch(() => []);
+      allRecentReports = await recentResp.json().catch(() => []);
     }
 
-    const recentQueue = recentReports.slice(PAGE_SIZE);
-    const recentInitial = recentReports.slice(0, PAGE_SIZE);
-    const recentHtml = recentInitial.map(_recentCardHtml).join('');
-
-    const seenIds = new Set(recentReports.map(r => String(r.appId)));
+    const seenIds = new Set(allRecentReports.map(r => String(r.appId)));
     let ratedGames = [], unratedGames = [];
     if (mostPlayedResp && mostPlayedResp.ok) {
       const all = (await mostPlayedResp.json().catch(() => [])).filter(g => !seenIds.has(String(g.appId)));
@@ -86,9 +110,29 @@ export async function renderHomePage() {
       : '';
 
     el.innerHTML = `
+      <div class="home-filter-bar">
+        <div class="home-sort-group">
+          <button class="home-sort-btn active" data-sort="recent">Recent</button>
+          <button class="home-sort-btn" data-sort="best">Best Tier</button>
+          <button class="home-sort-btn" data-sort="worst">Worst Tier</button>
+          <button class="home-sort-btn" data-sort="count">Most Reported</button>
+        </div>
+        <div class="home-layout-toggle">
+          <button class="home-layout-btn active" data-layout="grid" title="Grid view">Grid</button>
+          <button class="home-layout-btn" data-layout="list" title="List view">List</button>
+        </div>
+      </div>
+      <div class="home-tier-chips">
+        <button class="home-tier-chip active" data-tier="all">All</button>
+        ${_tierChip('platinum', 'Platinum')}
+        ${_tierChip('gold', 'Gold')}
+        ${_tierChip('silver', 'Silver')}
+        ${_tierChip('bronze', 'Bronze')}
+        ${_tierChip('borked', 'Borked')}
+      </div>
       <p class="section-label" style="margin-bottom:10px">Recent Reports</p>
-      <div class="cards" id="cards-recent">${recentHtml || '<div class="state-box">No reports yet.</div>'}</div>
-      ${recentQueue.length ? `<div id="load-more-recent">${_loadMoreBtn('recent')}</div>` : ''}
+      <div class="cards" id="cards-recent"></div>
+      <div id="load-more-recent"></div>
       <div class="section-label-row" style="margin-top:24px;margin-bottom:10px">
         <span class="section-label" style="margin:0">Popular on Steam</span>
         ${unratedToggle}
@@ -96,8 +140,72 @@ export async function renderHomePage() {
       <div class="cards" id="cards-popular">${popularHtml}</div>
       <div id="load-more-popular">${popularQueue.length ? _loadMoreBtn('popular') : ''}</div>`;
 
+    let currentSort = 'recent';
+    let currentTier = 'all';
+    let currentLayout = 'grid';
     let showingUnrated = false;
     const unratedQueue = unratedGames.slice(PAGE_SIZE);
+
+    function _listRowHtml(r) {
+      const tier = String(r.tier || '').toLowerCase();
+      const total = (r.protondbCount || 0) + (r.pulseCount || 0);
+      const countStr = total > 0 ? `${total.toLocaleString()} reports` : '';
+      return `<a class="home-list-row" href="#/app/${r.appId}">
+        <span class="home-list-tier tier-badge tier-badge--${tier || 'pending'}">${tier || '?'}</span>
+        <span class="home-list-title">${r.title || r.appId}</span>
+        <span class="home-list-meta">${[r.lastReportDate, countStr].filter(Boolean).join(' \u00b7 ')}</span>
+      </a>`;
+    }
+
+    function applyRecentFilters() {
+      const filtered = _filterByTier(_sortReports(allRecentReports, currentSort), currentTier);
+      const cardsEl = document.getElementById('cards-recent');
+      const loadMoreEl = document.getElementById('load-more-recent');
+      const isDefault = currentSort === 'recent' && currentTier === 'all';
+      const renderFn = currentLayout === 'list' ? _listRowHtml : _recentCardHtml;
+
+      if (isDefault && currentLayout === 'grid') {
+        const queue = filtered.slice(PAGE_SIZE);
+        const initial = filtered.slice(0, PAGE_SIZE);
+        cardsEl.innerHTML = initial.map(renderFn).join('') || '<div class="state-box">No reports yet.</div>';
+        loadMoreEl.innerHTML = queue.length ? _loadMoreBtn('recent') : '';
+        loadMoreEl.querySelector('button')?.addEventListener('click', () => _appendCards('recent', queue));
+      } else {
+        cardsEl.innerHTML = filtered.map(renderFn).join('') || `<div class="state-box">No ${currentTier !== 'all' ? currentTier + ' ' : ''}reports found.</div>`;
+        loadMoreEl.innerHTML = '';
+      }
+    }
+
+    document.querySelectorAll('.home-sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.home-sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentSort = btn.dataset.sort;
+        applyRecentFilters();
+      });
+    });
+
+    document.querySelectorAll('.home-tier-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.home-tier-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentTier = chip.dataset.tier;
+        applyRecentFilters();
+      });
+    });
+
+    document.querySelectorAll('.home-layout-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.home-layout-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLayout = btn.dataset.layout;
+        const cardsEl = document.getElementById('cards-recent');
+        if (cardsEl) cardsEl.classList.toggle('home-cards-list', currentLayout === 'list');
+        applyRecentFilters();
+      });
+    });
+
+    applyRecentFilters();
 
     document.getElementById('unrated-toggle')?.addEventListener('click', (e) => {
       showingUnrated = !showingUnrated;
@@ -113,7 +221,6 @@ export async function renderHomePage() {
           tier: 'pending', sourceLabel: 'Steam',
         })).join('');
         loadMoreEl.innerHTML = unratedQueue.length ? _loadMoreBtn('popular') : '';
-        // re-wire the load-more button for unrated queue
         loadMoreEl.querySelector('button')?.addEventListener('click', () => {
           const batch = unratedQueue.splice(0, PAGE_SIZE);
           cardsEl.insertAdjacentHTML('beforeend', batch.map(g => renderGameCard({
@@ -134,8 +241,6 @@ export async function renderHomePage() {
       }
     });
 
-    document.getElementById('load-more-recent')?.querySelector('button')
-      ?.addEventListener('click', () => _appendCards('recent', recentQueue, null));
     document.getElementById('load-more-popular')?.querySelector('button')
       ?.addEventListener('click', () => _appendCards('popular', popularQueue, null));
   } catch {

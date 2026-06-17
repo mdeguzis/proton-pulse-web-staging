@@ -1865,6 +1865,108 @@ a.card:active { transform: translateY(1px); }
 }
 .unrated-toggle--active .unrated-count { background: rgba(190,238,17,0.18); }
 
+/* ---- Home filter bar ---- */
+.home-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.home-sort-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.home-sort-btn {
+  padding: 5px 11px;
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.home-sort-btn:hover { background: var(--s2); color: var(--text); }
+.home-sort-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
+.home-layout-toggle { display: flex; gap: 4px; }
+.home-layout-btn {
+  padding: 5px 10px;
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.home-layout-btn:hover { background: var(--s2); color: var(--text); }
+.home-layout-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
+.home-tier-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
+.home-tier-chip {
+  padding: 4px 11px;
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.home-tier-chip:hover { background: var(--s2); color: var(--text); }
+.home-tier-chip.active { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
+.home-tier-chip[data-tier="platinum"].active { color: #b5c4f0; border-color: #b5c4f0; background: rgba(181,196,240,0.08); }
+.home-tier-chip[data-tier="gold"].active { color: #f5c518; border-color: #f5c518; background: rgba(245,197,24,0.08); }
+.home-tier-chip[data-tier="silver"].active { color: #aaa; border-color: #aaa; background: rgba(170,170,170,0.08); }
+.home-tier-chip[data-tier="bronze"].active { color: #cd7f32; border-color: #cd7f32; background: rgba(205,127,50,0.08); }
+.home-tier-chip[data-tier="borked"].active { color: #e05; border-color: #e05; background: rgba(238,0,85,0.08); }
+.home-cards-list { gap: 2px !important; }
+.home-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background .1s;
+  overflow: hidden;
+}
+.home-list-row:hover { background: var(--s2); }
+.home-list-tier {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  min-width: 56px;
+  text-align: center;
+}
+.home-list-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-list-meta {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
 /* ---- Stub page (game with no reports yet) ---- */
 .stub-page { max-width: 640px; }
 .stub-header {
