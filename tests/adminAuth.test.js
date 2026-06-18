@@ -395,20 +395,17 @@ describe('reinstateReport', () => {
     const fetch = okFetch();
     const ctx = makeCtx(fetch);
     await ctx.__reinstateReport({ access_token: 'tok' }, 42);
-    expect(fetch.mock.calls[0][0]).toContain('user_configs');
+    expect(fetch.mock.calls[0][0]).toContain('flagged_reports');
     expect(fetch.mock.calls[0][0]).toContain('id=eq.42');
     expect(fetch.mock.calls[0][1].method).toBe('PATCH');
   });
 
-  test('sets is_flagged=false, is_hidden=false, clears flagged_reason and flagged_at', async () => {
+  test('sets status=complete on the flagged_reports row', async () => {
     const fetch = okFetch();
     const ctx = makeCtx(fetch);
     await ctx.__reinstateReport({ access_token: 'tok' }, 42);
     const body = JSON.parse(fetch.mock.calls[0][1].body);
-    expect(body.is_flagged).toBe(false);
-    expect(body.is_hidden).toBe(false);
-    expect(body.flagged_reason).toBeNull();
-    expect(body.flagged_at).toBeNull();
+    expect(body.status).toBe('complete');
   });
 
   test('throws on HTTP 403', async () => {
@@ -577,12 +574,12 @@ describe('unbanUser', () => {
 describe('fetchFlaggedReports', () => {
   const session = { access_token: 'tok' };
 
-  test('always filters is_flagged=true', async () => {
+  test('queries flagged_reports table', async () => {
     const fetch = okFetch([]);
     const ctx = makeCtx(fetch);
     ctx.document.getElementById = jest.fn(() => makeEl());
     await ctx.__fetchFlaggedReports(session, {});
-    expect(fetch.mock.calls[0][0]).toContain('is_flagged=eq.true');
+    expect(fetch.mock.calls[0][0]).toContain('flagged_reports');
   });
 
   test('applies date-from filter', async () => {
@@ -600,7 +597,7 @@ describe('fetchFlaggedReports', () => {
   test('applies type filter', async () => {
     const fetch = okFetch([]);
     await makeCtx(fetch).__fetchFlaggedReports(session, { type: 'wordlist' });
-    expect(fetch.mock.calls[0][0]).toContain('flagged_reason=like.');
+    expect(fetch.mock.calls[0][0]).toContain('reason_category=eq.');
   });
 
   test('applies app_id filter when APP_ID is set', async () => {
@@ -612,13 +609,13 @@ describe('fetchFlaggedReports', () => {
 
   test('filters rows by search string (client-side)', async () => {
     const rows = [
-      { id: 1, app_id: 100, title: 'Half-Life', proton_pulse_user_id: null, client_id: null, flagged_reason: 'wordlist:slur in notes', flagged_at: null, is_hidden: true },
-      { id: 2, app_id: 200, title: 'Portal', proton_pulse_user_id: null, client_id: null, flagged_reason: 'openai:hate', flagged_at: null, is_hidden: true },
+      { id: 1, app_id: 100, report_key: 'key1', source: 'pulse', reason_category: 'wordlist', reason_text: 'slur in notes', status: 'open', reporter_client_id: 'abc', flagged_at: null },
+      { id: 2, app_id: 200, report_key: 'key2', source: 'protondb', reason_category: 'openai', reason_text: 'hate', status: 'open', reporter_client_id: 'def', flagged_at: null },
     ];
     const fetch = okFetch(rows);
-    const result = await makeCtx(fetch).__fetchFlaggedReports(session, { search: 'half' });
+    const result = await makeCtx(fetch).__fetchFlaggedReports(session, { search: '100' });
     expect(result).toHaveLength(1);
-    expect(result[0].title).toBe('Half-Life');
+    expect(result[0].app_id).toBe(100);
   });
 
   test('throws on HTTP error', async () => {

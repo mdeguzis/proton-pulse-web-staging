@@ -19,28 +19,34 @@ export function renderFlagged(rows) {
   empty.hidden = true;
   table.hidden = false;
 
+  const STATUS_LABELS = { open: 'Open', in_review: 'In Review', complete: 'Complete' };
+
   tbody.innerHTML = rows.map(r => {
     const appLink = `app.html#/app/${encodeURIComponent(r.app_id)}`;
     const name = escapeHtml(r.title || `App ${r.app_id}`);
-    const author = r._author?.display_name || r._author?.steam_id || r.proton_pulse_user_id?.slice(0, 8) || r.client_id?.slice(0, 8) || 'anon';
-    const reason = escapeHtml(friendlyReason(r.flagged_reason));
+    const source = escapeHtml(r.source || 'unknown');
+    const reporter = escapeHtml((r.reporter_client_id || '').slice(0, 12) || 'anon');
+    const reason = escapeHtml(friendlyReason(r.reason_category || r.flagged_reason));
+    const notesTip = r.reason_text ? ` title="${escapeHtml(r.reason_text)}"` : '';
+    const status = r.status || 'open';
+    const statusLabel = escapeHtml(STATUS_LABELS[status] || status);
     const flaggedAt = escapeHtml(fmtDateTime(r.flagged_at));
     const rowId = escapeHtml(String(r.id));
-    const userId = escapeHtml(r.proton_pulse_user_id || '');
-    const clientId = escapeHtml(r.client_id || '');
-    const authorName = escapeHtml(r._author?.display_name || author);
+    const reporterClientId = escapeHtml(r.reporter_client_id || '');
 
     return `<tr data-id="${rowId}">
       <td><a href="${escapeHtml(appLink)}" target="_blank" rel="noopener" class="admin-link">${name}</a>
           <div class="admin-sub">App ${escapeHtml(String(r.app_id))}</div></td>
-      <td>${escapeHtml(author)}</td>
-      <td><span class="admin-reason">${reason}</span></td>
+      <td>${source}</td>
+      <td class="admin-sub">${reporter}</td>
+      <td><span class="admin-reason"${notesTip}>${reason}</span></td>
+      <td><span class="admin-status admin-status--${escapeHtml(status)}">${statusLabel}</span></td>
       <td>${flaggedAt}</td>
       <td>
         <div class="admin-actions">
-          <button class="admin-btn admin-btn--sm admin-btn--ok" data-action="reinstate" data-id="${rowId}">Reinstate</button>
-          <button class="admin-btn admin-btn--sm admin-btn--danger" data-action="delete" data-id="${rowId}">Delete</button>
-          <button class="admin-btn admin-btn--sm admin-btn--warn" data-action="ban" data-id="${rowId}" data-user-id="${userId}" data-client-id="${clientId}" data-username="${authorName}">Ban User</button>
+          <button class="admin-btn admin-btn--sm admin-btn--ok" data-action="dismiss" data-id="${rowId}">Dismiss</button>
+          <button class="admin-btn admin-btn--sm admin-btn--warn" data-action="in-review" data-id="${rowId}">In Review</button>
+          <button class="admin-btn admin-btn--sm admin-btn--danger" data-action="complete" data-id="${rowId}">Complete</button>
         </div>
       </td>
     </tr>`;

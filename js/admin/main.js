@@ -1,8 +1,8 @@
 import { SupaAuth, SUPABASE_URL } from './config.js?v=ffed3d84';
 import { supabaseHeaders, escapeHtml } from './utils.js?v=86489fcb';
 import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMISSION_LABELS, presetFor, addPermission, removePermission } from './permissions.js?v=529eb059';
-import { fetchFlaggedReports, reinstateReport, deleteReport } from './api/flagged.js?v=55433ab8';
-import { renderFlagged } from './components/flagged.js?v=b9c9f230';
+import { fetchFlaggedReports, updateFlagStatus, deleteFlaggedReport } from './api/flagged.js?v=68890009';
+import { renderFlagged } from './components/flagged.js?v=d02206e3';
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=aa9b6b53';
 import { renderBanned } from './components/banned.js?v=45d01d17';
 import { fetchAllUsers } from './api/users.js?v=52e867d2';
@@ -389,30 +389,36 @@ function wireEvents() {
     const action = btn.dataset.action;
     const id = btn.dataset.id;
 
-    if (action === 'reinstate') {
+    if (action === 'dismiss' || action === 'in-review' || action === 'complete') {
+      const statusMap = { dismiss: 'open', 'in-review': 'in_review', complete: 'complete' };
+      const newStatus = statusMap[action];
+      const origText = btn.textContent;
       btn.disabled = true;
       btn.textContent = '...';
       try {
-        await reinstateReport(currentSession, id);
-        btn.closest('tr').remove();
-        flaggedRows = flaggedRows.filter(r => String(r.id) !== id);
-        if (!flaggedRows.length) {
-          document.getElementById('flagged-empty').hidden = false;
-          document.getElementById('flagged-table').hidden = true;
+        await updateFlagStatus(currentSession, id, newStatus);
+        const row = btn.closest('tr');
+        const statusCell = row?.querySelector('.admin-status');
+        const STATUS_LABELS = { open: 'Open', in_review: 'In Review', complete: 'Complete' };
+        if (statusCell) {
+          statusCell.textContent = STATUS_LABELS[newStatus] || newStatus;
+          statusCell.className = `admin-status admin-status--${newStatus}`;
         }
+        btn.disabled = false;
+        btn.textContent = origText;
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = 'Reinstate';
+        btn.textContent = origText;
         alert(`Error: ${err.message}`);
       }
     }
 
-    if (action === 'delete') {
-      if (!confirm('Delete this report permanently?')) return;
+    if (action === 'delete-flag') {
+      if (!confirm('Delete this flag entry permanently?')) return;
       btn.disabled = true;
       btn.textContent = '...';
       try {
-        await deleteReport(currentSession, id);
+        await deleteFlaggedReport(currentSession, id);
         btn.closest('tr').remove();
         flaggedRows = flaggedRows.filter(r => String(r.id) !== id);
         if (!flaggedRows.length) {
@@ -424,10 +430,6 @@ function wireEvents() {
         btn.textContent = 'Delete';
         alert(`Error: ${err.message}`);
       }
-    }
-
-    if (action === 'ban') {
-      openBanModal(btn.dataset.userId, btn.dataset.clientId, btn.dataset.username);
     }
   });
 

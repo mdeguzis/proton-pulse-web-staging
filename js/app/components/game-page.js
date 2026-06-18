@@ -5,13 +5,13 @@ import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '.
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=64d7ee9d';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=a9f7de6b';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=81b351aa';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=ffef19a3';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=8acef52f';
-import { enhanceAuthorBlocks } from './author.js?v=bd655128';
+import { enhanceAuthorBlocks } from './author.js?v=4bbf9945';
 import { renderConfigCard } from './config-cards.js?v=3d52c1a1';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=b0fa82d9';
-import { renderCard } from './report-card.js?v=17c01e5a';
-import { loadSearchIndex, searchIndex } from './search.js?v=3d3238e6';
+import { renderCard } from './report-card.js?v=f9562723';
+import { loadSearchIndex, searchIndex } from './search.js?v=e2e0605e';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref } from '../config.js?v=4031c5fa';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=f5dda5b6';
