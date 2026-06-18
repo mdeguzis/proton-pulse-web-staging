@@ -5,13 +5,13 @@ import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '.
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=64d7ee9d';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=a9f7de6b';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=b467da95';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=81b351aa';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=8acef52f';
-import { enhanceAuthorBlocks } from './author.js?v=fce5dcc9';
+import { enhanceAuthorBlocks } from './author.js?v=bd655128';
 import { renderConfigCard } from './config-cards.js?v=3d52c1a1';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=b0fa82d9';
-import { renderCard } from './report-card.js?v=672c553f';
-import { loadSearchIndex, searchIndex } from './search.js?v=7aa3f91b';
+import { renderCard } from './report-card.js?v=17c01e5a';
+import { loadSearchIndex, searchIndex } from './search.js?v=3d3238e6';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref } from '../config.js?v=4031c5fa';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=f5dda5b6';
@@ -26,6 +26,67 @@ async function _fetchSteamCatalog() {
     _steamCatalogCache = {};
   }
   return _steamCatalogCache;
+}
+
+const DISCORD_URL = 'https://discord.gg/4p6e4X7xW';
+
+function _showFlagModal(btn) {
+  const existing = document.getElementById('flag-report-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'flag-report-modal';
+  modal.className = 'flag-modal-overlay';
+  modal.innerHTML = `
+    <div class="flag-modal">
+      <h3 class="flag-modal-title">Flag this report</h3>
+      <label class="flag-modal-label" for="flag-category">Reason</label>
+      <select id="flag-category" class="flag-modal-select">
+        <option value="">Select a reason...</option>
+        <option value="spam">Spam or test data</option>
+        <option value="inaccurate">Inaccurate information</option>
+        <option value="inappropriate">Inappropriate content</option>
+        <option value="duplicate">Duplicate report</option>
+        <option value="other">Other</option>
+      </select>
+      <label class="flag-modal-label" for="flag-notes">Additional notes (optional)</label>
+      <textarea id="flag-notes" class="flag-modal-textarea" rows="3" placeholder="Describe the issue..."></textarea>
+      <p class="flag-modal-discord">Have questions or want to dispute a moderation decision? Reach out on <a href="${DISCORD_URL}" target="_blank" rel="noopener">Discord</a>.</p>
+      <div class="flag-modal-actions">
+        <button id="flag-cancel-btn" class="action-btn">Cancel</button>
+        <button id="flag-submit-btn" class="action-btn flag-modal-submit" disabled>Submit</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  const categoryEl = modal.querySelector('#flag-category');
+  const submitEl = modal.querySelector('#flag-submit-btn');
+  categoryEl.addEventListener('change', () => { submitEl.disabled = !categoryEl.value; });
+  modal.querySelector('#flag-cancel-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  submitEl.addEventListener('click', async () => {
+    submitEl.disabled = true;
+    submitEl.textContent = 'Submitting...';
+    const ok = await flagReport({
+      reportId: btn.dataset.reportId ? Number(btn.dataset.reportId) : null,
+      appId: btn.dataset.appId,
+      reportKey: btn.dataset.reportKey,
+      source: btn.dataset.source,
+      reasonCategory: categoryEl.value,
+      reasonText: modal.querySelector('#flag-notes').value.trim() || null,
+      reporterClientId: getWebClientId(),
+    });
+    if (ok) {
+      btn.classList.add('flagged');
+      btn.title = 'Flagged for review';
+      modal.remove();
+    } else {
+      submitEl.textContent = 'Failed - try again';
+      submitEl.disabled = false;
+    }
+  });
 }
 
 export function trendSummary(reps) {
@@ -671,26 +732,6 @@ export async function renderGamePage(appId) {
       });
     });
 
-    el.querySelectorAll('.flag-report-btn').forEach(b => {
-      b.addEventListener('click', async e => {
-        e.stopPropagation();
-        if (b.classList.contains('flagged')) return;
-        b.disabled = true;
-        const ok = await flagReport({
-          reportId: b.dataset.reportId ? Number(b.dataset.reportId) : null,
-          appId: b.dataset.appId,
-          reportKey: b.dataset.reportKey,
-          source: b.dataset.source,
-        });
-        if (ok) {
-          b.classList.add('flagged');
-          b.title = 'Flagged for review';
-        } else {
-          b.disabled = false;
-        }
-      });
-    });
-
     // async-enhance author blocks with stats + avatars after the DOM is ready
     void enhanceAuthorBlocks(reps.filter(r => r._kind !== 'config'));
 
@@ -725,6 +766,16 @@ export async function renderGamePage(appId) {
   }
 
   render();
+
+  // Delegated flag-button handler: one listener on the container survives
+  // render() calls (innerHTML replacement removes per-element listeners)
+  el.addEventListener('click', e => {
+    const btn = e.target.closest('.flag-report-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    if (btn.classList.contains('flagged')) return;
+    _showFlagModal(btn);
+  });
 
   // Scroll to a specific report if the URL has #report-{id} after the app hash
   const anchorMatch = location.hash.match(/#(report-[a-z0-9]+)$/i);
