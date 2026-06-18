@@ -344,6 +344,31 @@
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
+/* Load more for the popular list. Matches .load-more-btn in shared/site.css
+   so the homepage and the app browser pagination look the same. */
+.pg-load-more-row { display: flex; justify-content: center; }
+.pg-load-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px auto 0;
+  padding: 8px 24px;
+  background: var(--s2);
+  color: var(--muted);
+  border: none;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.pg-load-more:hover { background: var(--s3); color: var(--fg); }
+.pg-load-more-count {
+  background: var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
 
 /* quick-actions row removed - the topnav covers those links now */
 

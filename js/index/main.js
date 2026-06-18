@@ -140,19 +140,38 @@ import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=85cf419
     const unratedBtn = document.getElementById('pg-filter-unrated');
     const ratedCountEl = document.getElementById('pg-rated-count');
     const unratedCountEl = document.getElementById('pg-unrated-count');
+    const loadMoreEl = document.getElementById('pg-load-more');
     if (ratedCountEl) ratedCountEl.textContent = String(ratedGames.length);
     if (unratedCountEl) unratedCountEl.textContent = String(unratedGames.length);
 
+    const PAGE_SIZE = 12;
     const state = { rated: true, unrated: false };
+    let shownCount = PAGE_SIZE;
 
-    function renderPopular() {
-      const shown = [
+    // The combined list of games to show for the current filter state.
+    function currentList() {
+      return [
         ...(state.rated ? ratedGames : []),
         ...(state.unrated ? unratedGames : []),
       ];
-      list.innerHTML = shown.length
-        ? shown.map(pgCardHtml).join('')
-        : '<div class="pg-empty">No games match the current filters.</div>';
+    }
+
+    function renderPopular() {
+      const all = currentList();
+      if (!all.length) {
+        list.innerHTML = '<div class="pg-empty">No games match the current filters.</div>';
+        if (loadMoreEl) loadMoreEl.innerHTML = '';
+        return;
+      }
+      list.innerHTML = all.slice(0, shownCount).map(pgCardHtml).join('');
+      if (loadMoreEl) {
+        const remaining = all.length - shownCount;
+        loadMoreEl.innerHTML = remaining > 0
+          ? `<button class="pg-load-more" id="pg-load-more-btn" type="button">Load more <span class="pg-load-more-count">${remaining}</span></button>`
+          : '';
+        const moreBtn = document.getElementById('pg-load-more-btn');
+        if (moreBtn) moreBtn.addEventListener('click', () => { shownCount += PAGE_SIZE; renderPopular(); });
+      }
     }
 
     function wireFilter(btn, key) {
@@ -161,6 +180,7 @@ import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=85cf419
         state[key] = !state[key];
         btn.classList.toggle('pg-filter--active', state[key]);
         btn.setAttribute('aria-pressed', String(state[key]));
+        shownCount = PAGE_SIZE; // restart paging when the filter changes
         renderPopular();
       });
     }

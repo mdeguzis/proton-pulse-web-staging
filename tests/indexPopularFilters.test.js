@@ -50,4 +50,16 @@ describe('index page popular games rating filters', () => {
   test('shows an empty state when both filters are off', () => {
     expect(indexSrc).toContain("class=\"pg-empty\"");
   });
+
+  test('popular list pages with a load more button', () => {
+    expect(indexHtml).toContain('id="pg-load-more"');
+    expect(indexSrc).toContain('const PAGE_SIZE = 12');
+    expect(indexSrc).toContain('all.slice(0, shownCount)');
+    expect(indexSrc).toContain('id="pg-load-more-btn"');
+    expect(indexSrc).toContain('shownCount += PAGE_SIZE');
+  });
+
+  test('changing a filter restarts paging', () => {
+    expect(indexSrc).toContain('shownCount = PAGE_SIZE; // restart paging when the filter changes');
+  });
 });
