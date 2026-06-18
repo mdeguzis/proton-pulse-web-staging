@@ -1473,9 +1473,35 @@ a.card:active { transform: translateY(1px); }
 }
 .action-btn-danger:hover { background: rgba(200,80,80,0.12); color: #ff8a7a; }
 .action-btn-icon { padding: 5px 10px; }
-.flag-report-btn { opacity: 0.45; }
+.flag-report-btn { opacity: 0.7; }
 .flag-report-btn:hover { opacity: 1; color: #e0824a; border-color: #e0824a; }
 .flag-report-btn.flagged { opacity: 1; color: #e0824a; border-color: #e0824a; cursor: default; }
+.flag-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.flag-modal {
+  background: var(--s1); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 24px; width: 100%; max-width: 420px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.flag-modal-title { margin: 0; font-size: 1rem; color: var(--text); }
+.flag-modal-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.flag-modal-select, .flag-modal-textarea {
+  background: var(--bg); border: 1px solid var(--border2); color: var(--text);
+  padding: 7px 10px; font-size: 0.85rem; font-family: inherit;
+  border-radius: 4px; outline: none; width: 100%;
+}
+.flag-modal-select:focus, .flag-modal-textarea:focus { border-color: var(--accent); }
+.flag-modal-textarea { resize: vertical; }
+.flag-modal-discord { font-size: 0.78rem; color: var(--muted); margin: 2px 0 0; }
+.flag-modal-discord a { color: var(--accent); }
+.flag-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.flag-modal-submit { background: #c85050; border-color: #c85050; color: #fff; }
+.flag-modal-submit:hover:not(:disabled) { background: #e06060; border-color: #e06060; }
+.flag-modal-submit:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Permalink button used in the footer alongside the other action buttons -
    inherits .action-btn styling, just adds the chain icon */
 .card-footer .permalink-btn {
