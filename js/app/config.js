@@ -18,6 +18,9 @@ export const IS_LOCAL_DEV = ['localhost', '127.0.0.1', '0.0.0.0'].includes(windo
 // Staging (github.io) has no data directory -- read from the production CDN
 // just like local dev does.
 export const USES_PROD_DATA = IS_LOCAL_DEV || (window.location.hostname || '').endsWith('.github.io');
+export const SITE_ROOT = USES_PROD_DATA
+  ? 'https://www.proton-pulse.com'
+  : `${window.location.origin}${SITE_BASE}`;
 export const CDN = USES_PROD_DATA
   ? 'https://www.proton-pulse.com/data'
   : `${window.location.origin}${SITE_BASE}/data`;

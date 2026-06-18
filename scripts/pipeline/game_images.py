@@ -67,7 +67,7 @@ def _collect_all_app_ids(data_dir: Path) -> list[str]:
 
 
 def _hot_app_ids(output_dir: Path) -> list[str]:
-    """App IDs currently visible on the site (recent-reports + most_played), deduplicated."""
+    """App IDs currently visible on the site (recent-reports + most_played + steam-catalog), deduplicated."""
     ids: list[str] = []
     seen: set[str] = set()
     for fname in ("recent-reports.json", "most_played.json"):
@@ -82,6 +82,16 @@ def _hot_app_ids(output_dir: Path) -> list[str]:
                     ids.append(aid)
         except Exception as exc:
             log(f"[game-images] WARN: could not read {fname}: {exc}")
+    # Catalog-only games (Steam chart games with no ProtonDB data) always probe images.
+    catalog_path = output_dir / "steam-catalog.json"
+    if catalog_path.exists():
+        try:
+            for aid in json.loads(catalog_path.read_text(encoding="utf-8")).keys():
+                if str(aid).isdigit() and aid not in seen:
+                    seen.add(aid)
+                    ids.append(aid)
+        except Exception as exc:
+            log(f"[game-images] WARN: could not read steam-catalog.json: {exc}")
     return ids
 
 
@@ -153,12 +163,17 @@ def build_game_images(output_dir) -> dict[str, str]:
 
     # Hot: probe if uncached or stale
     hot_to_probe = [a for a in hot_ids if a not in cache or _is_stale(cache[a])]
-    # Backlog: probe only if uncached, cap applies
-    backlog_to_probe = [a for a in all_ids if a not in cache and a not in hot_set]
+    # Backlog: probe if uncached OR if hashed entry is stale (cover art hash may change), cap applies
+    backlog_to_probe = [
+        a for a in all_ids if a not in hot_set and (
+            a not in cache or
+            (cache[a].get("status") == "hashed" and _is_stale(cache[a]))
+        )
+    ]
 
     log(
         f"[game-images] {len(all_ids)} total app IDs | cache: {len(cache)} | "
-        f"hot: {len(hot_to_probe)} to probe | backlog: {len(backlog_to_probe)} uncached (cap {PROBE_CAP})"
+        f"hot: {len(hot_to_probe)} to probe | backlog: {len(backlog_to_probe)} uncached/stale-hashed (cap {PROBE_CAP})"
     )
 
     today = date.today().isoformat()

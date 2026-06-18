@@ -1,9 +1,9 @@
 // search (components) for the app page. Relocated from app.js/app-search.js.
 
 import { estimateScore } from '../../shared/scoring.js?v=0dae1257';
-import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../api/reports.js?v=ab9bb0d8';
-import { renderGamePage } from './game-page.js?v=478cbb2e';
-import { STEAM_IMG } from '../config.js?v=9970759a';
+import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../api/reports.js?v=a9fb53ae';
+import { renderGamePage } from './game-page.js?v=bf62c3d7';
+import { STEAM_IMG } from '../config.js?v=4031c5fa';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=ae6042a4';
 

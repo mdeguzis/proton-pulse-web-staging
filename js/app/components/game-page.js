@@ -4,17 +4,29 @@ import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
 import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=0dae1257';
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=64d7ee9d';
-import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=7ad8fd16';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=b1ef901e';
-import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=cb7b4c5e';
-import { enhanceAuthorBlocks } from './author.js?v=e6fb23a2';
-import { renderConfigCard } from './config-cards.js?v=42909e25';
+import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=a9f7de6b';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase } from '../api/supabase.js?v=fd3b676e';
+import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=8acef52f';
+import { enhanceAuthorBlocks } from './author.js?v=0372da7c';
+import { renderConfigCard } from './config-cards.js?v=3d52c1a1';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=b0fa82d9';
-import { renderCard } from './report-card.js?v=5e2c4525';
-import { loadSearchIndex, searchIndex } from './search.js?v=fd385d65';
-import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, STEAM_IMG, dataFilesHref } from '../config.js?v=9970759a';
+import { renderCard } from './report-card.js?v=456de641';
+import { loadSearchIndex, searchIndex } from './search.js?v=9e5719be';
+import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref } from '../config.js?v=4031c5fa';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=85cf4195';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=f5dda5b6';
+
+let _steamCatalogCache = null;
+async function _fetchSteamCatalog() {
+  if (_steamCatalogCache !== null) return _steamCatalogCache;
+  try {
+    const resp = await fetch(`${SITE_ROOT}/steam-catalog.json`);
+    _steamCatalogCache = resp.ok ? await resp.json() : {};
+  } catch {
+    _steamCatalogCache = {};
+  }
+  return _steamCatalogCache;
+}
 
 export function trendSummary(reps) {
   if (reps.length < 2) return '';
@@ -84,7 +96,11 @@ export async function renderGamePage(appId) {
   if (!reports.length && !configs.length) {
     await loadSearchIndex();
     const stubHit = (searchIndex || []).find(row => String(row[0]) === String(appId));
-    const stubTitle = stubHit?.[1];
+    let stubTitle = stubHit?.[1];
+    if (!stubTitle) {
+      const catalog = await _fetchSteamCatalog();
+      stubTitle = catalog?.[String(appId)] || null;
+    }
     if (stubTitle) {
       // Known game with no reports yet -- show a stub page with a submit CTA.
       const imgUrl = STEAM_IMG(appId);

@@ -19,6 +19,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .catalog import read_cached_steam_game_catalog
 from .common import log
 
 STEAM_MOST_PLAYED_URL = (
@@ -92,16 +93,20 @@ def build_most_played(
     output_dir,
     limit: int = 100,
     unrated_limit: int = 50,
+    catalog_limit: int = 20,
     ranks: list[dict] | None = None,
 ) -> list[dict]:
     """Write <output_dir>/most_played.json and return the rows written.
 
-    Takes Steam's most-played list (rank order) and produces two buckets:
+    Takes Steam's most-played list (rank order) and produces three buckets:
     - Rated games (tier in KNOWN_TIERS): up to ``limit`` rows, rank order.
     - Unrated games (tier == "pending", i.e. in our index but no rated reports):
       up to ``unrated_limit`` rows, appended after the rated section.
+    - Catalog-only games (in Steam charts but absent from our search-index):
+      up to ``catalog_limit`` rows, names sourced from the cached Steam game
+      catalog (populated by the steam-catalog CLI step). These carry
+      rating="catalog" so the frontend can group them with unrated games.
 
-    Games not in our search-index at all are skipped (no title available).
     ``ranks`` can be injected for testing.
 
     Shape: [{appId, title, peak, rating, protondbCount, pulseCount, lastReportDate, headerImage}]
@@ -120,7 +125,7 @@ def build_most_played(
         app_id = str(entry.get("appid"))
         match = index.get(app_id)
         if not match:
-            continue  # no title in our index, skip
+            continue  # no title in our index; handled by catalog-only pass below
         title, tier, protondb_count, pulse_count = match
         peak = entry.get("peak_in_game")
         row = {
@@ -138,8 +143,49 @@ def build_most_played(
         elif tier == "pending" and len(unrated) < unrated_limit:
             unrated.append(row)
 
-    result = rated + unrated
+    # Catalog-only pass: Steam chart games not in our search-index at all.
+    # Names come from the cached Steam game catalog (no API call here).
+    catalog_only: list[dict] = []
+    if catalog_limit > 0:
+        steam_catalog = read_cached_steam_game_catalog() or {}
+        if steam_catalog:
+            indexed_ids = set(index.keys())
+            seen_ids = {str(r["appId"]) for r in rated + unrated}
+            for entry in ranks:
+                if len(catalog_only) >= catalog_limit:
+                    break
+                app_id = str(entry.get("appid"))
+                if app_id in indexed_ids or app_id in seen_ids:
+                    continue
+                name = steam_catalog.get(app_id, "").strip()
+                if not name:
+                    continue
+                peak = entry.get("peak_in_game")
+                catalog_only.append({
+                    "appId": int(app_id),
+                    "title": name,
+                    "peak": int(peak) if isinstance(peak, int) else None,
+                    "rating": "catalog",
+                    "protondbCount": 0,
+                    "pulseCount": 0,
+                    "lastReportDate": None,
+                    "headerImage": None,
+                })
+            if catalog_only:
+                log(f"[most-played] {len(catalog_only)} catalog-only game(s) added from Steam catalog cache")
+        else:
+            log("[most-played] Steam catalog cache not available; skipping catalog-only pass")
+
+    result = rated + unrated + catalog_only
     out_path = output_dir / "most_played.json"
     out_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    log(f"[most-played] wrote {len(rated)} rated + {len(unrated)} unrated game(s) to {out_path}")
+    log(f"[most-played] wrote {len(rated)} rated + {len(unrated)} unrated + {len(catalog_only)} catalog-only game(s) to {out_path}")
+
+    # Write steam-catalog.json: { appId: name } for catalog-only games.
+    # Used by the frontend as a title fallback for games outside the ProtonDB dataset.
+    catalog_stubs = {str(r["appId"]): r["title"] for r in catalog_only}
+    catalog_stub_path = output_dir / "steam-catalog.json"
+    catalog_stub_path.write_text(json.dumps(catalog_stubs, indent=2) + "\n", encoding="utf-8")
+    log(f"[most-played] wrote {len(catalog_stubs)} catalog stub(s) to {catalog_stub_path.name}")
+
     return result

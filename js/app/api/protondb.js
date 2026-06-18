@@ -1,6 +1,6 @@
 // protondb (api) for the app page. Relocated from app.js.
 
-import { CDN } from '../config.js?v=9970759a';
+import { CDN } from '../config.js?v=4031c5fa';
 
 /**
  * Fetch the latest ProtonDB CDN report bundle for a game.

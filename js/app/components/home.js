@@ -1,8 +1,8 @@
 // home (components) for the app page. Relocated from app.js.
 
-import { fetchRecentPulseReports } from '../api/reports.js?v=ab9bb0d8';
-import { loadSearchIndex, searchIndex } from './search.js?v=35c6b620';
-import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=9970759a';
+import { fetchRecentPulseReports } from '../api/reports.js?v=a9fb53ae';
+import { loadSearchIndex, searchIndex } from './search.js?v=9e5719be';
+import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=4031c5fa';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=ae6042a4';
 
@@ -101,7 +101,7 @@ export async function renderHomePage() {
     if (mostPlayedResp && mostPlayedResp.ok) {
       const all = (await mostPlayedResp.json().catch(() => [])).filter(g => !seenIds.has(String(g.appId)));
       ratedGames = all.filter(g => KNOWN_TIERS.has(String(g.rating || '').toLowerCase()));
-      unratedGames = all.filter(g => String(g.rating || '').toLowerCase() === 'pending');
+      unratedGames = all.filter(g => ['pending', 'catalog'].includes(String(g.rating || '').toLowerCase()));
     }
 
     const unratedToggle = unratedGames.length

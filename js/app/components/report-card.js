@@ -3,10 +3,10 @@
 import { estimateScore } from '../../shared/scoring.js?v=0dae1257';
 import { getWebClientId } from '../../shared/submit.js?v=09904778';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
-import { renderAuthorBlock } from './author.js?v=e6fb23a2';
-import { buildFormRows } from './config-cards.js?v=42909e25';
+import { renderAuthorBlock } from './author.js?v=0372da7c';
+import { buildFormRows } from './config-cards.js?v=3d52c1a1';
 import { renderSignalStrip } from './signals.js?v=a1026433';
-import { RATING_COLORS, RATING_TEXT } from '../config.js?v=9970759a';
+import { RATING_COLORS, RATING_TEXT } from '../config.js?v=4031c5fa';
 import { confColor, confTextColor, configKey, daysAgo, esc, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=f5dda5b6';
 
 export function renderPermalink(r) {
