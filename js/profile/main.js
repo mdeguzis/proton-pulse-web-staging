@@ -12,7 +12,7 @@ import {
   getMyHwSourceMeta, setMyHwSourceMeta, getMyHwFieldOrigins,
   setMyHwFieldOrigins, setMyHwFieldOrigin, escapeHtml, formatSystemUpdated,
   getWebClientIdProfile, getMyReportBadges, flaggedMessageHtml,
-  mergeMyReportRows, getPluginLinkCodeFromLocation,
+  mergeMyReportRows, getPluginLinkCodeFromLocation, getSteamIdFromSession,
 } from './utils.js?v=2324dd84';
 import { supabaseHeaders } from './api/supabase.js?v=bdf4b262';
 import {
@@ -212,22 +212,23 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
     if (!session?.user) return;
     const uid = session.user.id;
     const meta = session.user.user_metadata || {};
-    const displayName = meta.full_name || meta.name || null;
-    const avatarUrl = meta.avatar_url || null;
+    const displayName = meta.full_name || meta.name || '';
+    const avatarUrl = meta.avatar_url || '';
+    const steamId = getSteamIdFromSession(session) || '';
     const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' };
     if (val) {
-      await fetch(`${SUPABASE_URL}/rest/v1/author_avatars`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/author_avatars`, {
         method: 'POST',
         headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ proton_pulse_user_id: uid, display_name: displayName, avatar_url: avatarUrl }),
+        body: JSON.stringify({ proton_pulse_user_id: uid, steam_id: steamId, display_name: displayName, avatar_url: avatarUrl }),
       });
-      console.debug('[profile] author_avatars upserted', { uid, displayName });
+      console.debug('[profile] author_avatars upserted', { uid, steamId, displayName, ok: res.ok, status: res.status });
     } else {
-      await fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}`, {
         method: 'DELETE',
         headers,
       });
-      console.debug('[profile] author_avatars deleted', { uid });
+      console.debug('[profile] author_avatars deleted', { uid, ok: res.ok, status: res.status });
     }
   }
 
