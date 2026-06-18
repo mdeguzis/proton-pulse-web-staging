@@ -672,6 +672,10 @@
   pointer-events: none;
 }
 .profile-configs-publish-btn,
+.profile-configs-unpublish-btn {
+  min-width: 68px;
+}
+.profile-configs-publish-btn,
 .profile-configs-view-link:not(.profile-configs-view-disabled),
 .profile-configs-edit-btn {
   color: #9ecbe8;
