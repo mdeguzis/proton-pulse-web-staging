@@ -208,6 +208,29 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
     renderMyHwFieldOrigins();
   }
 
+  async function syncAvatarVisibility(val, session) {
+    if (!session?.user) return;
+    const uid = session.user.id;
+    const meta = session.user.user_metadata || {};
+    const displayName = meta.full_name || meta.name || null;
+    const avatarUrl = meta.avatar_url || null;
+    const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' };
+    if (val) {
+      await fetch(`${SUPABASE_URL}/rest/v1/author_avatars`, {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ proton_pulse_user_id: uid, display_name: displayName, avatar_url: avatarUrl }),
+      });
+      console.debug('[profile] author_avatars upserted', { uid, displayName });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${uid}`, {
+        method: 'DELETE',
+        headers,
+      });
+      console.debug('[profile] author_avatars deleted', { uid });
+    }
+  }
+
   function showUser(user, session) {
     const name    = user.user_metadata?.full_name || user.user_metadata?.name || '';
     const email   = user.email || '';
@@ -233,6 +256,8 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
       if (fromMeta !== null) setShowUsername(val); // keep localStorage in sync
       usernameToggle.checked = val;
       usernameStatus.textContent = val ? 'Shown on reports' : 'Anonymous';
+      // ensure author_avatars row matches current preference on every load
+      if (session) syncAvatarVisibility(val, session).catch(() => {});
     }
     if (hwGpuSelect) hwGpuSelect.value = localStorage.getItem(HW_GPU_KEY) || '';
     if (hwOsInput)   hwOsInput.value   = localStorage.getItem(HW_OS_KEY)  || '';
@@ -358,7 +383,7 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
   } else {
     const session = await SupaAuth.getSession();
     if (session?.user) {
-      showUser(session.user);
+      showUser(session.user, session);
       void refreshLinkedPlugins();
     } else {
       showSignedOut();
@@ -476,6 +501,10 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
     // persist to Supabase so the preference follows the account across devices
     SupaAuth.updateUserMeta({ show_username: val }).catch((e) => {
       console.warn('[profile] failed to persist show_username to Supabase user_metadata:', e);
+    });
+    // actively upsert or delete the author_avatars row so report cards update immediately
+    SupaAuth.getSession().then(s => syncAvatarVisibility(val, s)).catch((e) => {
+      console.warn('[profile] syncAvatarVisibility failed:', e);
     });
   });
 
