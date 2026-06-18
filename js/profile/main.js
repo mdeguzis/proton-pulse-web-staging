@@ -1090,14 +1090,6 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
         return;
       }
 
-      const appId = action.dataset.appId;
-      if (!appId) return;
-
-      // Publish + Edit are now <a> links that navigate to submit.html,
-      // so the only inline action left is Delete. The browser handles
-      // the anchor click without firing this handler for them (no
-      // data-app-id on the new anchors either since we matched the
-      // selector above already, but the dataset.appId guard above
       if (action.classList.contains('profile-configs-unpublish-btn')) {
         const publishedId = action.dataset.publishedId;
         if (!publishedId) return;
@@ -1109,8 +1101,10 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
         return;
       }
 
-      // covers it -- only delete-btn carries data-app-id in this
-      // updated markup)
+      const appId = action.dataset.appId;
+      if (!appId) return;
+
+      // Publish + Edit are now <a> links; only delete-btn carries data-app-id
       if (!action.classList.contains('profile-configs-delete-btn')) return;
       if (!window.confirm('Delete this report/config from Proton Pulse?')) return;
       action.textContent = 'Deleting...';
