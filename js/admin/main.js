@@ -2,7 +2,7 @@ import { SupaAuth, SUPABASE_URL } from './config.js?v=ffed3d84';
 import { supabaseHeaders, escapeHtml } from './utils.js?v=86489fcb';
 import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMISSION_LABELS, presetFor, addPermission, removePermission } from './permissions.js?v=529eb059';
 import { fetchFlaggedReports, updateFlagStatus, deleteFlaggedReport } from './api/flagged.js?v=68890009';
-import { renderFlagged } from './components/flagged.js?v=d02206e3';
+import { renderFlagged, renderFlagDetail } from './components/flagged.js?v=b3e69751';
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=aa9b6b53';
 import { renderBanned } from './components/banned.js?v=45d01d17';
 import { fetchAllUsers } from './api/users.js?v=52e867d2';
@@ -130,8 +130,10 @@ async function loadFlagged() {
     const type     = document.getElementById('flagged-type').value;
     const dateFrom = document.getElementById('flagged-date-from').value;
     const dateTo   = document.getElementById('flagged-date-to').value;
+    const openOnly = document.getElementById('flagged-open-only')?.checked;
     flaggedRows = await fetchFlaggedReports(currentSession, { search, type, dateFrom, dateTo, sortField, sortDir });
-    renderFlagged(flaggedRows);
+    const displayRows = openOnly ? flaggedRows.filter(r => (r.status || 'open') === 'open') : flaggedRows;
+    renderFlagged(displayRows);
   } catch (e) {
     loading.hidden = true;
     errEl.textContent = e.message;
@@ -243,6 +245,13 @@ async function loadUserDetail(user) {
     content.innerHTML = `<div class="admin-error">${e.message}</div>
       <button class="admin-btn admin-btn--ghost admin-btn--sm" type="button" data-action="back-to-users" style="margin-top:10px">&#8592; Back to users</button>`;
   }
+}
+
+function loadFlagDetail(row) {
+  document.querySelectorAll('.admin-section').forEach(sec => { sec.hidden = true; });
+  document.getElementById('tab-flag-detail').hidden = false;
+  document.getElementById('admin-tab-select').value = '';
+  document.getElementById('flag-detail-content').innerHTML = renderFlagDetail(row);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +377,7 @@ function wireEvents() {
   document.getElementById('flagged-type').addEventListener('change', loadFlagged);
   document.getElementById('flagged-date-from').addEventListener('change', loadFlagged);
   document.getElementById('flagged-date-to').addEventListener('change', loadFlagged);
+  document.getElementById('flagged-open-only').addEventListener('change', loadFlagged);
   document.getElementById('banned-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadBanned(); });
   document.getElementById('users-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadUsers(); });
 
@@ -382,28 +392,42 @@ function wireEvents() {
     loadUsers();
   });
 
-  // Flagged table actions (delegated)
-  document.getElementById('flagged-tbody').addEventListener('click', async e => {
+  // Flagged table: Review button opens detail view
+  document.getElementById('flagged-tbody').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="review-flag"]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const row = flaggedRows.find(r => String(r.id) === id);
+    if (row) loadFlagDetail(row);
+  });
+
+  // Flag detail: status actions + delete + back
+  document.getElementById('flag-detail-content').addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.dataset.action;
-    const id = btn.dataset.id;
 
-    if (action === 'dismiss' || action === 'in-review' || action === 'complete') {
-      const statusMap = { dismiss: 'open', 'in-review': 'in_review', complete: 'complete' };
-      const newStatus = statusMap[action];
+    if (action === 'back-to-flagged') {
+      activateTab('flagged');
+      return;
+    }
+
+    if (action === 'flag-set-status') {
+      const newStatus = btn.dataset.status;
+      const id = btn.dataset.id;
       const origText = btn.textContent;
       btn.disabled = true;
       btn.textContent = '...';
       try {
         await updateFlagStatus(currentSession, id, newStatus);
-        const row = btn.closest('tr');
-        const statusCell = row?.querySelector('.admin-status');
         const STATUS_LABELS = { open: 'Open', in_review: 'In Review', complete: 'Complete' };
-        if (statusCell) {
-          statusCell.textContent = STATUS_LABELS[newStatus] || newStatus;
-          statusCell.className = `admin-status admin-status--${newStatus}`;
+        const statusEl = document.getElementById('flag-detail-status');
+        if (statusEl) {
+          statusEl.textContent = STATUS_LABELS[newStatus] || newStatus;
+          statusEl.className = `admin-status admin-status--${newStatus}`;
         }
+        const target = flaggedRows.find(r => String(r.id) === id);
+        if (target) target.status = newStatus;
         btn.disabled = false;
         btn.textContent = origText;
       } catch (err) {
@@ -413,18 +437,15 @@ function wireEvents() {
       }
     }
 
-    if (action === 'delete-flag') {
+    if (action === 'flag-delete') {
       if (!confirm('Delete this flag entry permanently?')) return;
+      const id = btn.dataset.id;
       btn.disabled = true;
       btn.textContent = '...';
       try {
         await deleteFlaggedReport(currentSession, id);
-        btn.closest('tr').remove();
         flaggedRows = flaggedRows.filter(r => String(r.id) !== id);
-        if (!flaggedRows.length) {
-          document.getElementById('flagged-empty').hidden = false;
-          document.getElementById('flagged-table').hidden = true;
-        }
+        activateTab('flagged');
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Delete';
@@ -560,10 +581,10 @@ function wireEvents() {
     if (e.target === e.currentTarget) closeBanModal();
   });
 
-  // Browser back button / swipe back from detail screen.
+  // Browser back button / swipe back from detail screens.
   window.addEventListener('popstate', e => {
-    const detailVisible = !document.getElementById('tab-user-detail').hidden;
-    if (detailVisible) activateTab('users');
+    if (!document.getElementById('tab-user-detail').hidden) activateTab('users');
+    else if (!document.getElementById('tab-flag-detail').hidden) activateTab('flagged');
   });
 
   // Add admin form

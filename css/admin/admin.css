@@ -667,6 +667,56 @@
   }
 }
 
+/* Flag detail view */
+.flag-detail-reason {
+  background: rgba(255, 200, 80, 0.08);
+  border: 1px solid rgba(255, 200, 80, 0.25);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.flag-detail-reason-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted, #888);
+  margin-bottom: 4px;
+}
+.flag-detail-reason-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text, #eee);
+}
+.flag-detail-reason-note {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted, #aaa);
+  font-style: italic;
+}
+.flag-detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  font-size: 0.875rem;
+}
+.flag-detail-meta .admin-label-text {
+  display: inline-block;
+  min-width: 72px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 6px;
+}
+.flag-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Analytics tab */
 .analytics-stats {
   display: flex;
