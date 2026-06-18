@@ -671,9 +671,9 @@
   cursor: default;
   pointer-events: none;
 }
-.profile-configs-publish-btn {
-  padding-left: 14px;
-  padding-right: 14px;
+.profile-configs-publish-btn,
+.profile-configs-unpublish-btn {
+  min-width: 72px;
 }
 .profile-configs-publish-btn,
 .profile-configs-view-link:not(.profile-configs-view-disabled),
