@@ -34,9 +34,33 @@ describe('flagged report moderation', () => {
     expect(flaggedComponentSrc).not.toMatch(/isPulseSource\(flagRow\.source\)\s*\?\s*`\s*<button[^`]*flag-release/);
   });
 
-  test('the action bar is rendered both at the top and bottom of the detail', () => {
+  test('the action bar is rendered only once (top), not at the bottom', () => {
     const occurrences = (flaggedComponentSrc.match(/\$\{actionBar\}/g) || []).length;
-    expect(occurrences).toBeGreaterThanOrEqual(2);
+    expect(occurrences).toBe(1);
+  });
+
+  test('Shadow ban is a stateful toggle showing current state', () => {
+    expect(flaggedComponentSrc).toContain('const isShadowed = state === \'shadowbanned\'');
+    expect(flaggedComponentSrc).toContain('Un-shadow ban');
+    expect(flaggedComponentSrc).toContain('flag-detail-state');
+    // when shadowed, the toggle releases
+    expect(flaggedComponentSrc).toMatch(/isShadowed[\s\S]*?data-action="flag-release"[\s\S]*?Un-shadow ban/);
+  });
+
+  test('flagged list shows a Flagged date column', () => {
+    expect(flaggedComponentSrc).toContain('fmtDateTime(r.flagged_at)');
+  });
+
+  test('fetchReportState resolves visible vs shadowbanned', async () => {
+    const created = '2026-06-16T00:00:00Z';
+    const ts = Math.floor(new Date(created).getTime() / 1000);
+    const key = `${ts}:NV:GE`;
+    const { mod } = loadFlaggedApi((url) =>
+      url.includes('/user_configs')
+        ? ok([{ id: 1, gpu: 'NV', proton_version: 'GE', created_at: created, is_hidden: true }])
+        : ok([]));
+    const st = await mod.fetchReportState({}, { app_id: '730', report_key: key, source: 'pulse' });
+    expect(st).toEqual({ kind: 'pulse', state: 'shadowbanned' });
   });
 
   test('isPulseSource recognizes pulse and proton-pulse', () => {

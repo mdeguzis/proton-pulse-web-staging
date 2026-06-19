@@ -48,6 +48,7 @@ export function renderFlagged(rows) {
       <td><a href="${escapeHtml(appLink)}" target="_blank" rel="noopener" class="admin-link">${name}</a>
           <div class="admin-sub">App ${escapeHtml(String(r.app_id))}</div></td>
       <td>${source}</td>
+      <td><span class="admin-sub">${escapeHtml(fmtDateTime(r.flagged_at))}</span></td>
       <td><span class="admin-status admin-status--${escapeHtml(status)}">${statusLabel}</span></td>
       <td>
         <button class="admin-btn admin-btn--sm" data-action="review-flag" data-id="${rowId}">Review</button>
@@ -74,7 +75,7 @@ function _renderRawFields(obj, title) {
   </div>`;
 }
 
-export function renderFlagDetail(flagRow, reportContent) {
+export function renderFlagDetail(flagRow, reportContent, modState) {
   const appLink    = `app.html#/app/${encodeURIComponent(flagRow.app_id)}`;
   const name       = escapeHtml(flagRow.title || `App ${flagRow.app_id}`);
   const source     = escapeHtml(flagRow.source || 'unknown');
@@ -86,14 +87,23 @@ export function renderFlagDetail(flagRow, reportContent) {
   const statusLabel = escapeHtml(STATUS_LABELS[status] || status);
   const rowId      = escapeHtml(String(flagRow.id));
 
-  // One action bar, shown at the top and bottom so a moderator never has to
-  // scroll past the raw fields to act. Actions apply to ANY source: Pulse
-  // reports are edited/deleted in our DB, ProtonDB mirror reports are suppressed
-  // via report_moderation and filtered out on the site. Our site, our rules.
+  // Current moderation state drives the toggle: when a report is shadow-banned,
+  // the Shadow ban button becomes Un-shadow ban (which releases it).
+  const state = (modState && modState.state) || 'visible';
+  const STATE_LABEL = { visible: 'Visible', shadowbanned: 'Shadow banned', deleted: 'Deleted' };
+  const isShadowed = state === 'shadowbanned';
+  const shadowBtn = isShadowed
+    ? `<button class="admin-btn admin-btn--ok flag-action-active" data-action="flag-release" data-id="${rowId}" title="Make this report visible again">Un-shadow ban</button>`
+    : `<button class="admin-btn admin-btn--warn" data-action="flag-shadowban" data-id="${rowId}" title="Hide from everyone except the submitter">Shadow ban</button>`;
+
+  // One action bar at the top. Actions apply to ANY source: Pulse reports are
+  // edited/deleted in our DB, ProtonDB mirror reports are suppressed via
+  // report_moderation and filtered out on the site. Our site, our rules.
   const actionBar = `
     <div class="flag-detail-actions">
+      <span class="flag-detail-state">State: <strong class="flag-state--${state}">${STATE_LABEL[state] || state}</strong></span>
       <button class="admin-btn admin-btn--ok" data-action="flag-release" data-id="${rowId}" title="Keep this report; clear its flagged/hidden state">Release</button>
-      <button class="admin-btn admin-btn--warn" data-action="flag-shadowban" data-id="${rowId}" title="Hide from everyone except the submitter">Shadow ban</button>
+      ${shadowBtn}
       <button class="admin-btn admin-btn--danger" data-action="flag-delete-report" data-id="${rowId}" title="Remove this report from the site">Delete report</button>
       <span class="flag-detail-actions-sep"></span>
       <button class="admin-btn admin-btn--sm" data-action="flag-set-status" data-status="in_review" data-id="${rowId}">In Review</button>
@@ -130,7 +140,5 @@ export function renderFlagDetail(flagRow, reportContent) {
     ${_renderRawFields(flagRow, 'Flag record (flagged_reports)')}
     ${reportContent
       ? _renderRawFields(reportContent, 'Linked report content')
-      : '<div class="admin-sub" style="margin-bottom:20px;font-style:italic">Linked report content not available (report_key may not match any stored report).</div>'}
-
-    ${actionBar}`;
+      : '<div class="admin-sub" style="margin-bottom:20px;font-style:italic">Linked report content not available (report_key may not match any stored report).</div>'}`;
 }

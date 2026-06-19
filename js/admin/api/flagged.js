@@ -83,6 +83,37 @@ export async function findPulseConfigId(session, app_id, report_key) {
   return row ? row.id : null;
 }
 
+// Current moderation state of a report so the detail view can show it and make
+// Shadow ban a toggle. Returns { kind: 'pulse'|'mirror', state: 'visible'|'shadowbanned'|'deleted' }.
+export async function fetchReportState(session, { app_id, report_key, source }) {
+  // Pulse: does the user_configs row exist and is it hidden?
+  try {
+    const cfgUrl = `${SUPABASE_URL}/rest/v1/user_configs?app_id=eq.${encodeURIComponent(app_id)}`
+      + `&select=id,gpu,proton_version,created_at,is_hidden`;
+    const cfgRes = await fetch(cfgUrl, { headers: supabaseHeaders(session) });
+    if (cfgRes.ok) {
+      const rows = await cfgRes.json();
+      const row = rows.find(r => {
+        const ts = Math.floor(new Date(r.created_at).getTime() / 1000);
+        return `${ts}:${(r.gpu || '').slice(0, 20)}:${(r.proton_version || '').slice(0, 15)}` === report_key;
+      });
+      if (row) return { kind: 'pulse', state: row.is_hidden ? 'shadowbanned' : 'visible' };
+    }
+  } catch { /* fall through to mirror check */ }
+  // Mirror: is there a suppression row?
+  try {
+    const modUrl = `${SUPABASE_URL}/rest/v1/report_moderation?app_id=eq.${encodeURIComponent(app_id)}`
+      + `&report_key=eq.${encodeURIComponent(report_key)}&source=eq.${encodeURIComponent(source || 'protondb')}&select=action`;
+    const modRes = await fetch(modUrl, { headers: supabaseHeaders(session) });
+    if (modRes.ok) {
+      const rows = await modRes.json();
+      if (rows.length) return { kind: 'mirror', state: rows[0].action === 'deleted' ? 'deleted' : 'shadowbanned' };
+    }
+  } catch { /* default below */ }
+  const s = String(source || '').toLowerCase();
+  return { kind: (s === 'pulse' || s === 'proton-pulse') ? 'pulse' : 'mirror', state: 'visible' };
+}
+
 async function _patchConfig(session, configId, body) {
   const url = `${SUPABASE_URL}/rest/v1/user_configs?id=eq.${configId}`;
   const res = await fetch(url, {
