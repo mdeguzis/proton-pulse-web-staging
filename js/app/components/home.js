@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=a9fb53ae';
-import { loadSearchIndex, searchIndex } from './search.js?v=3b08f36f';
+import { loadSearchIndex, searchIndex } from './search.js?v=0e708bed';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=4031c5fa';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=3a07c55e';
@@ -28,17 +28,67 @@ function _sortReports(reports, sort) {
   return copy;
 }
 
-function _filterByTier(reports, tier) {
-  if (!tier || tier === 'all') return reports;
-  if (tier === 'rated') return reports.filter(r => KNOWN_TIERS.has(r.tier));
-  return reports.filter(r => r.tier === tier);
+// Tier filter is multi-select. `sel` is a Set of chosen values. An empty set or
+// one containing 'all' means no filtering. Within the set values are OR'd:
+// 'rated' matches any KNOWN_TIER, 'unrated' matches anything that is not a known
+// tier (pending / no reports), and a specific tier matches that tier exactly.
+function _filterByTier(reports, sel) {
+  if (!sel || sel.size === 0 || sel.has('all')) return reports;
+  return reports.filter(r => {
+    const t = r.tier;
+    const isRated = KNOWN_TIERS.has(t);
+    for (const v of sel) {
+      if (v === 'rated' && isRated) return true;
+      if (v === 'unrated' && !isRated) return true;
+      if (v === t) return true;
+    }
+    return false;
+  });
 }
 
-function _filterByType(reports, type) {
-  if (!type || type === 'all') return reports;
-  return reports.filter(r => type === 'protondb'
-    ? (r.protondbCount || 0) > 0
-    : (r.pulseCount || 0) > 0);
+// Source filter is multi-select. `sel` is a Set of chosen values. Empty or 'all'
+// means no filtering. Values are OR'd: a report passes if it has any of the
+// selected sources.
+function _filterByType(reports, sel) {
+  if (!sel || sel.size === 0 || sel.has('all')) return reports;
+  return reports.filter(r => {
+    for (const v of sel) {
+      if (v === 'protondb' && (r.protondbCount || 0) > 0) return true;
+      if (v === 'pulse' && (r.pulseCount || 0) > 0) return true;
+    }
+    return false;
+  });
+}
+
+// Read the checked values (excluding 'all') from a checkbox filter group.
+function _readCheckGroup(groupEl) {
+  const set = new Set();
+  groupEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (cb.value !== 'all' && cb.checked) set.add(cb.value);
+  });
+  return set;
+}
+
+// Wire an "All + specific values" checkbox group. Checking "All" clears the
+// specifics; checking a specific clears "All"; unchecking the last specific
+// re-checks "All". Calls onChange with the resulting Set after every change.
+function _wireCheckGroup(groupEl, onChange) {
+  const allCb = groupEl.querySelector('input[value="all"]');
+  groupEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.value === 'all') {
+        if (cb.checked) {
+          groupEl.querySelectorAll('input[type="checkbox"]').forEach(o => { if (o !== cb) o.checked = false; });
+        } else if (_readCheckGroup(groupEl).size === 0) {
+          cb.checked = true; // never leave the whole group empty
+        }
+      } else {
+        if (cb.checked && allCb) allCb.checked = false;
+        if (_readCheckGroup(groupEl).size === 0 && allCb) allCb.checked = true;
+      }
+      onChange(_readCheckGroup(groupEl));
+    });
+  });
 }
 
 function _popularSub(g) {
@@ -109,35 +159,38 @@ export async function renderHomePage() {
 
     el.innerHTML = `
       <div class="home-filter-bar">
-        <div class="home-filter-selects">
-          <div class="home-filter-item">
-            <label class="home-filter-label" for="home-sort-select">Sort</label>
-            <select id="home-sort-select" class="home-filter-select">
-              <option value="recent">Recent</option>
-              <option value="best">Best Tier</option>
-              <option value="worst">Worst Tier</option>
-              <option value="count">Most Reported</option>
-            </select>
-          </div>
-          <div class="home-filter-item">
-            <label class="home-filter-label" for="home-tier-select">Tier</label>
-            <select id="home-tier-select" class="home-filter-select">
-              <option value="all">All</option>
-              <option value="rated">Rated only</option>
-              <option value="platinum">Platinum</option>
-              <option value="gold">Gold</option>
-              <option value="silver">Silver</option>
-              <option value="bronze">Bronze</option>
-              <option value="borked">Borked</option>
-            </select>
-          </div>
-          <div class="home-filter-item">
-            <label class="home-filter-label" for="home-type-select">Source</label>
-            <select id="home-type-select" class="home-filter-select">
-              <option value="all">All</option>
-              <option value="protondb">ProtonDB</option>
-              <option value="pulse">Pulse</option>
-            </select>
+        <div class="filter-wrap" id="home-filter-wrap">
+          <button class="filter-toggle-btn" id="home-filter-toggle" type="button" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39C20.25 4.95 19.8 4 18.95 4H5.04C4.2 4 3.74 4.95 4.25 5.61z"/></svg>
+            Filters<span class="filter-badge" id="home-filter-badge" hidden></span>
+          </button>
+          <div class="filter-panel filter-panel--stack" id="home-filter-panel">
+            <div class="filter-item">
+              <label class="home-filter-label" for="home-sort-select">Sort</label>
+              <select id="home-sort-select" class="home-filter-select">
+                <option value="recent">Recent</option>
+                <option value="best">Best Tier</option>
+                <option value="worst">Worst Tier</option>
+                <option value="count">Most Reported</option>
+              </select>
+            </div>
+            <div class="filter-checks" id="home-tier-checks" data-group="tier">
+              <span class="filter-checks-label">Tier</span>
+              <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
+              <label class="filter-check"><input type="checkbox" value="rated"><span>Rated</span></label>
+              <label class="filter-check"><input type="checkbox" value="unrated"><span>Not Rated Yet</span></label>
+              <label class="filter-check"><input type="checkbox" value="platinum"><span>Platinum</span></label>
+              <label class="filter-check"><input type="checkbox" value="gold"><span>Gold</span></label>
+              <label class="filter-check"><input type="checkbox" value="silver"><span>Silver</span></label>
+              <label class="filter-check"><input type="checkbox" value="bronze"><span>Bronze</span></label>
+              <label class="filter-check"><input type="checkbox" value="borked"><span>Borked</span></label>
+            </div>
+            <div class="filter-checks" id="home-source-checks" data-group="source">
+              <span class="filter-checks-label">Source</span>
+              <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
+              <label class="filter-check"><input type="checkbox" value="protondb"><span>ProtonDB</span></label>
+              <label class="filter-check"><input type="checkbox" value="pulse"><span>Pulse</span></label>
+            </div>
           </div>
         </div>
         <div class="home-layout-toggle">
@@ -156,8 +209,8 @@ export async function renderHomePage() {
       <div id="load-more-popular"></div>`;
 
     let currentSort = 'recent';
-    let currentTier = 'all';
-    let currentType = 'all';
+    let tierSel = new Set();   // empty => all tiers
+    let sourceSel = new Set(); // empty => all sources
     let currentLayout = 'grid';
     let showingUnrated = false;
     const unratedQueue = unratedGames.slice(PAGE_SIZE);
@@ -175,15 +228,11 @@ export async function renderHomePage() {
 
     function applyPopularFilters() {
       if (showingUnrated) return;
-      let filtered = ratedGames;
-      if (currentTier !== 'all' && currentTier !== 'rated') {
-        filtered = filtered.filter(g => String(g.rating || '').toLowerCase() === currentTier);
-      }
-      if (currentType !== 'all') {
-        filtered = filtered.filter(g => currentType === 'protondb'
-          ? (g.protondbCount || 0) > 0
-          : (g.pulseCount || 0) > 0);
-      }
+      // most_played rated games carry their tier on `rating`; reuse the shared
+      // Set-based filters by mapping rating -> tier so the popular list honors
+      // the same tier/source selection as recent reports.
+      const asReports = ratedGames.map(g => ({ ...g, tier: String(g.rating || '').toLowerCase() }));
+      const filtered = _filterByType(_filterByTier(asReports, tierSel), sourceSel);
       const cardsEl = document.getElementById('cards-popular');
       const loadMoreEl = document.getElementById('load-more-popular');
       if (!cardsEl) return;
@@ -205,7 +254,7 @@ export async function renderHomePage() {
     }
 
     function applyRecentFilters() {
-      const filtered = _filterByType(_filterByTier(_sortReports(allRecentReports, currentSort), currentTier), currentType);
+      const filtered = _filterByType(_filterByTier(_sortReports(allRecentReports, currentSort), tierSel), sourceSel);
       const cardsEl = document.getElementById('cards-recent');
       const loadMoreEl = document.getElementById('load-more-recent');
       const renderFn = currentLayout === 'list' ? _listRowHtml : _recentCardHtml;
@@ -227,16 +276,40 @@ export async function renderHomePage() {
       applyRecentFilters();
     });
 
-    document.getElementById('home-tier-select')?.addEventListener('change', e => {
-      currentTier = e.target.value;
-      applyRecentFilters();
-      applyPopularFilters();
+    // Filters popover: toggle open, close on outside click.
+    const filterWrap = document.getElementById('home-filter-wrap');
+    const filterToggle = document.getElementById('home-filter-toggle');
+    const filterPanel = document.getElementById('home-filter-panel');
+    const filterBadge = document.getElementById('home-filter-badge');
+    filterToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = filterPanel.classList.toggle('open');
+      filterToggle.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', (e) => {
+      if (filterPanel?.classList.contains('open') && filterWrap && !filterWrap.contains(e.target)) {
+        filterPanel.classList.remove('open');
+        filterToggle.setAttribute('aria-expanded', 'false');
+      }
     });
 
-    document.getElementById('home-type-select')?.addEventListener('change', e => {
-      currentType = e.target.value;
-      applyRecentFilters();
-      applyPopularFilters();
+    // Active-filter badge: count specific tier + source selections.
+    function updateFilterBadge() {
+      const n = tierSel.size + sourceSel.size;
+      filterToggle?.classList.toggle('has-filters', n > 0);
+      if (filterBadge) {
+        filterBadge.textContent = String(n);
+        filterBadge.hidden = n === 0;
+      }
+    }
+
+    const tierGroup = document.getElementById('home-tier-checks');
+    const sourceGroup = document.getElementById('home-source-checks');
+    if (tierGroup) _wireCheckGroup(tierGroup, sel => {
+      tierSel = sel; updateFilterBadge(); applyRecentFilters(); applyPopularFilters();
+    });
+    if (sourceGroup) _wireCheckGroup(sourceGroup, sel => {
+      sourceSel = sel; updateFilterBadge(); applyRecentFilters(); applyPopularFilters();
     });
 
     document.querySelectorAll('.home-layout-btn').forEach(btn => {
