@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=a9fb53ae';
-import { loadSearchIndex, searchIndex } from './search.js?v=d808f5db';
+import { loadSearchIndex, searchIndex } from './search.js?v=7f526e87';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=4031c5fa';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=3a07c55e';
@@ -351,16 +351,24 @@ export async function renderHomePage() {
       document.getElementById('home-size-toggle')?.classList.toggle('home-size-toggle--disabled', !enabled);
     }
 
+    // List/Grid is a saved user preference, like card size. Default grid.
+    const LAYOUT_KEY = 'pp:grid-layout';
+    function _savedLayout() {
+      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'grid'; } catch { return 'grid'; }
+    }
+    function applyLayout(layout) {
+      currentLayout = layout;
+      const isList = layout === 'list';
+      document.querySelectorAll('.home-layout-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
+      // List view applies to BOTH sections so they stay consistent.
+      document.getElementById('cards-recent')?.classList.toggle('home-cards-list', isList);
+      document.getElementById('cards-popular')?.classList.toggle('home-cards-list', isList);
+      _setSizeEnabled(!isList);
+    }
     document.querySelectorAll('.home-layout-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.home-layout-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentLayout = btn.dataset.layout;
-        const isList = currentLayout === 'list';
-        // List view applies to BOTH sections so they stay consistent.
-        document.getElementById('cards-recent')?.classList.toggle('home-cards-list', isList);
-        document.getElementById('cards-popular')?.classList.toggle('home-cards-list', isList);
-        _setSizeEnabled(!isList);
+        try { localStorage.setItem(LAYOUT_KEY, btn.dataset.layout); } catch { /* ignore */ }
+        applyLayout(btn.dataset.layout);
         applyRecentFilters();
         applyPopularFilters();
       });
@@ -388,6 +396,7 @@ export async function renderHomePage() {
       });
     });
     applyGridSize(_savedSize());
+    applyLayout(_savedLayout()); // restore saved list/grid before first render
 
     applyRecentFilters();
     applyPopularFilters();

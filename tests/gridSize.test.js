@@ -20,6 +20,12 @@ describe('configurable card size (S/M/L)', () => {
     expect(homeSrc).toContain('applyGridSize(_savedSize())');
   });
 
+  test('list/grid layout is also a saved preference, restored on load', () => {
+    expect(homeSrc).toContain("const LAYOUT_KEY = 'pp:grid-layout'");
+    expect(homeSrc).toContain('localStorage.setItem(LAYOUT_KEY, btn.dataset.layout)');
+    expect(homeSrc).toContain('applyLayout(_savedLayout())');
+  });
+
   test('size class is applied to both card lists', () => {
     expect(homeSrc).toContain("['cards-recent', 'cards-popular'].forEach");
     expect(homeSrc).toContain('el2.classList.add(`cards--${size}`)');
