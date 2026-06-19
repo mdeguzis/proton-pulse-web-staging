@@ -26,7 +26,7 @@ import {
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=59c9f51e';
-import { showEditCloudConfigModal, showEditReportModal, showEditSystemModal, showAddSystemModal } from './components/edit-modals.js?v=27767f46';
+import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=27767f46';
 
 (async function () {
   const signedIn  = document.getElementById('profile-signed-in');
@@ -690,7 +690,7 @@ import { showEditCloudConfigModal, showEditReportModal, showEditSystemModal, sho
         <td class="col-action">
           <div class="profile-configs-actions">
             <button type="button" class="profile-configs-action profile-configs-view-link" data-role="toggle-details" aria-expanded="false">View</button>
-            <button type="button" class="profile-configs-action profile-configs-edit-btn" data-role="edit">Edit</button>
+            <a href="system-edit.html?device=${encodeURIComponent(r.device_id)}" class="profile-configs-action profile-configs-edit-btn">Edit</a>
             <button type="button" class="profile-configs-action profile-configs-delete-btn" data-role="delete">Delete</button>
           </div>
         </td>
@@ -810,11 +810,6 @@ import { showEditCloudConfigModal, showEditReportModal, showEditSystemModal, sho
         if (detailRow) detailRow.hidden = expanded;
         return;
       }
-      if (btn.dataset.role === 'edit') {
-        const row = systemsCache.find(r => r.device_id === deviceId);
-        if (row) showEditSystemModal(row, protonPulseUserId, s, () => { void refreshSystems(); });
-        return;
-      }
       if (btn.dataset.role === 'delete') {
         if (!window.confirm('Delete this system? The plugin will re-create it next time you upload.')) return;
         await deleteSystem(protonPulseUserId, deviceId, s);
@@ -850,17 +845,11 @@ import { showEditCloudConfigModal, showEditReportModal, showEditSystemModal, sho
   systemsTable?.addEventListener('focusout', handleSystemsLabelBlur);
   systemsRefresh?.addEventListener('click', () => { void refreshSystems(); });
 
-  // Add system button opens modal
+  // Add system navigates to system-edit page
   const addSysBtn = document.getElementById('add-system-btn');
   if (addSysBtn) {
-    addSysBtn.addEventListener('click', async () => {
-      const s = await SupaAuth.getSession();
-      const protonPulseUserId = getProtonPulseUserIdFromSession(s);
-      if (!protonPulseUserId) return;
-      showAddSystemModal(protonPulseUserId, s, { supabaseUserSystemsUrl, supabaseHeaders, systemsCache }, () => {
-        showSystemsStatus('System added', true);
-        void refreshSystems();
-      });
+    addSysBtn.addEventListener('click', () => {
+      window.location.href = 'system-edit.html';
     });
   }
 
