@@ -759,7 +759,9 @@
         if (avatarEl)  avatarEl.src = (user.user_metadata && user.user_metadata.avatar_url) || '';
         if (avatarEl)  avatarEl.alt = (user.user_metadata && user.user_metadata.name) || user.email || '';
         const rawName = (user.user_metadata && user.user_metadata.name) || user.email || '';
-        if (nameEl)    nameEl.textContent = rawName.length > 10 ? rawName.slice(0, 10) + '\u2026' : rawName;
+        // Set the full name; CSS (.auth-username) handles truncation, capping it
+        // on narrow viewports but showing it in full on desktop (>=1024px).
+        if (nameEl) { nameEl.textContent = rawName; nameEl.title = rawName; }
 
         // Show/hide the pre-rendered admin nav link based on admin status.
         checkIsAdmin(state.session).then(function (admin) {
