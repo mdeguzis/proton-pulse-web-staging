@@ -18,7 +18,7 @@ import { supabaseHeaders } from './api/supabase.js?v=bdf4b262';
 import {
   supabaseUserSystemsUrl, listUserSystems, setDefaultSystem,
   clearDefaultSystem, updateSystemLabel, deleteSystem,
-} from './api/systems.js?v=fcfc95e6';
+} from './api/systems.js?v=8c9eb2f2';
 import {
   fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
   deleteAllMyData, fetchAllMyData, checkMyDataExists, unpublishReport,
@@ -26,7 +26,7 @@ import {
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=59c9f51e';
-import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=d0e0780c';
+import { showEditCloudConfigModal, showEditReportModal } from './components/edit-modals.js?v=27767f46';
 
 (async function () {
   const signedIn  = document.getElementById('profile-signed-in');
@@ -678,7 +678,6 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
             <input type="text" class="profile-systems-label-input"
               data-role="label" value="${escapeHtml(displayLabel)}" maxlength="80">
             <div class="profile-systems-summary">${escapeHtml(summary)}</div>
-            <button type="button" class="profile-systems-view-btn" data-role="toggle-details" aria-expanded="false">View hardware</button>
           </div>
         </td>
         <td>${escapeHtml(formatSystemUpdated(r.updated_at))}</td>
@@ -686,11 +685,14 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
           <label class="profile-systems-default-toggle" title="Set as default">
             <input type="checkbox" data-role="default" ${r.is_default ? 'checked' : ''}>
             <span class="profile-systems-default-switch" aria-hidden="true"></span>
-            <span class="profile-systems-default-text">Default</span>
           </label>
         </td>
-        <td class="col-delete">
-          <button type="button" class="profile-systems-trash" data-role="delete" title="Delete">x</button>
+        <td class="col-action">
+          <div class="profile-configs-actions">
+            <button type="button" class="profile-configs-action profile-configs-view-link" data-role="toggle-details" aria-expanded="false">View</button>
+            <a href="system-edit.html?device=${encodeURIComponent(r.device_id)}" class="profile-configs-action profile-configs-edit-btn">Edit</a>
+            <button type="button" class="profile-configs-action profile-configs-delete-btn" data-role="delete">Delete</button>
+          </div>
         </td>
       </tr>
       <tr class="profile-systems-details-row" data-details-for="${escapeHtml(r.device_id)}" hidden>
@@ -804,7 +806,7 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
           .find((row) => row.getAttribute('data-details-for') === deviceId);
         const expanded = btn.getAttribute('aria-expanded') === 'true';
         btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        btn.textContent = expanded ? 'View hardware' : 'Hide hardware';
+        btn.textContent = expanded ? 'View' : 'Hide';
         if (detailRow) detailRow.hidden = expanded;
         return;
       }
@@ -843,97 +845,13 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
   systemsTable?.addEventListener('focusout', handleSystemsLabelBlur);
   systemsRefresh?.addEventListener('click', () => { void refreshSystems(); });
 
-  // manual system add form
+  // Add system navigates to system-edit page
   const addSysBtn = document.getElementById('add-system-btn');
-  const addSysForm = document.getElementById('add-system-form');
-  const addSysSubmit = document.getElementById('add-sys-submit');
-  const addSysCancel = document.getElementById('add-sys-cancel');
-  const addSysStatus = document.getElementById('add-sys-status');
-  if (addSysBtn && addSysForm) {
+  if (addSysBtn) {
     addSysBtn.addEventListener('click', () => {
-      addSysForm.hidden = !addSysForm.hidden;
-      addSysBtn.textContent = addSysForm.hidden ? '+ Add system' : '- Cancel';
+      window.location.href = 'system-edit.html';
     });
   }
-
-  if (addSysCancel && addSysForm && addSysBtn) {
-    addSysCancel.addEventListener('click', () => {
-      addSysForm.hidden = true;
-      addSysBtn.textContent = '+ Add system';
-    });
-  }
-
-  addSysSubmit?.addEventListener('click', async () => {
-    const label = document.getElementById('add-sys-label')?.value?.trim() || 'Manual system';
-    const cpu = document.getElementById('add-sys-cpu')?.value?.trim() || '';
-    const gpu = document.getElementById('add-sys-gpu')?.value?.trim() || '';
-    const gpuVendor = document.getElementById('add-sys-gpu-vendor')?.value || '';
-    const gpuDriver = document.getElementById('add-sys-gpu-driver')?.value?.trim() || '';
-    const ram = document.getElementById('add-sys-ram')?.value?.trim() || '';
-    const vram = document.getElementById('add-sys-vram')?.value?.trim() || '';
-    const os = document.getElementById('add-sys-os')?.value?.trim() || '';
-    const kernel = document.getElementById('add-sys-kernel')?.value?.trim() || '';
-
-    if (!cpu && !gpu) {
-      if (addSysStatus) { addSysStatus.textContent = 'At least CPU or GPU is needed'; addSysStatus.style.color = 'var(--red)'; }
-      return;
-    }
-
-    // build a sysinfo_text blob that parseSteamSystemInfo can read back
-    const lines = [];
-    if (cpu) lines.push(`CPU Brand: ${cpu}`);
-    if (gpu) lines.push(`Video Card: ${gpu}`);
-    if (gpuDriver) lines.push(`Driver Version: ${gpuDriver}`);
-    // convert user-entered GB to the MB format parseSteamSystemInfo expects
-    if (ram) {
-      const gb = parseInt(ram.replace(/[^0-9]/g, ''), 10);
-      lines.push(`RAM: ${gb * 1024} Mb`);
-    }
-    if (vram) lines.push(`VRAM: ${vram} Mb`);
-    if (os) lines.push(`OS Version: ${os}`);
-    if (kernel) lines.push(`Kernel Version: ${kernel}`);
-    const sysinfoText = lines.join('\n');
-
-    // generate a device_id for web-created systems so they dont collide
-    const deviceId = 'web-' + crypto.randomUUID().slice(0, 12);
-
-    try {
-      addSysSubmit.disabled = true;
-      addSysSubmit.textContent = 'Saving...';
-      const s = await SupaAuth.getSession();
-      const protonPulseUserId = getProtonPulseUserIdFromSession(s);
-      if (!protonPulseUserId) throw new Error('Not signed in');
-
-      const isFirst = systemsCache.length === 0;
-
-      const resp = await fetch(supabaseUserSystemsUrl(), {
-        method: 'POST',
-        headers: supabaseHeaders(s, { Prefer: 'return=minimal' }),
-        body: JSON.stringify({
-          proton_pulse_user_id: protonPulseUserId,
-          device_id: deviceId,
-          label,
-          sysinfo_text: sysinfoText,
-          is_default: isFirst,
-          updated_at: new Date().toISOString(),
-        }),
-      });
-      if (!resp.ok) throw new Error(`Save failed: HTTP ${resp.status}`);
-
-      addSysForm.hidden = true;
-      addSysBtn.textContent = '+ Add system';
-      // clear the form inputs
-      ['add-sys-label','add-sys-cpu','add-sys-gpu','add-sys-gpu-vendor','add-sys-gpu-driver','add-sys-ram','add-sys-vram','add-sys-os','add-sys-kernel']
-        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-      showSystemsStatus('System added', true);
-      void refreshSystems();
-    } catch (e) {
-      if (addSysStatus) { addSysStatus.textContent = e.message || 'Failed'; addSysStatus.style.color = 'var(--red)'; }
-    } finally {
-      addSysSubmit.disabled = false;
-      addSysSubmit.textContent = 'Save system';
-    }
-  });
 
   // Initial fetch so the table populates on page load
   void refreshSystems();
@@ -979,10 +897,9 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
   const myConfigsRefresh  = document.getElementById('my-configs-refresh-btn');
 
   function showMyConfigsStatus(msg, ok) {
-    if (!myConfigsStatus) return;
-    myConfigsStatus.textContent = msg;
-    myConfigsStatus.style.color = ok ? 'var(--green)' : 'var(--red)';
-    setTimeout(() => { myConfigsStatus.textContent = ''; }, 3000);
+    // Surface report actions (publish/unpublish/delete/update) through the
+    // shared toast so feedback is consistent with the rest of the site.
+    if (ok) window.ppToast?.success(msg); else window.ppToast?.error(msg);
   }
 
   function renderMyConfigs(rows) {
@@ -1021,7 +938,7 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
         // already have (proton version, launch options, hardware) and
         // validation enforces the rest before save
         row.cloud && row.unpublished
-          ? `<a class="profile-configs-action profile-configs-publish-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1" target="_blank" rel="noopener">Publish</a>`
+          ? `<a class="profile-configs-action profile-configs-publish-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1&return=profile.html" target="_blank" rel="noopener">Publish</a>`
           : '',
         row.published_id
           ? `<button type="button" class="profile-configs-action profile-configs-unpublish-btn" data-published-id="${escapeHtml(String(row.published_id))}">Unpublish</button>`
@@ -1030,9 +947,9 @@ import { showEditCloudConfigModal, showEditReportModal } from './components/edit
         // pre-fill from user_configs). Cloud-only rows go to submit.html?fromCloud=1
         // where a Save button lets them update the draft without publishing.
         row.published_id
-          ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&edit=${escapeHtml(String(row.published_id))}" target="_blank" rel="noopener">Edit</a>`
+          ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&edit=${escapeHtml(String(row.published_id))}&return=profile.html" target="_blank" rel="noopener">Edit</a>`
           : row.cloud
-            ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1" target="_blank" rel="noopener">Edit</a>`
+            ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1&return=profile.html" target="_blank" rel="noopener">Edit</a>`
             : '',
         `<button type="button" class="profile-configs-action profile-configs-delete-btn" data-app-id="${escapeHtml(String(row.app_id))}">Delete</button>`,
       ].filter(Boolean).join('');

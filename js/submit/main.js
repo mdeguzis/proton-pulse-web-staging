@@ -17,6 +17,13 @@ import { SupaAuth } from '../shared/config.js?v=f6f2c00a';
   // user_configs with form_responses)
   const fromCloud = !isEdit && params.get('fromCloud') === '1';
 
+  // Where to go after a successful save. Defaults to the game page, but the
+  // profile page passes return=profile.html so an edit returns to where the
+  // user came from. Sanitized to a same-origin relative .html path to avoid an
+  // open-redirect: no protocol, no //, must end in .html.
+  const returnRaw = params.get('return') || '';
+  const returnTo = /^[a-z0-9._-]+\.html(?:[?#].*)?$/i.test(returnRaw) ? returnRaw : null;
+
   if (!appId) {
     document.getElementById('game-title').textContent = 'No app ID provided';
     document.getElementById('submit-form-content').innerHTML =
@@ -293,7 +300,6 @@ import { SupaAuth } from '../shared/config.js?v=f6f2c00a';
       const statusEl = el.querySelector('#submit-status');
       const submitBtn = form.querySelector('button[type="submit"]');
       const savingText = isEdit ? 'Saving...' : 'Submitting...';
-      const savedText  = isEdit ? 'Saved! Redirecting...' : 'Report submitted! Redirecting...';
 
       el.querySelectorAll('.sf-question.sf-needs-answer, .sf-row.sf-needs-answer').forEach(q => q.classList.remove('sf-needs-answer'));
       const state = form._formState || {};
@@ -344,16 +350,20 @@ import { SupaAuth } from '../shared/config.js?v=f6f2c00a';
           result = await submitReport(appId, title, form);
         }
         if (result.ok) {
-          if (statusEl) { statusEl.textContent = savedText; statusEl.style.color = 'var(--green)'; }
+          // Toast is the single success confirmation now; no duplicate inline text.
+          window.ppToast?.success(isEdit ? 'Changes saved.' : 'Report submitted. Thanks!');
           if (typeof window.ppTrack === 'function') window.ppTrack('report_submit', { app_id: String(appId), is_edit: isEdit });
-          setTimeout(() => { window.location.href = `app.html#/app/${appId}`; }, 1200);
+          const dest = returnTo || `app.html#/app/${appId}`;
+          setTimeout(() => { window.location.href = dest; }, 900);
         } else {
           if (statusEl) { statusEl.textContent = result.error || 'Failed'; statusEl.style.color = 'var(--red)'; }
+          window.ppToast?.error(result.error || (isEdit ? 'Could not save changes.' : 'Could not submit the report.'));
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Save Changes' : 'Submit'; }
         }
       } catch (err) {
         console.error('[submit] save failed:', err);
         if (statusEl) { statusEl.textContent = err.message || 'Failed'; statusEl.style.color = 'var(--red)'; }
+        window.ppToast?.error(`Submit failed: ${err.message || err}`);
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Save Changes' : 'Submit'; }
       }
     });

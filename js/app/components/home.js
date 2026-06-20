@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=a9fb53ae';
-import { loadSearchIndex, searchIndex } from './search.js?v=ba3209c7';
+import { loadSearchIndex, searchIndex } from './search.js?v=ec18de56';
 import { SB_KEY, SB_URL, isNonSteamAppId } from '../config.js?v=4031c5fa';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=3a07c55e';
@@ -106,26 +106,6 @@ function _allShownNote(count) {
   return `<p class="home-results-note">Showing all ${count} result${count === 1 ? '' : 's'}</p>`;
 }
 
-function _appendCards(sectionId, queue) {
-  const cardsEl = document.getElementById(`cards-${sectionId}`);
-  const btnEl = document.getElementById(`load-more-${sectionId}`);
-  if (!cardsEl || !queue.length) { if (btnEl) btnEl.innerHTML = ''; return; }
-  const batch = queue.splice(0, PAGE_SIZE);
-  const html = sectionId === 'recent'
-    ? batch.map(_recentCardHtml).join('')
-    : batch.map(g => {
-        const tier = g.tier || String(g.rating || '').toLowerCase();
-        return renderGameCard({
-          href: `#/app/${g.appId}`, appId: g.appId, imgUrl: g.headerImage || undefined,
-          title: g.title,
-          sub: tier === 'pending' ? 'No reports yet · be the first' : _popularSub(g),
-          tier: tier || undefined, sourceLabel: 'Steam',
-        });
-      }).join('');
-  cardsEl.insertAdjacentHTML('beforeend', html);
-  if (!queue.length && btnEl) btnEl.innerHTML = '';
-}
-
 function _recentCardHtml(r) {
   return renderGameCard({
     href: `#/app/${r.appId}`,
@@ -198,9 +178,16 @@ export async function renderHomePage() {
             </div>
           </div>
         </div>
-        <div class="home-layout-toggle">
-          <button class="home-layout-btn active" data-layout="grid" title="Grid view">Grid</button>
-          <button class="home-layout-btn" data-layout="list" title="List view">List</button>
+        <div class="home-view-controls">
+          <div class="home-size-toggle" id="home-size-toggle" title="Card size">
+            <button class="home-size-btn" data-size="sm" type="button" title="Small cards">S</button>
+            <button class="home-size-btn" data-size="md" type="button" title="Medium cards">M</button>
+            <button class="home-size-btn" data-size="lg" type="button" title="Large cards">L</button>
+          </div>
+          <div class="home-layout-toggle">
+            <button class="home-layout-btn active" data-layout="grid" title="Grid view">Grid</button>
+            <button class="home-layout-btn" data-layout="list" title="List view">List</button>
+          </div>
         </div>
       </div>
       <p class="section-label" style="margin-bottom:10px">Recent Reports</p>
@@ -249,21 +236,33 @@ export async function renderHomePage() {
       const loadMoreEl = document.getElementById('load-more-popular');
       if (!cardsEl) return;
       const initial = filtered.slice(0, PAGE_SIZE);
-      const newQueue = filtered.slice(PAGE_SIZE);
-      cardsEl.innerHTML = initial.map(g => renderGameCard({
-        href: `#/app/${g.appId}`, appId: g.appId, imgUrl: g.headerImage || undefined,
-        title: g.title,
-        sub: g.tier === 'pending' ? 'No reports yet · be the first' : _popularSub(g),
-        tier: g.tier || undefined, sourceLabel: 'Steam',
-      })).join('') || '<div class="state-box">No games match the current filters.</div>';
+      const queue = filtered.slice(PAGE_SIZE);
+      cardsEl.innerHTML = initial.map(_popularItemHtml).join('')
+        || '<div class="state-box">No games match the current filters.</div>';
       if (loadMoreEl) {
-        if (newQueue.length) {
+        if (queue.length) {
           loadMoreEl.innerHTML = _loadMoreBtn('popular');
-          loadMoreEl.querySelector('button').addEventListener('click', () => _appendCards('popular', newQueue));
+          loadMoreEl.querySelector('button').addEventListener('click', () => {
+            const batch = queue.splice(0, PAGE_SIZE);
+            cardsEl.insertAdjacentHTML('beforeend', batch.map(_popularItemHtml).join(''));
+            if (!queue.length) loadMoreEl.innerHTML = '';
+          });
         } else {
           loadMoreEl.innerHTML = initial.length ? _allShownNote(filtered.length) : '';
         }
       }
+    }
+
+    // Render a popular game honoring the current view type: a slim list row in
+    // List mode (same as recent reports), or a sized card in Grid mode.
+    function _popularItemHtml(g) {
+      if (currentLayout === 'list') return _listRowHtml(g);
+      return renderGameCard({
+        href: `#/app/${g.appId}`, appId: g.appId, imgUrl: g.headerImage || undefined,
+        title: g.title,
+        sub: g.tier === 'pending' ? 'No reports yet · be the first' : _popularSub(g),
+        tier: g.tier || undefined, sourceLabel: 'Steam',
+      });
     }
 
     function applyRecentFilters() {
@@ -277,7 +276,12 @@ export async function renderHomePage() {
       if (loadMoreEl) {
         if (queue.length) {
           loadMoreEl.innerHTML = _loadMoreBtn('recent');
-          loadMoreEl.querySelector('button').addEventListener('click', () => _appendCards('recent', queue));
+          // Append with the same renderFn so load-more keeps the current view.
+          loadMoreEl.querySelector('button').addEventListener('click', () => {
+            const batch = queue.splice(0, PAGE_SIZE);
+            cardsEl.insertAdjacentHTML('beforeend', batch.map(renderFn).join(''));
+            if (!queue.length) loadMoreEl.innerHTML = '';
+          });
         } else {
           loadMoreEl.innerHTML = filtered.length ? _allShownNote(filtered.length) : '';
         }
@@ -341,16 +345,58 @@ export async function renderHomePage() {
       applyPopularFilters();
     });
 
+    // S/M/L only make sense for the card (grid) view; disable them in list mode.
+    function _setSizeEnabled(enabled) {
+      document.querySelectorAll('.home-size-btn').forEach(b => { b.disabled = !enabled; });
+      document.getElementById('home-size-toggle')?.classList.toggle('home-size-toggle--disabled', !enabled);
+    }
+
+    // List/Grid is a saved user preference, like card size. Default grid.
+    const LAYOUT_KEY = 'pp:grid-layout';
+    function _savedLayout() {
+      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'grid'; } catch { return 'grid'; }
+    }
+    function applyLayout(layout) {
+      currentLayout = layout;
+      const isList = layout === 'list';
+      document.querySelectorAll('.home-layout-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
+      // List view applies to BOTH sections so they stay consistent.
+      document.getElementById('cards-recent')?.classList.toggle('home-cards-list', isList);
+      document.getElementById('cards-popular')?.classList.toggle('home-cards-list', isList);
+      _setSizeEnabled(!isList);
+    }
     document.querySelectorAll('.home-layout-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.home-layout-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentLayout = btn.dataset.layout;
-        const cardsEl = document.getElementById('cards-recent');
-        if (cardsEl) cardsEl.classList.toggle('home-cards-list', currentLayout === 'list');
+        try { localStorage.setItem(LAYOUT_KEY, btn.dataset.layout); } catch { /* ignore */ }
+        applyLayout(btn.dataset.layout);
         applyRecentFilters();
+        applyPopularFilters();
       });
     });
+
+    // Card size (S/M/L) is a saved user preference. Applies the cards--<size>
+    // class to both card lists; default medium.
+    const SIZE_KEY = 'pp:grid-size';
+    const SIZES = ['sm', 'md', 'lg'];
+    function _savedSize() {
+      try { const s = localStorage.getItem(SIZE_KEY); return SIZES.includes(s) ? s : 'md'; } catch { return 'md'; }
+    }
+    function applyGridSize(size) {
+      ['cards-recent', 'cards-popular'].forEach(id => {
+        const el2 = document.getElementById(id);
+        if (el2) { SIZES.forEach(s => el2.classList.remove(`cards--${s}`)); el2.classList.add(`cards--${size}`); }
+      });
+      document.querySelectorAll('.home-size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+    }
+    document.querySelectorAll('.home-size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const size = btn.dataset.size;
+        try { localStorage.setItem(SIZE_KEY, size); } catch { /* ignore */ }
+        applyGridSize(size);
+      });
+    });
+    applyGridSize(_savedSize());
+    applyLayout(_savedLayout()); // restore saved list/grid before first render
 
     applyRecentFilters();
     applyPopularFilters();

@@ -13,7 +13,7 @@ import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPh
 import { renderPhrases } from './components/phrases.js?v=79051c31';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
 import { fetchUserReports, fetchUserActivity } from './api/userDetail.js?v=916aedfc';
-import { renderUserDetail } from './components/userDetail.js?v=7025c758';
+import { renderUserDetail } from './components/userDetail.js?v=74450110';
 import { fetchAnalytics } from './api/analytics.js?v=1b3f4599';
 import { renderAnalytics } from './components/analytics.js?v=7d29939b';
 import { renderCacheStatus } from './components/cache-status.js?v=764c4d18';
@@ -446,10 +446,11 @@ function wireEvents() {
         if (target) target.status = newStatus;
         btn.disabled = false;
         btn.textContent = origText;
+        window.ppToast?.success(`Status set to ${STATUS_LABELS[newStatus] || newStatus}.`);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = origText;
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(`Could not update status: ${err.message}`);
       }
     }
 
@@ -462,10 +463,11 @@ function wireEvents() {
         await deleteFlaggedReport(currentSession, id);
         flaggedRows = flaggedRows.filter(r => String(r.id) !== id);
         activateTab('flagged');
+        window.ppToast?.success('Flag entry deleted.');
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Delete';
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(`Could not delete flag: ${err.message}`);
       }
     }
 
@@ -506,10 +508,16 @@ function wireEvents() {
         // flips to Un-shadow ban) instead of bouncing back to the list. Only the
         // Back button / browser back should leave this screen.
         await loadFlagDetail(target || flag);
+        const doneMsg = {
+          'flag-shadowban': 'Report shadow banned.',
+          'flag-release': 'Report released and made visible.',
+          'flag-delete-report': 'Report deleted.',
+        }[action];
+        window.ppToast?.success(doneMsg);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = origText;
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(`Action failed: ${err.message}`);
       }
     }
   });
@@ -543,11 +551,12 @@ function wireEvents() {
       btn.textContent = '...';
       try {
         await unbanUser(currentSession, btn.dataset.banId, { protonPulseUserId: btn.dataset.userid, clientId: btn.dataset.clientid });
+        window.ppToast?.success('User unbanned. Their reports are visible again.');
         loadUsers();
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Unban';
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
       }
     }
     if (action === 'view-user-detail') {
@@ -555,7 +564,7 @@ function wireEvents() {
       try {
         user = JSON.parse(btn.dataset.userobj);
       } catch (_) {
-        alert('Could not parse user data.');
+        window.ppToast?.error('Could not parse user data.');
         return;
       }
       loadUserDetail(user);
@@ -579,11 +588,12 @@ function wireEvents() {
       btn.textContent = '...';
       try {
         await unbanUser(currentSession, btn.dataset.banId, { protonPulseUserId: btn.dataset.userid, clientId: btn.dataset.clientid });
+        window.ppToast?.success('User unbanned.');
         activateTab('users');
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Unban';
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
       }
     }
   });
@@ -598,10 +608,11 @@ function wireEvents() {
     try {
       await unbanUser(currentSession, btn.dataset.banId, { protonPulseUserId: btn.dataset.userId, clientId: btn.dataset.clientId });
       btn.closest('tr').remove();
+      window.ppToast?.success('User unbanned.');
     } catch (err) {
       btn.disabled = false;
       btn.textContent = 'Unban';
-      alert(`Error: ${err.message}`);
+      window.ppToast?.error(err.message);
     }
   });
 
@@ -627,10 +638,11 @@ function wireEvents() {
         reason,
       });
       closeBanModal();
+      window.ppToast?.success(`Banned ${pendingBan.username || 'user'}.`);
       // Refresh the users list so the newly banned user shows Unban.
       loadUsers();
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      window.ppToast?.error(err.message);
       confirmBtn.disabled = false;
       confirmBtn.textContent = 'Ban';
     }
@@ -659,8 +671,8 @@ function wireEvents() {
     const permissions = newAdminRole === 'super_admin' ? presetFor('super_admin') : newAdminPerms;
     try {
       await addAdmin(currentSession, { uuid, username, role, permissions });
-      status.textContent = `Added ${username}.`;
-      status.style.color = 'var(--green)';
+      window.ppToast?.success(`Added ${username} as admin.`);
+      status.textContent = '';
       document.getElementById('new-admin-uuid').value = '';
       document.getElementById('new-admin-username').value = '';
       newAdminRole = 'moderator';
@@ -668,8 +680,7 @@ function wireEvents() {
       syncNewAdminForm();
       loadAdmins();
     } catch (e) {
-      status.textContent = e.message;
-      status.style.color = 'var(--red)';
+      window.ppToast?.error(e.message);
     }
   });
 
@@ -696,7 +707,7 @@ function wireEvents() {
         await applyAdminChange(uuid, resolveRoleLabel('moderator', perms), perms);
       }
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      window.ppToast?.error(err.message);
       if (uuid !== 'new') loadAdmins();
     }
   });
@@ -710,17 +721,18 @@ function wireEvents() {
       btn.disabled = true; btn.textContent = '...';
       try {
         await removeAdmin(currentSession, uuid);
+        window.ppToast?.success(`Removed ${btn.dataset.name} as admin.`);
         loadAdmins();
       } catch (err) {
         btn.disabled = false; btn.textContent = 'Remove';
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
       }
     } else if (action === 'remove-perm') {
       try {
         const perms = removePermission(currentRowPerms(uuid), btn.dataset.perm);
         await applyAdminChange(uuid, resolveRoleLabel('moderator', perms), perms);
       } catch (err) {
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
         if (uuid !== 'new') loadAdmins();
       }
     }
@@ -799,9 +811,10 @@ function wireEvents() {
       try {
         await removeBannedPhrase(currentSession, id);
         btn.closest('tr').remove();
+        window.ppToast?.success('Banned phrase removed.');
       } catch (err) {
         btn.disabled = false; btn.textContent = 'Remove';
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
       }
     }
 
@@ -810,10 +823,11 @@ function wireEvents() {
       btn.disabled = true; btn.textContent = '...';
       try {
         await toggleBannedPhrase(currentSession, id, enabled);
+        window.ppToast?.success(enabled ? 'Phrase enabled.' : 'Phrase disabled.');
         loadPhrases();
       } catch (err) {
         btn.disabled = false;
-        alert(`Error: ${err.message}`);
+        window.ppToast?.error(err.message);
       }
     }
   });
