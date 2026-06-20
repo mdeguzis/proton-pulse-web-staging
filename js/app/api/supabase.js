@@ -43,7 +43,7 @@ export async function fetchSupabase(appId) {
 export async function fetchNativeReports(appId) {
   try {
     const r = await fetch(
-      `${SB_URL}/user_configs?app_id=eq.${appId}&is_flagged=neq.true&select=id,client_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,gpu_architecture,ram,os,kernel,proton_version,rating,duration,duration_minutes,notes,vram_mb,form_responses,config_key,game_owned,created_at,updated_at,source,is_flagged&order=created_at.desc`,
+      `${SB_URL}/user_configs?app_id=eq.${appId}&is_flagged=neq.true&select=id,client_id,proton_pulse_user_id,app_id,title,cpu,gpu,gpu_driver,gpu_vendor,gpu_architecture,ram,os,kernel,proton_version,rating,duration,duration_minutes,notes,vram_mb,form_responses,config_key,game_owned,created_at,updated_at,source,is_flagged&order=created_at.desc`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (!r.ok) return [];
@@ -59,6 +59,7 @@ export async function fetchNativeReports(appId) {
       reportId:          row.id ?? null,
       appId:             row.app_id,
       clientId:          row.client_id || '',
+      protonPulseUserId: row.proton_pulse_user_id || null,
       title:             row.title || `App ${row.app_id}`,
       cpu:               row.cpu || '',
       gpu:               row.gpu || '',
