@@ -79,6 +79,7 @@ import { supabaseUserSystemsUrl, listUserSystems, updateSystem } from './api/sys
 
     // Per-field validation
     let firstError = null;
+    const VALIDATED_FIELDS = ['sys-cpu', 'sys-gpu', 'sys-gpu-vendor', 'sys-ram', 'sys-os'];
     function fieldError(id, msg) {
       const el = document.getElementById(id);
       const labelEl = formEl.querySelector(`label[for="${id}"]`);
@@ -87,7 +88,7 @@ import { supabaseUserSystemsUrl, listUserSystems, updateSystem } from './api/sys
       if (!firstError) firstError = { el, msg };
     }
     function clearErrors() {
-      ['sys-cpu', 'sys-gpu'].forEach(id => {
+      VALIDATED_FIELDS.forEach(id => {
         const el = document.getElementById(id);
         const labelEl = formEl.querySelector(`label[for="${id}"]`);
         if (el) el.style.outline = '';
@@ -99,6 +100,12 @@ import { supabaseUserSystemsUrl, listUserSystems, updateSystem } from './api/sys
     if (!cpu && !gpu) {
       fieldError('sys-cpu', 'At least CPU or GPU is required');
       fieldError('sys-gpu', 'At least CPU or GPU is required');
+    }
+    if (!gpuVendor) fieldError('sys-gpu-vendor', 'GPU Vendor is required');
+    if (!ram) fieldError('sys-ram', 'RAM is required');
+    if (!os) fieldError('sys-os', 'OS is required');
+
+    if (firstError) {
       statusEl.textContent = firstError.msg;
       statusEl.style.color = 'var(--red)';
       firstError.el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
