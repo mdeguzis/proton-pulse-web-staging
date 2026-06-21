@@ -25,7 +25,7 @@ export async function renderPending(session, { onApproved } = {}) {
     table.hidden = false;
     tbody.innerHTML = reports.map(r => {
       const game = escapeHtml(r.app_id ? `App ${r.app_id}` : 'Unknown');
-      const reportId = escapeHtml(r.id?.slice(0, 8) || '?');
+      const reportId = escapeHtml(r.id != null ? String(r.id).slice(0, 8) : '?');
       const date = escapeHtml(fmtDate(r.created_at));
       return `<tr data-report-id="${r.id}">
         <td><a class="admin-link" href="app.html#/app/${r.app_id}" target="_blank">${game}</a></td>
@@ -81,7 +81,7 @@ function showReviewDetail(report) {
   detail.hidden = false;
 
   const fields = [
-    ['Report ID', `#${report.id}`],
+    ['Report ID', `#${String(report.id)}`],
     ['App ID', report.app_id],
     ['Rating', report.rating || '(not set)'],
     ['GPU', report.gpu || '(not set)'],
