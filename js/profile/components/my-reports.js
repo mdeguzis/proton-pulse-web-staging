@@ -163,7 +163,17 @@ export function initMyReports(ctx) {
   // ── Wire event listeners ─────────────────────────────────────────────────
 
   myConfigsRefresh?.addEventListener('click', () => { void refreshMyConfigs(); });
-  myConfigsSearch?.addEventListener('input', () => { applySearch(); });
+
+  const searchClear = document.getElementById('my-configs-search-clear');
+  myConfigsSearch?.addEventListener('input', () => {
+    applySearch();
+    if (searchClear) searchClear.hidden = !myConfigsSearch.value;
+  });
+  searchClear?.addEventListener('click', () => {
+    if (myConfigsSearch) { myConfigsSearch.value = ''; myConfigsSearch.focus(); }
+    searchClear.hidden = true;
+    applySearch();
+  });
 
   myConfigsTbody?.addEventListener('click', (e) => {
     const target = e.target;

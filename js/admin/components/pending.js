@@ -33,36 +33,16 @@ export async function renderPending(session, { onApproved } = {}) {
         <td>${date}</td>
         <td>
           <button class="admin-btn admin-btn--sm" data-action="review" data-report='${escapeHtml(JSON.stringify(r))}'>Review</button>
-          <button class="admin-btn admin-btn--ok admin-btn--sm" data-action="approve" data-report='${escapeHtml(JSON.stringify(r))}'>Approve</button>
         </td>
       </tr>`;
     }).join('');
 
-    tbody.addEventListener('click', async (e) => {
+    tbody.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
       const report = JSON.parse(btn.dataset.report);
-
       if (btn.dataset.action === 'review') {
-        showReviewDetail(report);
-        return;
-      }
-
-      if (btn.dataset.action === 'approve') {
-        btn.disabled = true;
-        btn.textContent = 'Approving...';
-        try {
-          await approveReport(session, report);
-          btn.closest('tr').remove();
-          if (!tbody.children.length) {
-            table.hidden = true;
-            empty.hidden = false;
-          }
-          onApproved?.();
-        } catch (e) {
-          btn.textContent = 'Failed';
-          btn.disabled = false;
-        }
+        showReviewDetail(report, session, onApproved);
       }
     });
   } catch (e) {
@@ -72,7 +52,7 @@ export async function renderPending(session, { onApproved } = {}) {
   }
 }
 
-export function closePendingReview() {
+export function closePendingReview(approved = false) {
   const detail = document.getElementById('pending-detail');
   const table = document.getElementById('pending-table');
   if (!detail || detail.hidden) return;
@@ -80,9 +60,10 @@ export function closePendingReview() {
   table.hidden = false;
 }
 
-function showReviewDetail(report) {
+function showReviewDetail(report, session, onApproved) {
   const detail = document.getElementById('pending-detail');
   const table = document.getElementById('pending-table');
+  const tbody = document.getElementById('pending-tbody');
   if (!detail) return;
 
   history.pushState({ adminView: 'pending-review' }, '', window.location.href);
@@ -103,8 +84,8 @@ function showReviewDetail(report) {
   detail.innerHTML = `
     <button class="admin-btn admin-btn--sm" id="pending-back-btn" style="margin-bottom:12px">Back to list</button>
     <div class="admin-card">
-      <div class="admin-subhead">Report Review (Read-only)</div>
-      <table class="admin-table">
+      <div class="admin-subhead">Report Review</div>
+      <table class="admin-table" style="margin-bottom:16px">
         <tbody>
           ${fields.map(([label, value]) => `
             <tr>
@@ -114,11 +95,42 @@ function showReviewDetail(report) {
           `).join('')}
         </tbody>
       </table>
+      <div style="display:flex;gap:8px">
+        <button class="admin-btn admin-btn--ok" id="pending-approve-btn">Approve</button>
+        <button class="admin-btn admin-btn--warn" id="pending-decline-btn">Decline</button>
+      </div>
+      <div id="pending-action-status" style="font-size:0.8rem;margin-top:8px"></div>
     </div>
   `;
 
   detail.querySelector('#pending-back-btn')?.addEventListener('click', () => {
-    detail.hidden = true;
-    table.hidden = false;
+    closePendingReview();
+  });
+
+  const approveBtn = detail.querySelector('#pending-approve-btn');
+  const declineBtn = detail.querySelector('#pending-decline-btn');
+  const statusEl = detail.querySelector('#pending-action-status');
+
+  approveBtn?.addEventListener('click', async () => {
+    approveBtn.disabled = true;
+    declineBtn.disabled = true;
+    approveBtn.textContent = 'Approving...';
+    try {
+      await approveReport(session, report);
+      document.querySelector(`#pending-tbody tr[data-report-id="${report.id}"]`)?.remove();
+      if (tbody && !tbody.children.length) { table.hidden = true; }
+      onApproved?.();
+      closePendingReview();
+    } catch (e) {
+      approveBtn.textContent = 'Approve';
+      approveBtn.disabled = false;
+      declineBtn.disabled = false;
+      statusEl.textContent = e.message || 'Approve failed';
+      statusEl.style.color = 'var(--red)';
+    }
+  });
+
+  declineBtn?.addEventListener('click', () => {
+    closePendingReview();
   });
 }
