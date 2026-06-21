@@ -39,6 +39,42 @@ VENDOR_KEYWORDS = {
 
 BRACKET_RE = re.compile(r'\[(.+?)\]')
 
+CURATED_OS = [
+    'Arch Linux',
+    'Bazzite',
+    'CachyOS',
+    'ChimeraOS',
+    'Debian',
+    'Debian 12',
+    'Debian 13',
+    'EndeavourOS',
+    'Fedora',
+    'Fedora 40',
+    'Fedora 41',
+    'Fedora 42',
+    'Garuda Linux',
+    'Gentoo',
+    'Linux Mint',
+    'Linux Mint 22',
+    'Manjaro',
+    'Nobara',
+    'Nobara 40',
+    'Nobara 41',
+    'NixOS',
+    'openSUSE Tumbleweed',
+    'Pop!_OS',
+    'Pop!_OS 22.04',
+    'SteamOS',
+    'SteamOS 3.5',
+    'SteamOS 3.6',
+    'Ubuntu',
+    'Ubuntu 22.04',
+    'Ubuntu 24.04',
+    'Ubuntu 24.10',
+    'Void Linux',
+    'Zorin OS',
+]
+
 CURATED_CPUS = [
     # Steam Deck APUs
     'AMD Custom APU 0405',
@@ -179,6 +215,7 @@ def run(output_dir=None):
     result = {
         'gpu': gpus,
         'cpu': CURATED_CPUS,
+        'os': CURATED_OS,
     }
 
     out_path = os.path.join(output_dir, 'hardware-suggestions.json')

@@ -13,11 +13,15 @@ function loadHardwareSuggestions() {
       if (!data) return;
       const gpuList = document.getElementById('gpu-suggestions');
       const cpuList = document.getElementById('cpu-suggestions');
+      const osList = document.getElementById('os-suggestions');
       if (gpuList && data.gpu) {
         gpuList.innerHTML = data.gpu.map(g => `<option value="${g}">`).join('');
       }
       if (cpuList && data.cpu) {
         cpuList.innerHTML = data.cpu.map(c => `<option value="${c}">`).join('');
+      }
+      if (osList && data.os) {
+        osList.innerHTML = data.os.map(o => `<option value="${o}">`).join('');
       }
     })
     .catch(() => {});
