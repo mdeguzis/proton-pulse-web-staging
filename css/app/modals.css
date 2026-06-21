@@ -288,3 +288,39 @@
   .search-result-card { flex-direction: column; }
   .search-result-side { align-items: flex-start; min-width: 0; }
 }
+
+.submit-approval-banner {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--s2);
+  border: 1px solid var(--border);
+}
+.submit-approval-banner code {
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.submit-approval-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 8px;
+}
+.submit-approval-badge--approved {
+  background: rgba(76,175,128,0.15);
+  border: 1px solid rgba(76,175,128,0.4);
+  color: #a9d7b6;
+}
+.submit-approval-badge--pending {
+  background: rgba(160,120,200,0.15);
+  border: 1px solid rgba(160,120,200,0.4);
+  color: #c0a8e0;
+}

@@ -5,12 +5,12 @@ import {
   getProtonPulseUserIdFromSession, escapeHtml, formatSystemUpdated,
   getWebClientIdProfile, getMyReportBadges, flaggedMessageHtml,
   mergeMyReportRows,
-} from '../utils.js?v=9ed63d23';
+} from '../utils.js?v=2c832a3c';
 import {
   fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
   unpublishReport,
 } from '../api/configs.js?v=a51234ab';
-import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=a7c14e27';
+import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=e0dc33e4';
 
 /**
  * Initialise the My Reports pane. Call once after DOM is ready.
@@ -74,15 +74,16 @@ export function initMyReports(ctx) {
             <p>${flaggedMessageHtml(row.flagged_reason)}</p>
           </details>`
         : '';
+      const isLive = row.published_id && !row.pending;
       const actions = [
-        viewHref
+        isLive
           ? `<a class="profile-configs-view-link" href="${escapeHtml(viewHref)}">View</a>`
-          : `<span class="profile-configs-view-link profile-configs-view-disabled" title="Not published">View</span>`,
+          : `<span class="profile-configs-view-link profile-configs-view-disabled" title="Not published yet">View</span>`,
         row.cloud && row.unpublished
           ? `<a class="profile-configs-action profile-configs-publish-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1&return=profile.html" target="_blank" rel="noopener">Publish</a>`
           : '',
         row.published_id
-          ? `<button type="button" class="profile-configs-action profile-configs-unpublish-btn" data-published-id="${escapeHtml(String(row.published_id))}">Unpublish</button>`
+          ? `<button type="button" class="profile-configs-action profile-configs-unpublish-btn" data-published-id="${escapeHtml(String(row.published_id))}">${row.pending ? 'Cancel' : 'Unpublish'}</button>`
           : '',
         row.published_id
           ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&edit=${escapeHtml(String(row.published_id))}&return=profile.html" target="_blank" rel="noopener">Edit</a>`
