@@ -481,6 +481,7 @@ export function getMyReportBadges(row) {
   if (row.cloud) badges.push({ label: 'Cloud', tone: 'cloud' });
   if (row.published) badges.push({ label: 'Published', tone: 'published' });
   if (row.unpublished) badges.push({ label: 'Unpublished', tone: 'unpublished' });
+  if (row.pending) badges.push({ label: 'Pending', tone: 'pending' });
   if (row.flagged) badges.push({ label: 'Flagged', tone: 'flagged' });
   return badges;
 }

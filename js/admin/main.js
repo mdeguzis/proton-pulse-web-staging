@@ -17,6 +17,7 @@ import { renderUserDetail } from './components/userDetail.js?v=74450110';
 import { fetchAnalytics } from './api/analytics.js?v=f0ba00d2';
 import { renderAnalytics } from './components/analytics.js?v=e9b6ce1c';
 import { renderCacheStatus } from './components/cache-status.js?v=764c4d18';
+import { renderPending } from './components/pending.js?v=0a783e2d';
 
 // ---------------------------------------------------------------------------
 // State
@@ -114,6 +115,10 @@ async function applyAdminChange(uuid, role, permissions) {
 // ---------------------------------------------------------------------------
 // Load sections
 // ---------------------------------------------------------------------------
+
+async function loadPending() {
+  await renderPending(currentSession);
+}
 
 async function loadFlagged() {
   const loading = document.getElementById('flagged-loading');
@@ -318,6 +323,7 @@ async function loadAnalytics() {
 
 // Maps each tab to its data loader so tab clicks and ?tab= restore share one path.
 const TAB_LOADERS = {
+  pending: loadPending,
   flagged: loadFlagged,
   banned: loadBanned,
   users: loadUsers,
