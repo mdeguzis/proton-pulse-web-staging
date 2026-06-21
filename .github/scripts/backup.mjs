@@ -230,3 +230,5 @@ async function main() {
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
+
+export { TABLE_ORDER_KEY };
