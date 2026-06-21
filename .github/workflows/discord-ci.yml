@@ -1,0 +1,36 @@
+name: Discord CI Status
+
+on:
+  workflow_run:
+    workflows:
+      - Update ProtonDB Data
+      - CI
+      - Deploy Supabase Edge Functions
+      - Backup
+      - Content Moderation
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_BUILDS }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          WF_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WF_URL: ${{ github.event.workflow_run.html_url }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          jq -n \
+            --arg title "$WF_NAME failed" \
+            --arg desc "Branch \`$WF_BRANCH\` - [view run]($WF_URL)" \
+            --arg url "$WF_URL" \
+            --argjson color 15548997 \
+            --arg footer "$SENDER" \
+            '{embeds: [{title: $title, description: $desc, url: $url, color: $color, footer: {text: $footer}}]}' \
+          | curl -s -H "Content-Type: application/json" -d @- "$WEBHOOK_URL"

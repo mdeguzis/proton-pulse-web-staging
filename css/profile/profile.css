@@ -184,8 +184,8 @@
   line-height: 1.5;
 }
 .profile-select {
-  background: var(--card-bg);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--card-bg, var(--s1));
+  border: 1px solid var(--border2);
   border-radius: 6px;
   color: var(--text);
   font-size: 0.82rem;
