@@ -29,10 +29,12 @@ function loadHardwareSuggestions() {
 
 function parseRamToMb(raw) {
   if (!raw) return 0;
-  const s = raw.trim().toLowerCase();
-  const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+  const s = raw.trim();
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*(gb|mb|)$/i);
+  if (!m) return 0;
+  const num = parseFloat(m[1]);
   if (!num || num <= 0 || !isFinite(num)) return 0;
-  if (s.includes('mb')) return Math.round(num);
+  if (m[2].toLowerCase() === 'mb') return Math.round(num);
   return Math.round(num * 1024);
 }
 
