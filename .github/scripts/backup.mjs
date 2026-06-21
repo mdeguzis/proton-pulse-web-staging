@@ -68,12 +68,16 @@ function redactPaths(str) {
     .replace(/\/root/g, '/root');
 }
 
+// Tables that don't have an `id` column and need a different order key.
+const TABLE_ORDER_KEY = { author_avatars: 'proton_pulse_user_id' };
+
 async function fetchAll(table, select = '*', extraFilter = '') {
   const rows = [];
   let offset = 0;
   const limit = 1000;
+  const orderKey = TABLE_ORDER_KEY[table] || 'id';
   while (true) {
-    const url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}${extraFilter}&limit=${limit}&offset=${offset}&order=id.asc`;
+    const url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}${extraFilter}&limit=${limit}&offset=${offset}&order=${orderKey}.asc`;
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) throw new Error(`Fetch ${table} failed: ${res.status} ${await res.text()}`);
     const batch = await res.json();
