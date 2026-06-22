@@ -1,5 +1,5 @@
 import { escapeHtml, fmtDate } from '../utils.js?v=86489fcb';
-import { fetchPendingReports, approveReport } from '../api/pending.js?v=814363ad';
+import { fetchPendingReports, approveReport } from '../api/pending.js?v=6eb54134';
 
 export async function renderPending(session, { onApproved } = {}) {
   const loading = document.getElementById('pending-loading');
@@ -73,6 +73,7 @@ function showReviewDetail(report, session, onApproved) {
   const val = (v) => (v != null && v !== '') ? String(v) : '(not set)';
   const fields = [
     ['Report ID', `#${String(report.id)}`],
+    ['Approval Hash', val(report._approval_hash)],
     ['App ID', val(report.app_id)],
     ['Title', val(report.title)],
     ['Source', val(report.source)],

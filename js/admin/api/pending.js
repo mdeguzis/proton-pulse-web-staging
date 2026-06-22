@@ -15,12 +15,13 @@ export async function fetchPendingReports(session) {
   const approvals = approvalsRes.ok ? await approvalsRes.json() : [];
   const approvalMap = new Map(approvals.map(a => [a.report_id, a.approval_hash]));
 
-  return reports.filter(r => {
-    const storedHash = approvalMap.get(r.id);
-    if (!storedHash) return true;
-    const expected = computeHash(r);
-    return storedHash !== expected;
-  });
+  return reports
+    .filter(r => {
+      const storedHash = approvalMap.get(r.id);
+      if (!storedHash) return true;
+      return storedHash !== computeHash(r);
+    })
+    .map(r => ({ ...r, _approval_hash: computeHash(r) }));
 }
 
 export async function approveReport(session, report) {
