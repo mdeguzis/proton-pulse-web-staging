@@ -1,0 +1,50 @@
+name: Discord Backup Status
+
+on:
+  workflow_run:
+    workflows: ["Backup"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_BACKUPS }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WF_URL:        ${{ github.event.workflow_run.html_url }}
+          WF_BRANCH:     ${{ github.event.workflow_run.head_branch }}
+          WF_SHA:        ${{ github.event.workflow_run.head_sha }}
+          WF_EVENT:      ${{ github.event.workflow_run.event }}
+          SENDER:        ${{ github.event.sender.login }}
+          REPO:          ${{ github.repository }}
+          SERVER_URL:    ${{ github.server_url }}
+        run: |
+          SHORT_SHA="${WF_SHA:0:7}"
+          COMMIT_URL="${SERVER_URL}/${REPO}/commit/${WF_SHA}"
+
+          # Map trigger event to a readable label
+          case "$WF_EVENT" in
+            schedule)         TRIGGER="scheduled"  ;;
+            workflow_dispatch) TRIGGER="manual"    ;;
+            workflow_run)     TRIGGER="post-deploy" ;;
+            *)                TRIGGER="$WF_EVENT"  ;;
+          esac
+
+          if [ "$WF_CONCLUSION" = "success" ]; then
+            STATUS="Backup complete"
+            COLOR=3066993
+          else
+            STATUS="Backup FAILED"
+            COLOR=15158332
+          fi
+
+          MSG=$(printf '**%s** (%s)\nBranch: `%s` | Commit: [%s](%s)\nTrigger: %s\n[View run](%s)' \
+            "$STATUS" "$WF_CONCLUSION" "$WF_BRANCH" "$SHORT_SHA" "$COMMIT_URL" "$TRIGGER" "$WF_URL")
+
+          jq -n --arg content "$MSG" '{content: $content}' \
+            | curl -s -H "Content-Type: application/json" -d @- "$WEBHOOK_URL"
