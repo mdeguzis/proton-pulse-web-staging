@@ -79,6 +79,8 @@ jobs:
           TRIGGER: ${{ steps.trigger.outputs.label }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
           git clone https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/mdeguzis/proton-pulse-data-backup.git backup-repo
           cp backup-out/*.tar.gz backup-repo/
@@ -87,19 +89,27 @@ jobs:
           python3 - <<'PYEOF'
           import json, os
 
+          repo     = os.environ['GITHUB_REPOSITORY']
+          run_id   = os.environ['GITHUB_RUN_ID']
+          base_url = os.environ['GITHUB_SERVER_URL']
+          run_url  = f'{base_url}/{repo}/actions/runs/{run_id}'
+
           manifest = json.load(open('backup-out/backup-manifest.json'))
           entry = {
             'ts': manifest['ts'],
             'date': manifest['date'],
             'trigger': os.environ['TRIGGER'],
-            'run_id': os.environ['GITHUB_RUN_ID'],
+            'run_id': run_id,
+            'run_url': run_url,
             'source_sha': os.environ['GITHUB_SHA'],
+            'source_url': f'{base_url}/{repo}/commit/{os.environ["GITHUB_SHA"]}',
             'files': manifest['files'],
           }
           log_path = 'backup-repo/backups.jsonl'
           with open(log_path, 'a') as f:
             f.write(json.dumps(entry) + '\n')
-          print(f'Appended entry to {log_path}: {json.dumps(entry)}')
+          print(f'Appended to {log_path}')
+          print(f'run_url: {run_url}')
           PYEOF
 
           cd backup-repo
