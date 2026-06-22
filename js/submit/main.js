@@ -185,6 +185,25 @@ import { SupaAuth } from '../shared/config.js?v=f6f2c00a';
         }
         form._formState = state;
         console.debug('[submit] edit mode: prefilled from report', { editReportId, appId });
+
+        // Show approval status banner
+        try {
+          const approvalRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/report_approvals?report_id=eq.${editReportId}&select=approval_hash,approved_at,approved_by`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}` } }
+          );
+          const approvalRows = approvalRes.ok ? await approvalRes.json() : [];
+          const approval = approvalRows[0];
+          const banner = document.createElement('div');
+          banner.className = 'submit-approval-banner';
+          if (approval) {
+            banner.innerHTML = `<span class="submit-approval-badge submit-approval-badge--approved">Approved</span> Report #${editReportId} | Hash: <code>${approval.approval_hash.slice(0, 12)}...</code> | Approved: ${new Date(approval.approved_at).toLocaleDateString()} | By: ${approval.approved_by || 'pipeline'}`;
+          } else {
+            banner.innerHTML = `<span class="submit-approval-badge submit-approval-badge--pending">Pending Approval</span> Report #${editReportId} | This report is awaiting review. It will not appear publicly until approved. Reference this ID if you need to request a manual review.`;
+          }
+          const formContent = document.getElementById('submit-form-content');
+          formContent?.insertBefore(banner, formContent.firstChild);
+        } catch {}
       }
     } catch (err) {
       console.warn('[submit] edit prefill failed:', err);

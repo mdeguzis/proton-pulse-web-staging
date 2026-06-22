@@ -9,16 +9,16 @@ import {
   getProtonPulseUserIdFromSession, getShowUsername, setShowUsername,
   escapeHtml, formatSystemUpdated, getWebClientIdProfile,
   getPluginLinkCodeFromLocation, getSteamIdFromSession,
-} from './utils.js?v=e44cbab2';
+} from './utils.js?v=c97505eb';
 import {
   deleteAllMyData, fetchAllMyData, checkMyDataExists,
 } from './api/configs.js?v=a51234ab';
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=59c9f51e';
-import { initMyHardware } from './components/my-hardware.js?v=174c6b89';
-import { initSystems } from './components/systems.js?v=12e707ae';
-import { initMyReports } from './components/my-reports.js?v=89e00c59';
+import { initMyHardware } from './components/my-hardware.js?v=350d68d5';
+import { initSystems } from './components/systems.js?v=6c3aa1d4';
+import { initMyReports } from './components/my-reports.js?v=1fe31246';
 
 (async function () {
   // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -94,6 +94,7 @@ import { initMyReports } from './components/my-reports.js?v=89e00c59';
     myConfigsLoading: document.getElementById('my-configs-loading'),
     myConfigsStatus:  document.getElementById('my-configs-status'),
     myConfigsRefresh: document.getElementById('my-configs-refresh-btn'),
+    myConfigsSearch:  document.getElementById('my-configs-search'),
   });
 
   // ── Session display helpers ───────────────────────────────────────────────

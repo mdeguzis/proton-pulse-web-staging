@@ -120,3 +120,5 @@ js/app/lib/steam-img.js
 system-edit.html
 js/profile/system-edit.js
 hardware-suggestions.json
+js/admin/api/pending.js
+js/admin/components/pending.js

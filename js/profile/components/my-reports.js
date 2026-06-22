@@ -1,16 +1,16 @@
 // My Reports section: fetches published + cloud-synced configs, renders the
 // table, and handles publish/unpublish/delete/edit actions.
-import { SupaAuth } from '../config.js?v=87cd0f3d';
+import { SupaAuth, SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js?v=87cd0f3d';
 import {
   getProtonPulseUserIdFromSession, escapeHtml, formatSystemUpdated,
   getWebClientIdProfile, getMyReportBadges, flaggedMessageHtml,
   mergeMyReportRows,
-} from '../utils.js?v=e44cbab2';
+} from '../utils.js?v=c97505eb';
 import {
   fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
   unpublishReport,
 } from '../api/configs.js?v=a51234ab';
-import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=f3bac94a';
+import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=9c4eb133';
 
 /**
  * Initialise the My Reports pane. Call once after DOM is ready.
@@ -28,7 +28,10 @@ export function initMyReports(ctx) {
   const {
     myConfigsTable, myConfigsTbody, myConfigsEmpty,
     myConfigsLoading, myConfigsStatus, myConfigsRefresh,
+    myConfigsSearch,
   } = ctx;
+
+  let allRows = [];
 
   // ── Internal helpers ─────────────────────────────────────────────────────
 
@@ -38,9 +41,20 @@ export function initMyReports(ctx) {
 
   function renderMyConfigs(rows) {
     myConfigsLoading.hidden = true;
-    if (!rows || rows.length === 0) {
+    allRows = rows || [];
+    applySearch();
+  }
+
+  function applySearch() {
+    const q = (myConfigsSearch?.value || '').trim().toLowerCase();
+    const rows = q ? allRows.filter(r => {
+      const hay = [r.title, r.app_id, r.rating, r.os, r.gpu, r.notes].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    }) : allRows;
+    if (!rows.length) {
       myConfigsTable.hidden = true;
       myConfigsEmpty.hidden = false;
+      myConfigsEmpty.textContent = q ? 'No reports match your search.' : 'Nothing synced yet.';
       return;
     }
     myConfigsEmpty.hidden = true;
@@ -60,15 +74,16 @@ export function initMyReports(ctx) {
             <p>${flaggedMessageHtml(row.flagged_reason)}</p>
           </details>`
         : '';
+      const isLive = row.published_id && !row.pending;
       const actions = [
-        viewHref
+        isLive
           ? `<a class="profile-configs-view-link" href="${escapeHtml(viewHref)}">View</a>`
-          : `<span class="profile-configs-view-link profile-configs-view-disabled" title="Not published">View</span>`,
+          : `<span class="profile-configs-view-link profile-configs-view-disabled" title="Not published yet">View</span>`,
         row.cloud && row.unpublished
           ? `<a class="profile-configs-action profile-configs-publish-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&fromCloud=1&return=profile.html" target="_blank" rel="noopener">Publish</a>`
           : '',
         row.published_id
-          ? `<button type="button" class="profile-configs-action profile-configs-unpublish-btn" data-published-id="${escapeHtml(String(row.published_id))}">Unpublish</button>`
+          ? `<button type="button" class="profile-configs-action profile-configs-unpublish-btn" data-published-id="${escapeHtml(String(row.published_id))}">${row.pending ? 'Cancel' : 'Unpublish'}</button>`
           : '',
         row.published_id
           ? `<a class="profile-configs-action profile-configs-edit-btn" href="submit.html?app=${escapeHtml(String(row.app_id))}&edit=${escapeHtml(String(row.published_id))}&return=profile.html" target="_blank" rel="noopener">Edit</a>`
@@ -81,7 +96,7 @@ export function initMyReports(ctx) {
         <tr data-app-id="${escapeHtml(String(row.app_id))}">
           <td>
             <a href="${escapeHtml(appLink)}" class="profile-configs-game-link">${escapeHtml(name)}</a>
-            <div class="profile-configs-appid">App ${escapeHtml(String(row.app_id))}</div>
+            <div class="profile-configs-appid">App ${escapeHtml(String(row.app_id))}${row.published_id ? ` · Report #${row.published_id}` : ''}</div>
           </td>
           <td>${escapeHtml(row.rating || '—')}</td>
           <td><div class="profile-configs-status">${badges}</div>${flaggedNote}</td>
@@ -122,6 +137,22 @@ export function initMyReports(ctx) {
           }
         }
       }
+      // Check approval status for published reports
+      try {
+        const approvalsRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/report_approvals?select=report_id,approval_hash`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+        );
+        if (approvalsRes.ok) {
+          const approvals = await approvalsRes.json();
+          const approvalMap = new Map(approvals.map(a => [a.report_id, a.approval_hash]));
+          for (const row of merged) {
+            if (row.published_id && !approvalMap.has(row.published_id)) {
+              row.pending = true;
+            }
+          }
+        }
+      } catch {}
       renderMyConfigs(merged);
     } catch (e) {
       myConfigsLoading.hidden = true;
@@ -132,6 +163,17 @@ export function initMyReports(ctx) {
   // ── Wire event listeners ─────────────────────────────────────────────────
 
   myConfigsRefresh?.addEventListener('click', () => { void refreshMyConfigs(); });
+
+  const searchClear = document.getElementById('my-configs-search-clear');
+  myConfigsSearch?.addEventListener('input', () => {
+    applySearch();
+    if (searchClear) searchClear.hidden = !myConfigsSearch.value;
+  });
+  searchClear?.addEventListener('click', () => {
+    if (myConfigsSearch) { myConfigsSearch.value = ''; myConfigsSearch.focus(); }
+    searchClear.hidden = true;
+    applySearch();
+  });
 
   myConfigsTbody?.addEventListener('click', (e) => {
     const target = e.target;

@@ -4,19 +4,20 @@ import { effectivePermissions, hasPermission, canSeeTab, resolveRoleLabel, PERMI
 import { fetchFlaggedReports, updateFlagStatus, deleteFlaggedReport, fetchFlagReportContent, findPulseConfigId, shadowBanReport, releaseReportContent, deleteReportContent, suppressMirrorReport, unsuppressMirrorReport, fetchReportState } from './api/flagged.js?v=6202ee12';
 import { renderFlagged, renderFlagDetail } from './components/flagged.js?v=3f4bb02b';
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=aa9b6b53';
-import { renderBanned } from './components/banned.js?v=45d01d17';
-import { fetchAllUsers } from './api/users.js?v=52e867d2';
-import { renderUsers } from './components/users.js?v=bb3b3f25';
+import { renderBanned } from './components/banned.js?v=1c1ba341';
+import { fetchAllUsers } from './api/users.js?v=72f82137';
+import { renderUsers } from './components/users.js?v=765cb3cc';
 import { fetchAdmins, addAdmin, removeAdmin, updateAdminRole } from './api/admins.js?v=16a55837';
-import { renderAdmins, renderNewAdminEditor } from './components/admins.js?v=84b4ecad';
+import { renderAdmins, renderNewAdminEditor } from './components/admins.js?v=30fa53a1';
 import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPhrase } from './api/phrases.js?v=ca024bd3';
-import { renderPhrases } from './components/phrases.js?v=79051c31';
+import { renderPhrases } from './components/phrases.js?v=20dbf1ea';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
 import { fetchUserReports, fetchUserActivity } from './api/userDetail.js?v=916aedfc';
-import { renderUserDetail } from './components/userDetail.js?v=74450110';
+import { renderUserDetail } from './components/userDetail.js?v=de9360ad';
 import { fetchAnalytics } from './api/analytics.js?v=f0ba00d2';
 import { renderAnalytics } from './components/analytics.js?v=e9b6ce1c';
 import { renderCacheStatus } from './components/cache-status.js?v=764c4d18';
+import { renderPending, closePendingReview } from './components/pending.js?v=1fc5b1b4';
 
 // ---------------------------------------------------------------------------
 // State
@@ -114,6 +115,10 @@ async function applyAdminChange(uuid, role, permissions) {
 // ---------------------------------------------------------------------------
 // Load sections
 // ---------------------------------------------------------------------------
+
+async function loadPending() {
+  await renderPending(currentSession);
+}
 
 async function loadFlagged() {
   const loading = document.getElementById('flagged-loading');
@@ -231,13 +236,29 @@ async function loadUserDetail(user) {
   content.innerHTML = '<div class="admin-loading">Loading reports...</div>';
 
   try {
-    const [reports, authEvents] = await Promise.all([
-      fetchUserReports(currentSession, {
-        userId: user.proton_pulse_user_id || null,
-        clientId: user.client_id || null,
-      }),
-      fetchUserActivity(currentSession, { userId: user.proton_pulse_user_id || null }),
+    const uid = user.proton_pulse_user_id || null;
+    const [reports, authEvents, avatarRows, authRows] = await Promise.all([
+      fetchUserReports(currentSession, { userId: uid, clientId: user.client_id || null }),
+      fetchUserActivity(currentSession, { userId: uid }),
+      uid ? fetch(`${SUPABASE_URL}/rest/v1/author_avatars?proton_pulse_user_id=eq.${encodeURIComponent(uid)}&select=last_seen_at`, { headers: supabaseHeaders(currentSession) }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      uid ? fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_list_users`, { method: 'POST', headers: { ...supabaseHeaders(currentSession), 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]);
+
+    // Re-derive last_active from all available signals so the detail view
+    // always reflects the most recent one, independent of what was serialized
+    // into the button's data-userobj at render time.
+    const avatarRow  = avatarRows[0];
+    const authUser   = uid ? authRows.find(a => a.id === uid) : null;
+    const candidates = [
+      user.last_active,
+      avatarRow?.last_seen_at,
+      authUser?.last_sign_in_at,
+    ].filter(Boolean);
+    if (candidates.length) {
+      user.last_active = candidates.reduce((a, b) => (a > b ? a : b));
+    }
+    if (authUser?.last_sign_in_at) user.last_login = authUser.last_sign_in_at;
+
     renderUserDetail(user, reports, authEvents, {
       session: currentSession,
       currentUserId: currentSession?.user?.id,
@@ -318,6 +339,7 @@ async function loadAnalytics() {
 
 // Maps each tab to its data loader so tab clicks and ?tab= restore share one path.
 const TAB_LOADERS = {
+  pending: loadPending,
   flagged: loadFlagged,
   banned: loadBanned,
   users: loadUsers,
@@ -655,6 +677,8 @@ function wireEvents() {
 
   // Browser back button / swipe back from detail screens.
   window.addEventListener('popstate', e => {
+    const pendingDetail = document.getElementById('pending-detail');
+    if (pendingDetail && !pendingDetail.hidden) { closePendingReview(); return; }
     if (!document.getElementById('tab-user-detail').hidden) activateTab('users');
     else if (!document.getElementById('tab-flag-detail').hidden) activateTab('flagged');
   });
@@ -834,6 +858,63 @@ function wireEvents() {
 }
 
 // ---------------------------------------------------------------------------
+// Generic client-side table sort
+// ---------------------------------------------------------------------------
+
+function setupTableSort(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const ths = table.querySelectorAll('thead th[data-sort-col]');
+  ths.forEach(th => {
+    const indicator = document.createElement('span');
+    indicator.className = 'sort-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    th.appendChild(indicator);
+
+    th.addEventListener('click', () => {
+      const col  = parseInt(th.dataset.sortCol, 10);
+      const type = th.dataset.sortType || 'text';
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+
+      const wasActive = th.dataset.sortActive === '1';
+      const nowAsc    = wasActive ? th.dataset.sortDir !== 'asc' : true;
+
+      ths.forEach(h => {
+        h.dataset.sortActive = '';
+        h.dataset.sortDir    = '';
+        h.classList.remove('admin-th--sorted');
+        const ind = h.querySelector('.sort-indicator');
+        if (ind) ind.textContent = '';
+      });
+
+      th.dataset.sortActive = '1';
+      th.dataset.sortDir    = nowAsc ? 'asc' : 'desc';
+      th.classList.add('admin-th--sorted');
+      indicator.textContent = nowAsc ? ' \u25b2' : ' \u25bc';
+
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a, b) => {
+        const aVal = a.cells[col]?.textContent.trim() ?? '';
+        const bVal = b.cells[col]?.textContent.trim() ?? '';
+        let cmp = 0;
+        if (type === 'number') {
+          cmp = (parseFloat(aVal) || 0) - (parseFloat(bVal) || 0);
+        } else if (type === 'date') {
+          const at = Date.parse(aVal);
+          const bt = Date.parse(bVal);
+          cmp = (isNaN(at) ? 0 : at) - (isNaN(bt) ? 0 : bt);
+        } else {
+          cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
+        }
+        return nowAsc ? cmp : -cmp;
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
@@ -860,6 +941,7 @@ async function init() {
   renderPermissionSummary();
   applyTabVisibility();
   wireEvents();
+  ['pending-table', 'flagged-table', 'banned-table', 'users-table', 'admins-table', 'phrases-table'].forEach(setupTableSort);
 
   const params = new URLSearchParams(window.location.search);
 

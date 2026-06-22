@@ -54,13 +54,18 @@ export async function fetchAllUsers(session, { search } = {}) {
   // Enrich with display names from author_avatars.
   const uuids = [...byUser.values()].map(u => u.proton_pulse_user_id).filter(Boolean);
   if (uuids.length) {
-    const avatarUrl = `${SUPABASE_URL}/rest/v1/author_avatars?select=proton_pulse_user_id,display_name&proton_pulse_user_id=in.(${uuids.join(',')})`;
+    const avatarUrl = `${SUPABASE_URL}/rest/v1/author_avatars?select=proton_pulse_user_id,display_name,last_seen_at&proton_pulse_user_id=in.(${uuids.join(',')})`;
     const avatarRes = await fetch(avatarUrl, { headers: supabaseHeaders(session) });
     if (avatarRes.ok) {
       const avatars = await avatarRes.json();
       for (const a of avatars) {
         const u = byUser.get(a.proton_pulse_user_id);
-        if (u) u.display_name = a.display_name || null;
+        if (u) {
+          u.display_name = a.display_name || null;
+          if (a.last_seen_at && a.last_seen_at > (u.last_active || '')) {
+            u.last_active = a.last_seen_at;
+          }
+        }
       }
     }
   }
@@ -109,7 +114,11 @@ export async function fetchAllUsers(session, { search } = {}) {
       for (const au of authUsers) {
         if (!au.id) continue;
         if (byUser.has(au.id)) {
-          byUser.get(au.id).last_login = au.last_sign_in_at || null;
+          const u = byUser.get(au.id);
+          u.last_login = au.last_sign_in_at || null;
+          if (au.last_sign_in_at && au.last_sign_in_at > (u.last_active || '')) {
+            u.last_active = au.last_sign_in_at;
+          }
         } else {
           // User exists in auth but has never submitted - still show them.
           byUser.set(au.id, {

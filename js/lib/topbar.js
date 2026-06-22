@@ -225,21 +225,20 @@
             <svg class="nav-icon" aria-hidden="true"><use href="#icon-gamepad"/></svg>
             <span>Decky Plugin</span>
           </a>
+          <a href="https://github.com/mdeguzis/proton-pulse-web/issues/new/choose" target="_blank" rel="noopener" title="Report a bug, file a Game Report, or contact the maintainer">
+            <svg class="nav-icon" aria-hidden="true"><use href="#icon-contact"/></svg>
+            <span>Contact</span>
+          </a>
+          <a href="https://discord.gg/4p6e4X7xW" target="_blank" rel="noopener" title="Join the Proton Pulse Discord">
+            <svg class="nav-icon" aria-hidden="true"><use href="#icon-discord"/></svg>
+            <span>Discord</span>
+          </a>
         </div>
       </div>
       <!-- About: top-level, placed after the dropdowns (dropdowns come first) -->
       <a href="about.html" data-page="about" title="What Proton Pulse is and how it compares to ProtonDB">
         <svg class="nav-icon" aria-hidden="true"><use href="#icon-info"/></svg>
         <span>About</span>
-      </a>
-      <!-- GitHub issue chooser - shows Game Report / Missing ProtonDB / Plugin Issue / Blank etc. -->
-      <a href="https://github.com/mdeguzis/proton-pulse-web/issues/new/choose" target="_blank" rel="noopener" title="Report a bug, file a Game Report, or contact the maintainer">
-        <svg class="nav-icon" aria-hidden="true"><use href="#icon-contact"/></svg>
-        <span>Contact</span>
-      </a>
-      <a href="https://discord.gg/4p6e4X7xW" target="_blank" rel="noopener" title="Join the Proton Pulse Discord">
-        <svg class="nav-icon" aria-hidden="true"><use href="#icon-discord"/></svg>
-        <span>Discord</span>
       </a>
       <!-- Admin link: hidden until checkIsAdmin confirms the signed-in user is an admin -->
       <a href="admin.html" id="topbar-admin-link" class="auth-admin-navlink" hidden>
@@ -756,6 +755,20 @@
       if (user) {
         if (signedOut) signedOut.hidden = true;
         if (signedIn)  signedIn.hidden  = false;
+
+        // Fire-and-forget: record that this user visited the site right now.
+        // Uses PATCH so it only updates existing rows (users who have opted in
+        // to showing their username). No-op if no row exists yet.
+        var sbUrl2 = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : '';
+        var sbKey2 = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : '';
+        var token2 = state.session && state.session.access_token;
+        if (sbUrl2 && token2) {
+          fetch(sbUrl2 + '/rest/v1/author_avatars?proton_pulse_user_id=eq.' + user.id, {
+            method: 'PATCH',
+            headers: { apikey: sbKey2, Authorization: 'Bearer ' + token2, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+          }).catch(function () {});
+        }
         if (avatarEl)  avatarEl.src = (user.user_metadata && user.user_metadata.avatar_url) || '';
         if (avatarEl)  avatarEl.alt = (user.user_metadata && user.user_metadata.name) || user.email || '';
         const rawName = (user.user_metadata && user.user_metadata.name) || user.email || '';

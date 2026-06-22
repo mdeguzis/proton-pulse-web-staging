@@ -601,6 +601,11 @@
   border-color: rgba(212,168,67,0.4);
   background: rgba(212,168,67,0.1);
 }
+.profile-configs-badge--pending {
+  color: #c0a8e0;
+  border-color: rgba(160,120,200,0.4);
+  background: rgba(160,120,200,0.1);
+}
 .profile-configs-badge--flagged {
   color: #e88a8a;
   border-color: rgba(220,80,80,0.4);
@@ -655,6 +660,10 @@
 .profile-configs-publish-btn,
 .profile-configs-unpublish-btn {
   min-width: 72px;
+}
+.profile-configs-unpublish-btn {
+  color: #d4b36a;
+  border-color: rgba(212,168,67,0.45);
 }
 .profile-configs-publish-btn,
 .profile-configs-view-link:not(.profile-configs-view-disabled),
