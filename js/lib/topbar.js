@@ -756,6 +756,20 @@
       if (user) {
         if (signedOut) signedOut.hidden = true;
         if (signedIn)  signedIn.hidden  = false;
+
+        // Fire-and-forget: record that this user visited the site right now.
+        // Uses PATCH so it only updates existing rows (users who have opted in
+        // to showing their username). No-op if no row exists yet.
+        var sbUrl2 = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : '';
+        var sbKey2 = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : '';
+        var token2 = state.session && state.session.access_token;
+        if (sbUrl2 && token2) {
+          fetch(sbUrl2 + '/rest/v1/author_avatars?proton_pulse_user_id=eq.' + user.id, {
+            method: 'PATCH',
+            headers: { apikey: sbKey2, Authorization: 'Bearer ' + token2, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+          }).catch(function () {});
+        }
         if (avatarEl)  avatarEl.src = (user.user_metadata && user.user_metadata.avatar_url) || '';
         if (avatarEl)  avatarEl.alt = (user.user_metadata && user.user_metadata.name) || user.email || '';
         const rawName = (user.user_metadata && user.user_metadata.name) || user.email || '';
