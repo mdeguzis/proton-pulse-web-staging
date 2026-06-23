@@ -18,7 +18,8 @@ import { fetchAnalytics } from './api/analytics.js?v=f0ba00d2';
 import { renderAnalytics } from './components/analytics.js?v=e9b6ce1c';
 import { renderCacheStatus } from './components/cache-status.js?v=764c4d18';
 import { renderPending, closePendingReview } from './components/pending.js?v=1fc5b1b4';
-import { renderAllReports } from './components/allReports.js?v=d7fe1915';
+import { renderAllReports, updateAllReportsRow } from './components/allReports.js?v=50ca4510';
+import { patchReportFlags } from './api/allReports.js?v=3e62862a';
 
 // ---------------------------------------------------------------------------
 // State
@@ -419,6 +420,7 @@ function wireEvents() {
 
   // Search inputs - live filter on enter
   document.getElementById('all-reports-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadAllReports(); });
+  document.getElementById('all-reports-status-filter').addEventListener('change', loadAllReports);
   document.getElementById('flagged-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadFlagged(); });
   document.getElementById('flagged-type').addEventListener('change', loadFlagged);
   document.getElementById('flagged-date-from').addEventListener('change', loadFlagged);
@@ -553,12 +555,36 @@ function wireEvents() {
   });
 
   // All Reports table actions (delegated)
-  document.getElementById('all-reports-tbody').addEventListener('click', e => {
-    const btn = e.target.closest('[data-action="view-user-detail"]');
+  document.getElementById('all-reports-tbody').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    let user;
-    try { user = JSON.parse(btn.dataset.userobj); } catch (_) { return; }
-    loadUserDetail(user);
+    const action = btn.dataset.action;
+
+    if (action === 'view-user-detail') {
+      let user;
+      try { user = JSON.parse(btn.dataset.userobj); } catch (_) { return; }
+      loadUserDetail(user);
+      return;
+    }
+
+    const rid = btn.dataset.rid;
+    if (!rid) return;
+    btn.disabled = true;
+    try {
+      if (action === 'ar-flag') {
+        await patchReportFlags(currentSession, rid, { is_flagged: true });
+        updateAllReportsRow(rid, true, false);
+      } else if (action === 'ar-hide') {
+        await patchReportFlags(currentSession, rid, { is_flagged: true, is_hidden: true });
+        updateAllReportsRow(rid, true, true);
+      } else if (action === 'ar-release') {
+        await patchReportFlags(currentSession, rid, { is_flagged: false, is_hidden: false });
+        updateAllReportsRow(rid, false, false);
+      }
+    } catch (err) {
+      btn.disabled = false;
+      window.ppToast?.error(err.message);
+    }
   });
 
   // Users table actions (delegated)
