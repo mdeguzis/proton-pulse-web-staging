@@ -41,14 +41,7 @@ jobs:
         run: uv sync
 
       - name: Fetch GOG catalog
-        run: |
-          uv run python - <<'PY'
-          from scripts.pipeline.gog_catalog import load_gog_catalog
-          import os
-          force = os.environ.get("FORCE_REFRESH", "false").lower() == "true"
-          catalog = load_gog_catalog(force_refresh=force)
-          print(f"[gog-catalog] {len(catalog):,} entries loaded")
-          PY
+        run: uv run python scripts/fetch_gog_catalog.py
         env:
           FORCE_REFRESH: ${{ inputs.force_refresh }}
 
