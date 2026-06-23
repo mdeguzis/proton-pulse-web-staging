@@ -41,17 +41,9 @@ jobs:
         run: uv sync
 
       - name: Fetch GOG catalog
-        run: |
-          uv run python - <<'PY'
-          import os
-          from scripts.pipeline.gog_catalog import load_gog_catalog
-          force = os.environ.get("FORCE_REFRESH", "false").lower() == "true"
-          catalog = load_gog_catalog(force_refresh=force)
-          print(f"[gog-catalog] {len(catalog):,} entries loaded")
-          PY
+        run: uv run python scripts/fetch_gog_catalog.py
         env:
           FORCE_REFRESH: ${{ inputs.force_refresh }}
-          PYTHONPATH: ${{ github.workspace }}
 
       - name: Commit catalog cache to gh-pages
         run: |
