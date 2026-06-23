@@ -9,9 +9,14 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from urllib import request
+from urllib import error, request
 
 from .common import log
+
+# Transient HTTP statuses worth retrying instead of giving up on the whole run.
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
+_MAX_PAGE_ATTEMPTS = 6
+_INTER_PAGE_DELAY_SECONDS = 0.25
 
 DEFAULT_EPIC_CATALOG_CACHE_PATH = (
     Path(__file__).resolve().parents[2] / ".cache" / "epic-catalog-cache.json"
@@ -107,15 +112,10 @@ def _fetch_all_pages() -> dict[str, str]:
     total = None
 
     while True:
-        query = _EPIC_QUERY % {"count": EPIC_PAGE_SIZE, "start": start}
-        body = json.dumps({"query": query}).encode("utf-8")
-        req = request.Request(EPIC_GRAPHQL_URL, data=body, headers=_HEADERS, method="POST")
-
         try:
-            with request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+            data = _fetch_page(start)
         except Exception as exc:
-            log(f"[epic-catalog] WARN: request at start={start} failed ({exc}); stopping")
+            log(f"[epic-catalog] WARN: request at start={start} failed after retries ({exc}); stopping")
             break
 
         store = data.get("data", {}).get("Catalog", {}).get("searchStore", {})
@@ -138,9 +138,42 @@ def _fetch_all_pages() -> dict[str, str]:
 
         if start % 400 == 0:
             log(f"[epic-catalog] fetched {start}/{total} ({len(catalog):,} unique namespaces so far)")
+        time.sleep(_INTER_PAGE_DELAY_SECONDS)
 
     log(f"[epic-catalog] complete: {len(catalog):,} Epic games")
     return catalog
+
+
+def _fetch_page(start: int) -> dict:
+    """POST one searchStore page, retrying transient failures with backoff.
+
+    The old loop broke out of pagination on the first error, so a single HTTP
+    429 truncated the whole catalog. Retry with exponential backoff (honoring
+    Retry-After) and only raise after _MAX_PAGE_ATTEMPTS.
+    """
+    query = _EPIC_QUERY % {"count": EPIC_PAGE_SIZE, "start": start}
+    body = json.dumps({"query": query}).encode("utf-8")
+    delay = 1.0
+    for attempt in range(1, _MAX_PAGE_ATTEMPTS + 1):
+        req = request.Request(EPIC_GRAPHQL_URL, data=body, headers=_HEADERS, method="POST")
+        try:
+            with request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            if exc.code not in _RETRY_STATUSES or attempt == _MAX_PAGE_ATTEMPTS:
+                raise
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            wait = float(retry_after) if (retry_after and str(retry_after).isdigit()) else delay
+            log(f"[epic-catalog] start={start} HTTP {exc.code} (attempt {attempt}/{_MAX_PAGE_ATTEMPTS}); retry in {wait:.1f}s")
+            time.sleep(wait)
+            delay = min(delay * 2, 30.0)
+        except (error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            if attempt == _MAX_PAGE_ATTEMPTS:
+                raise
+            log(f"[epic-catalog] start={start} transient error {exc!r} (attempt {attempt}/{_MAX_PAGE_ATTEMPTS}); retry in {delay:.1f}s")
+            time.sleep(delay)
+            delay = min(delay * 2, 30.0)
+    raise RuntimeError(f"unreachable: exhausted retries for start={start}")
 
 
 def flush_epic_catalog_cache() -> None:

@@ -9,9 +9,16 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from urllib import request
+from urllib import error, request
 
 from .common import log
+
+# Transient HTTP statuses worth retrying. 429 (rate limited) is the big one:
+# embed.gog.com throttles aggressively and dropping those pages loses thousands
+# of games from the catalog.
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
+_MAX_PAGE_ATTEMPTS = 6
+_INTER_PAGE_DELAY_SECONDS = 0.25
 
 DEFAULT_GOG_CATALOG_CACHE_PATH = (
     Path(__file__).resolve().parents[2] / ".cache" / "gog-catalog-cache.json"
@@ -75,16 +82,16 @@ def _fetch_all_pages() -> dict[str, str]:
     catalog: dict[str, str] = {}
     page = 1
     total_pages = 1
+    skipped_pages = 0
 
     while page <= total_pages:
-        url = GOG_CATALOG_URL.format(page=page)
-        req = request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         try:
-            with request.urlopen(req, timeout=20) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+            data = _fetch_page(page)
         except Exception as exc:
-            log(f"[gog-catalog] WARN: page {page} failed ({exc}); skipping")
+            skipped_pages += 1
+            log(f"[gog-catalog] WARN: page {page}/{total_pages} failed after retries ({exc}); skipping")
             page += 1
+            time.sleep(_INTER_PAGE_DELAY_SECONDS)
             continue
 
         if page == 1:
@@ -103,9 +110,42 @@ def _fetch_all_pages() -> dict[str, str]:
         if page % 100 == 0:
             log(f"[gog-catalog] page {page}/{total_pages} ({len(catalog):,} games so far)")
         page += 1
+        time.sleep(_INTER_PAGE_DELAY_SECONDS)
 
-    log(f"[gog-catalog] complete: {len(catalog):,} GOG games")
+    log(f"[gog-catalog] complete: {len(catalog):,} GOG games ({skipped_pages} page(s) skipped after retries)")
     return catalog
+
+
+def _fetch_page(page: int) -> dict:
+    """Fetch one catalog page, retrying transient failures with backoff.
+
+    embed.gog.com returns HTTP 429 under load. The old code skipped those pages
+    outright, which silently dropped thousands of games. Retry with exponential
+    backoff (honoring Retry-After when present) and only give up after
+    _MAX_PAGE_ATTEMPTS, so a busy moment no longer truncates the catalog.
+    """
+    url = GOG_CATALOG_URL.format(page=page)
+    req = request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    delay = 1.0
+    for attempt in range(1, _MAX_PAGE_ATTEMPTS + 1):
+        try:
+            with request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            if exc.code not in _RETRY_STATUSES or attempt == _MAX_PAGE_ATTEMPTS:
+                raise
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            wait = float(retry_after) if (retry_after and str(retry_after).isdigit()) else delay
+            log(f"[gog-catalog] page {page} HTTP {exc.code} (attempt {attempt}/{_MAX_PAGE_ATTEMPTS}); retry in {wait:.1f}s")
+            time.sleep(wait)
+            delay = min(delay * 2, 30.0)
+        except (error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            if attempt == _MAX_PAGE_ATTEMPTS:
+                raise
+            log(f"[gog-catalog] page {page} transient error {exc!r} (attempt {attempt}/{_MAX_PAGE_ATTEMPTS}); retry in {delay:.1f}s")
+            time.sleep(delay)
+            delay = min(delay * 2, 30.0)
+    raise RuntimeError(f"unreachable: exhausted retries for page {page}")
 
 
 def flush_gog_catalog_cache() -> None:

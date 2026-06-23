@@ -96,3 +96,70 @@ def test_flush_clears_in_memory_cache(tmp_path):
     gog_module._gog_catalog_cache = {"1": "Cached"}
     flush_gog_catalog_cache()
     assert gog_module._gog_catalog_cache is None
+
+
+# ── _fetch_page retry behavior (rate limiting) ────────────────────────────────
+
+import pytest  # noqa: E402
+from email.message import Message  # noqa: E402
+from urllib.error import HTTPError, URLError  # noqa: E402
+
+
+def _http_error(code):
+    return HTTPError("https://embed.gog.com", code, "err", Message(), None)
+
+
+def test_fetch_page_retries_on_429_then_succeeds():
+    calls = {"n": 0}
+
+    class FakeResp:
+        def read(self):
+            return _make_page([{"id": 1, "title": "Swat 4 Gold"}], total_pages=1)
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake_urlopen(req, timeout=20):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise _http_error(429)
+        return FakeResp()
+
+    with patch("scripts.pipeline.gog_catalog.request.urlopen", side_effect=fake_urlopen), \
+         patch("scripts.pipeline.gog_catalog.time.sleep"):
+        data = gog_module._fetch_page(7)
+    assert calls["n"] == 3  # two 429s retried, third succeeds
+    assert data["products"][0]["title"] == "Swat 4 Gold"
+
+
+def test_fetch_page_gives_up_after_max_attempts():
+    def fake_urlopen(req, timeout=20):
+        raise _http_error(429)
+    with patch("scripts.pipeline.gog_catalog.request.urlopen", side_effect=fake_urlopen), \
+         patch("scripts.pipeline.gog_catalog.time.sleep"):
+        with pytest.raises(HTTPError):
+            gog_module._fetch_page(1)
+
+
+def test_fetch_page_does_not_retry_non_transient_status():
+    calls = {"n": 0}
+    def fake_urlopen(req, timeout=20):
+        calls["n"] += 1
+        raise _http_error(404)
+    with patch("scripts.pipeline.gog_catalog.request.urlopen", side_effect=fake_urlopen), \
+         patch("scripts.pipeline.gog_catalog.time.sleep"):
+        with pytest.raises(HTTPError):
+            gog_module._fetch_page(1)
+    assert calls["n"] == 1  # 404 is not retried
+
+
+def test_fetch_all_pages_skips_only_after_retries_exhausted():
+    # page 2 always fails (after retries); pages 1 and 3 succeed. The catalog
+    # must still contain games from the surviving pages, not bail entirely.
+    def fake_fetch_page(page):
+        if page == 2:
+            raise _http_error(429)
+        return json.loads(_make_page([{"id": page, "title": f"Game {page}"}], total_pages=3))
+    with patch("scripts.pipeline.gog_catalog._fetch_page", side_effect=fake_fetch_page), \
+         patch("scripts.pipeline.gog_catalog.time.sleep"):
+        catalog = gog_module._fetch_all_pages()
+    assert catalog == {"1": "Game 1", "3": "Game 3"}
