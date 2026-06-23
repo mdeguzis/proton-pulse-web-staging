@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/shared/topbar.css?v=55e85c86">
 <link rel="stylesheet" href="css/shared/site.css?v=86052a10">
 <link rel="stylesheet" href="css/shared/cards.css?v=c0a5fad1">
-<link rel="stylesheet" href="css/admin/admin.css?v=aca21e62">
+<link rel="stylesheet" href="css/admin/admin.css?v=b3e96439">
 </head>
 <body>
 
@@ -37,8 +37,8 @@
       <div class="admin-nav">
         <select id="admin-tab-select" class="admin-select admin-nav-select">
           <option value="users">All Users</option>
-          <option value="pending">Pending Reports</option>
-          <option value="flagged">Flagged Reports</option>
+          <option value="all-reports">Reports</option>
+          <option value="flagged">Flag Review</option>
           <option value="banned">Banned Users</option>
           <option value="admins">Admins</option>
           <option value="phrases">Banned Phrases</option>
@@ -48,20 +48,61 @@
 
       <div id="admin-perms-summary" class="admin-perms-summary" hidden></div>
 
-      <!-- Pending Reports (awaiting approval) -->
-      <section id="tab-pending" class="admin-section" hidden>
-        <div class="admin-card">
-          <div id="pending-loading" class="admin-loading">Loading pending reports...</div>
-          <div id="pending-empty" class="admin-empty" hidden>No pending reports.</div>
-          <table id="pending-table" class="admin-table" hidden>
-            <thead><tr><th data-sort-col="0">Game</th><th data-sort-col="1">Report ID</th><th data-sort-col="2" data-sort-type="date">Submitted</th><th></th></tr></thead>
-            <tbody id="pending-tbody"></tbody>
-          </table>
-          <div id="pending-detail" hidden></div>
+      <!-- Reports (unified) -->
+      <section id="tab-all-reports" class="admin-section" hidden>
+        <div class="admin-filters">
+          <input type="text" id="all-reports-search" class="admin-input admin-input--wide" placeholder="Search by app ID or title...">
+          <select id="all-reports-status-filter" class="admin-select">
+            <option value="">All statuses</option>
+            <option value="clean" selected>Clean</option>
+            <option value="flagged">Flagged</option>
+            <option value="hidden">Hidden</option>
+          </select>
+          <select id="all-reports-apptype-filter" class="admin-select">
+            <option value="">All stores</option>
+            <option value="steam">Steam</option>
+            <option value="gog">GOG</option>
+            <option value="epic">Epic</option>
+            <option value="nonsteam">Non-Steam</option>
+          </select>
+          <label class="admin-label">From <input type="date" id="all-reports-date-from" class="admin-input admin-input--date"></label>
+          <label class="admin-label">To <input type="date" id="all-reports-date-to" class="admin-input admin-input--date"></label>
+          <button class="admin-btn" id="all-reports-refresh-btn">Refresh</button>
+        </div>
+        <div class="admin-legend">
+          <span class="admin-badge admin-badge--warn">flagged</span> queued for mod review &nbsp;&middot;&nbsp;
+          <span class="admin-badge admin-badge--muted">hidden</span> shadow-banned, not visible to users &nbsp;&middot;&nbsp;
+          blank = visible and clean
+        </div>
+        <div id="all-reports-count" class="admin-counts" hidden></div>
+        <div id="all-reports-loading" class="admin-loading">Loading reports...</div>
+        <div id="all-reports-empty" class="admin-empty" hidden>No reports found.</div>
+        <div class="admin-table-scroll">
+        <table id="all-reports-table" class="admin-table" hidden>
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>App</th>
+              <th>Title</th>
+              <th>Source</th>
+              <th>Store</th>
+              <th>User</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="all-reports-tbody"></tbody>
+        </table>
         </div>
       </section>
 
-      <!-- Flagged Reports list -->
+      <!-- Report Detail (navigated to programmatically) -->
+      <section id="tab-report-detail" class="admin-section" hidden>
+        <div id="report-detail-content"></div>
+      </section>
+
+      <!-- Flag Review -->
       <section id="tab-flagged" class="admin-section">
         <div class="admin-filters">
           <input type="text" id="flagged-search" class="admin-input" placeholder="Search game or user...">
@@ -281,6 +322,6 @@
 <script src="js/lib/analytics.js?v=89bd7747"></script>
 <script src="js/lib/topbar.js?v=46cb7ea1"></script>
 <script src="js/lib/toast.js?v=7bb23014"></script>
-<script type="module" src="js/admin/main.js?v=5fe8d7bc"></script>
+<script type="module" src="js/admin/main.js?v=4ccbece8"></script>
 </body>
 </html>

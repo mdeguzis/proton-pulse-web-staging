@@ -17,7 +17,8 @@ import { renderUserDetail } from './components/userDetail.js?v=1fd27df1';
 import { fetchAnalytics } from './api/analytics.js?v=f0ba00d2';
 import { renderAnalytics } from './components/analytics.js?v=e9b6ce1c';
 import { renderCacheStatus } from './components/cache-status.js?v=764c4d18';
-import { renderPending, closePendingReview } from './components/pending.js?v=1fc5b1b4';
+import { renderAllReports, updateAllReportsRow, renderAllReportsDetail } from './components/allReports.js?v=06239b0a';
+import { patchReportFlags, fetchReportById } from './api/allReports.js?v=de397c2f';
 
 // ---------------------------------------------------------------------------
 // State
@@ -28,6 +29,7 @@ let flaggedRows = [];
 let bannedRows = [];
 let sortField = 'flagged_at';
 let sortDir = 'desc';
+let userDetailReturnTab = 'users';
 
 // ---------------------------------------------------------------------------
 // Supabase queries
@@ -116,8 +118,52 @@ async function applyAdminChange(uuid, role, permissions) {
 // Load sections
 // ---------------------------------------------------------------------------
 
-async function loadPending() {
-  await renderPending(currentSession);
+async function loadAllReports() {
+  await renderAllReports(currentSession);
+}
+
+async function loadReportDetail(id) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('reportid', String(id));
+  url.searchParams.delete('detail');
+  url.searchParams.delete('flagid');
+  history.pushState({ adminView: 'report-detail' }, '', url);
+
+  document.querySelectorAll('.admin-section').forEach(sec => { sec.hidden = true; });
+  document.getElementById('tab-report-detail').hidden = false;
+  document.getElementById('admin-tab-select').value = '';
+
+  const content = document.getElementById('report-detail-content');
+  content.innerHTML = '<div class="admin-loading">Loading report...</div>';
+
+  try {
+    const report = await fetchReportById(currentSession, id);
+    renderAllReportsDetail(report, {
+      onBack: () => activateTab('all-reports'),
+      onAction: async (action, rid, btn) => {
+        try {
+          if (action === 'ar-flag') {
+            await patchReportFlags(currentSession, rid, { is_flagged: true });
+            updateAllReportsRow(rid, true, false);
+          } else if (action === 'ar-hide') {
+            await patchReportFlags(currentSession, rid, { is_flagged: true, is_hidden: true });
+            updateAllReportsRow(rid, true, true);
+          } else if (action === 'ar-release') {
+            await patchReportFlags(currentSession, rid, { is_flagged: false, is_hidden: false });
+            updateAllReportsRow(rid, false, false);
+          }
+          window.ppToast?.success('Report updated.');
+        } catch (err) {
+          if (btn) btn.disabled = false;
+          window.ppToast?.error(err.message);
+        }
+      },
+    });
+  } catch (err) {
+    content.innerHTML = `<div class="admin-error">${err.message}</div>
+      <button class="admin-btn admin-btn--ghost admin-btn--sm" data-action="ar-back" style="margin-top:10px">&#8592; Back to reports</button>`;
+    content.querySelector('[data-action="ar-back"]')?.addEventListener('click', () => activateTab('all-reports'));
+  }
 }
 
 async function loadFlagged() {
@@ -219,6 +265,7 @@ async function loadPhrases() {
 }
 
 async function loadUserDetail(user) {
+  userDetailReturnTab = document.getElementById('admin-tab-select').value || 'users';
   // Persist user so a page refresh can restore this view.
   sessionStorage.setItem('admin_detail_user', JSON.stringify(user));
   const url = new URL(window.location.href);
@@ -263,9 +310,11 @@ async function loadUserDetail(user) {
       session: currentSession,
       currentUserId: currentSession?.user?.id,
     });
+    const backBtn = content.querySelector('[data-action="back-to-users"]');
+    if (backBtn) backBtn.textContent = `\u2190 Back to ${userDetailReturnTab.replace('-', ' ')}`;
   } catch (e) {
     content.innerHTML = `<div class="admin-error">${e.message}</div>
-      <button class="admin-btn admin-btn--ghost admin-btn--sm" type="button" data-action="back-to-users" style="margin-top:10px">&#8592; Back to users</button>`;
+      <button class="admin-btn admin-btn--ghost admin-btn--sm" type="button" data-action="back-to-users" style="margin-top:10px">\u2190 Back to ${userDetailReturnTab.replace('-', ' ')}</button>`;
   }
 }
 
@@ -339,7 +388,7 @@ async function loadAnalytics() {
 
 // Maps each tab to its data loader so tab clicks and ?tab= restore share one path.
 const TAB_LOADERS = {
-  pending: loadPending,
+  'all-reports': loadAllReports,
   flagged: loadFlagged,
   banned: loadBanned,
   users: loadUsers,
@@ -352,6 +401,7 @@ const TAB_LOADERS = {
 // refresh restores the same tab. Unknown names fall back to 'users' (the
 // default landing tab).
 function activateTab(tabName, { updateUrl = true } = {}) {
+  if (tabName === 'pending') tabName = 'all-reports';
   if (!TAB_LOADERS[tabName]) tabName = 'users';
   // Never land on a tab this admin lacks access to (e.g. via a stale ?tab= URL).
   if (currentAdmin && !canSeeTab(currentAdmin.role, currentAdmin.permissions, tabName)) tabName = 'users';
@@ -406,11 +456,16 @@ function wireEvents() {
   });
 
   // Refresh buttons
+  document.getElementById('all-reports-refresh-btn').addEventListener('click', loadAllReports);
   document.getElementById('flagged-refresh-btn').addEventListener('click', loadFlagged);
   document.getElementById('banned-refresh-btn').addEventListener('click', loadBanned);
   document.getElementById('users-refresh-btn').addEventListener('click', loadUsers);
 
   // Search inputs - live filter on enter
+  document.getElementById('all-reports-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadAllReports(); });
+  document.getElementById('all-reports-status-filter').addEventListener('change', loadAllReports);
+  document.getElementById('all-reports-date-from').addEventListener('change', loadAllReports);
+  document.getElementById('all-reports-date-to').addEventListener('change', loadAllReports);
   document.getElementById('flagged-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadFlagged(); });
   document.getElementById('flagged-type').addEventListener('change', loadFlagged);
   document.getElementById('flagged-date-from').addEventListener('change', loadFlagged);
@@ -544,6 +599,46 @@ function wireEvents() {
     }
   });
 
+  // All Reports table actions (delegated)
+  document.getElementById('all-reports-tbody').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    if (action === 'view-user-detail') {
+      let user;
+      try { user = JSON.parse(btn.dataset.userobj); } catch (_) { return; }
+      loadUserDetail(user);
+      return;
+    }
+
+    if (action === 'ar-view-detail') {
+      const rid = btn.dataset.rid;
+      if (!rid) return;
+      loadReportDetail(rid);
+      return;
+    }
+
+    const rid = btn.dataset.rid;
+    if (!rid) return;
+    btn.disabled = true;
+    try {
+      if (action === 'ar-flag') {
+        await patchReportFlags(currentSession, rid, { is_flagged: true });
+        updateAllReportsRow(rid, true, false);
+      } else if (action === 'ar-hide') {
+        await patchReportFlags(currentSession, rid, { is_flagged: true, is_hidden: true });
+        updateAllReportsRow(rid, true, true);
+      } else if (action === 'ar-release') {
+        await patchReportFlags(currentSession, rid, { is_flagged: false, is_hidden: false });
+        updateAllReportsRow(rid, false, false);
+      }
+    } catch (err) {
+      btn.disabled = false;
+      window.ppToast?.error(err.message);
+    }
+  });
+
   // Users table actions (delegated)
   document.getElementById('users-tbody').addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
@@ -599,7 +694,7 @@ function wireEvents() {
     if (!btn) return;
     const action = btn.dataset.action;
     if (action === 'back-to-users') {
-      activateTab('users');
+      activateTab(userDetailReturnTab);
     }
     if (action === 'ban-from-detail') {
       openBanModal(btn.dataset.userid || null, btn.dataset.clientid || null, btn.dataset.username);
@@ -611,7 +706,7 @@ function wireEvents() {
       try {
         await unbanUser(currentSession, btn.dataset.banId, { protonPulseUserId: btn.dataset.userid, clientId: btn.dataset.clientid });
         window.ppToast?.success('User unbanned.');
-        activateTab('users');
+        activateTab(userDetailReturnTab);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Unban';
@@ -677,10 +772,9 @@ function wireEvents() {
 
   // Browser back button / swipe back from detail screens.
   window.addEventListener('popstate', e => {
-    const pendingDetail = document.getElementById('pending-detail');
-    if (pendingDetail && !pendingDetail.hidden) { closePendingReview(); return; }
-    if (!document.getElementById('tab-user-detail').hidden) activateTab('users');
+    if (!document.getElementById('tab-user-detail').hidden) activateTab(userDetailReturnTab);
     else if (!document.getElementById('tab-flag-detail').hidden) activateTab('flagged');
+    else if (!document.getElementById('tab-report-detail').hidden) activateTab('all-reports');
   });
 
   // Add admin form
@@ -941,9 +1035,15 @@ async function init() {
   renderPermissionSummary();
   applyTabVisibility();
   wireEvents();
-  ['pending-table', 'flagged-table', 'banned-table', 'users-table', 'admins-table', 'phrases-table'].forEach(setupTableSort);
+  ['flagged-table', 'banned-table', 'users-table', 'admins-table', 'phrases-table'].forEach(setupTableSort);
 
   const params = new URLSearchParams(window.location.search);
+
+  const reportIdParam = params.get('reportid');
+  if (reportIdParam) {
+    loadReportDetail(reportIdParam);
+    return;
+  }
 
   const flagIdParam = params.get('flagid');
   if (flagIdParam) {
