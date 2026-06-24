@@ -166,6 +166,16 @@ h2 {
   overflow-y: auto;
 }
 .filter-dropdown.is-open .filter-panel { display: block; }
+@media (min-width: 601px) {
+  .filter-dropdown.is-open .filter-panel {
+    max-height: none;
+    column-count: 2;
+    column-gap: 0;
+    min-width: 340px;
+    max-width: 540px;
+  }
+  .filter-panel-summary { column-span: all; }
+}
 
 .filter-panel-summary {
   padding: 4px 12px 8px;
@@ -723,6 +733,6 @@ h2 {
 
 </div></div>
 
-<script type="module" src="js/stats/main.js?v=0ea0efb1"></script>
+<script type="module" src="js/stats/main.js?v=6ed2633c"></script>
 </body>
 </html>
