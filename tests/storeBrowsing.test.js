@@ -62,6 +62,11 @@ describe('store filter group in the home Filters popover', () => {
     expect(homeSrc).toContain('tierSel.size + sourceSel.size + storeSel.size');
     expect(homeSrc).toContain('storeSel = new Set();');
   });
+  test('renderHomePage preloads the search index so GOG/Epic filters can pull stubs', () => {
+    // Without this, storeSel = Set(['gog'|'epic']) hits the wantNonSteamOnly
+    // path against a null searchIndex and renders no results.
+    expect(homeSrc).toContain('loadSearchIndex().catch(() => null)');
+  });
 });
 
 describe('store pill rendering', () => {
