@@ -1,0 +1,102 @@
+/* Shared filter UI: toggle button, badge, and panel container.
+   Applied across index.html, app.html, and stats.html so all filter controls
+   share the same visual language and responsive behaviour.
+
+   Each page keeps its own scoped selectors for layout specifics (grid columns,
+   inner control types), but these base rules enforce the consistent shell. */
+
+/* ── Toggle button ────────────────────────────────────────────────────── */
+.filter-toggle-btn,
+.pg-filter-toggle-btn,
+.filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--s1);
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.filter-toggle-btn:hover,
+.pg-filter-toggle-btn:hover,
+.filter-button:hover {
+  border-color: var(--accent);
+  color: var(--strong);
+}
+.filter-toggle-btn.has-filters,
+.filter-toggle-btn.is-active,
+.pg-filter-toggle-btn.has-filters,
+.filter-button.is-active {
+  color: var(--accent-hi);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 16px -6px var(--accent-glow);
+}
+
+/* ── Badge (count on button) ──────────────────────────────────────────── */
+.filter-badge,
+.pg-filter-badge,
+.filter-btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+/* ── Panel container ──────────────────────────────────────────────────── */
+/* app.html and stats.html use .filter-panel; index uses .pg-filter-panel.
+   Both are absolutely-positioned dropdowns anchored to their toggle button. */
+.filter-panel,
+.pg-filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  min-width: 260px;
+  max-width: 96vw;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (min-width: 601px) {
+  .filter-panel,
+  .pg-filter-panel {
+    min-width: 480px;
+  }
+}
+
+/* Stats page: per-dimension dropdown panels are narrow by design (single dim).
+   Override back to a sensible compact width and use 2-column on desktop. */
+.filter-dropdown .filter-panel {
+  min-width: 220px;
+  max-width: 420px;
+}
+@media (min-width: 601px) {
+  .filter-dropdown.is-open .filter-panel {
+    column-count: 2;
+    column-gap: 0;
+    min-width: 340px;
+  }
+  .filter-panel-summary { column-span: all; }
+}

@@ -59,48 +59,11 @@
   align-items: center;
   gap: 10px;
 }
-.filter-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--s1);
-  border: 1px solid var(--border2);
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background .1s, color .1s, border-color .1s;
-}
-.filter-toggle-btn:hover { background: var(--s2); color: var(--text); }
-.filter-toggle-btn.has-filters { color: var(--accent); border-color: var(--accent); background: rgba(74,159,208,0.08); }
-.filter-badge {
-  background: var(--accent);
-  color: #fff;
-  border-radius: 10px;
-  padding: 1px 6px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.filter-panel {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 200;
-  background: var(--s1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
-  min-width: 280px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
+/* .filter-toggle-btn, .filter-badge -- base styles in css/shared/filters.css */
+/* .filter-panel base -- positioning, bg, border, radius, shadow in css/shared/filters.css */
+.filter-panel { display: none; }
 .filter-panel.open { display: block; }
 @media (min-width: 601px) {
-  .filter-panel { min-width: 480px; }
   .filter-panel-grid { grid-template-columns: repeat(3, 1fr); }
 }
 .filter-panel-grid {
