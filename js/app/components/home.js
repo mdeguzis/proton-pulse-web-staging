@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=30cf98fd';
-import { loadSearchIndex, searchIndex } from './search.js?v=f68f83d2';
+import { loadSearchIndex, searchIndex } from './search.js?v=69369686';
 import { SB_KEY, SB_URL, isNonSteamAppId, appTypeFromAppId, storeLabel } from '../config.js?v=df5b5024';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=de2b700a';
@@ -172,6 +172,13 @@ export async function renderHomePage() {
                 <option value="count">Most Reported</option>
               </select>
             </div>
+            <div class="filter-checks" id="home-store-checks" data-group="store">
+              <span class="filter-checks-label">Store</span>
+              <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
+              <label class="filter-check"><input type="checkbox" value="steam"><span>Steam</span></label>
+              <label class="filter-check"><input type="checkbox" value="gog"><span>GOG</span></label>
+              <label class="filter-check"><input type="checkbox" value="epic"><span>Epic</span></label>
+            </div>
             <div class="filter-checks" id="home-tier-checks" data-group="tier">
               <span class="filter-checks-label">Tier</span>
               <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
@@ -188,13 +195,6 @@ export async function renderHomePage() {
               <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
               <label class="filter-check"><input type="checkbox" value="protondb"><span>ProtonDB</span></label>
               <label class="filter-check"><input type="checkbox" value="pulse"><span>Pulse</span></label>
-            </div>
-            <div class="filter-checks" id="home-store-checks" data-group="store">
-              <span class="filter-checks-label">Store</span>
-              <label class="filter-check"><input type="checkbox" value="all" checked><span>All</span></label>
-              <label class="filter-check"><input type="checkbox" value="steam"><span>Steam</span></label>
-              <label class="filter-check"><input type="checkbox" value="gog"><span>GOG</span></label>
-              <label class="filter-check"><input type="checkbox" value="epic"><span>Epic</span></label>
             </div>
             <div class="filter-panel-footer filter-panel-footer--stack">
               <button class="filter-clear-btn" id="home-filter-clear" type="button">Clear filters</button>
