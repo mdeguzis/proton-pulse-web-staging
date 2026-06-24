@@ -101,3 +101,38 @@ describe('home page popular section -- store-aware label and pool', () => {
     expect(homeSrc).toContain('...(wantUnrated ? unratedGames : [])');
   });
 });
+
+describe('home page browse -- text filter box', () => {
+  test('panel has a text filter input with the short "Filter text" placeholder', () => {
+    expect(homeSrc).toContain('id="home-text-filter"');
+    expect(homeSrc).toContain('class="home-filter-text"');
+    expect(homeSrc).toContain('placeholder="Filter text"');
+  });
+
+  test('_filterByText is a case-insensitive, trimmed title substring match', () => {
+    expect(homeSrc).toContain('function _filterByText(reports, text)');
+    expect(homeSrc).toContain("const q = String(text || '').trim().toLowerCase()");
+    expect(homeSrc).toContain('if (!q) return reports');
+    expect(homeSrc).toContain("return reports.filter(r => String(r.title || '').toLowerCase().includes(q))");
+  });
+
+  test('both filter pipelines pass results through _filterByText with textFilter', () => {
+    // Recent and Popular sections must both honor the text box.
+    const matches = homeSrc.match(/_filterByText\(_filterByStore\([^]*?, textFilter\)/g) || [];
+    expect(matches.length).toBe(2);
+  });
+
+  test('typing in the text box updates badge and re-renders both sections', () => {
+    expect(homeSrc).toContain("document.getElementById('home-text-filter')?.addEventListener('input'");
+    expect(homeSrc).toContain('textFilter = e.target.value');
+  });
+
+  test('text filter counts toward the active-filter badge when non-empty', () => {
+    expect(homeSrc).toContain('storeSel.size + (textFilter.trim() ? 1 : 0)');
+  });
+
+  test('clear filters resets the text box value and textFilter state', () => {
+    expect(homeSrc).toContain("if (textInput) textInput.value = ''");
+    expect(homeSrc).toContain("textFilter = ''");
+  });
+});

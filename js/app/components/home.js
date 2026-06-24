@@ -1,7 +1,7 @@
 // home (components) for the app page. Relocated from app.js.
 
 import { fetchRecentPulseReports } from '../api/reports.js?v=30cf98fd';
-import { loadSearchIndex, searchIndex } from './search.js?v=644d8996';
+import { loadSearchIndex, searchIndex } from './search.js?v=37a03e4e';
 import { SB_KEY, SB_URL, isNonSteamAppId, appTypeFromAppId, storeLabel } from '../config.js?v=df5b5024';
 import { daysAgo, latestPerApp } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=de2b700a';
@@ -70,6 +70,14 @@ function _filterByType(reports, sel) {
 function _filterByStore(reports, sel) {
   if (!sel || sel.size === 0 || sel.has('all')) return reports;
   return reports.filter(r => sel.has(r.appType || appTypeFromAppId(r.appId)));
+}
+
+// Text filter: case-insensitive substring match on the game title. Empty/blank
+// text means no filtering. Trims so a stray space does not hide everything.
+function _filterByText(reports, text) {
+  const q = String(text || '').trim().toLowerCase();
+  if (!q) return reports;
+  return reports.filter(r => String(r.title || '').toLowerCase().includes(q));
 }
 
 // Read the active (non-all) pill values from a pg-filter-group element.
@@ -165,6 +173,10 @@ export async function renderHomePage() {
           </button>
           <div class="filter-panel filter-panel--stack" id="home-filter-panel">
             <div class="filter-item">
+              <label class="home-filter-label" for="home-text-filter">Filter</label>
+              <input id="home-text-filter" class="home-filter-text" type="search" placeholder="Filter text" autocomplete="off" />
+            </div>
+            <div class="filter-item">
               <label class="home-filter-label" for="home-sort-select">Sort</label>
               <select id="home-sort-select" class="home-filter-select">
                 <option value="recent">Recent</option>
@@ -227,6 +239,7 @@ export async function renderHomePage() {
       <div id="load-more-popular"></div>`;
 
     let currentSort = 'recent';
+    let textFilter = '';       // title substring filter; '' => no text filtering
     let tierSel = new Set();   // empty => all tiers
     let sourceSel = new Set(); // empty => all sources
     let storeSel = new Set();  // empty => all stores
@@ -302,7 +315,7 @@ export async function renderHomePage() {
           return { ...g, tier: KNOWN_TIERS.has(t) ? t : 'pending' };
         });
       }
-      const filtered = _filterByStore(_filterByType(_filterByTier(asReports, tierSel), sourceSel), storeSel);
+      const filtered = _filterByText(_filterByStore(_filterByType(_filterByTier(asReports, tierSel), sourceSel), storeSel), textFilter);
       const cardsEl = document.getElementById('cards-popular');
       const loadMoreEl = document.getElementById('load-more-popular');
       if (!cardsEl) return;
@@ -337,7 +350,7 @@ export async function renderHomePage() {
     }
 
     function applyRecentFilters() {
-      const filtered = _filterByStore(_filterByType(_filterByTier(_sortReports(allRecentReports, currentSort), tierSel), sourceSel), storeSel);
+      const filtered = _filterByText(_filterByStore(_filterByType(_filterByTier(_sortReports(allRecentReports, currentSort), tierSel), sourceSel), storeSel), textFilter);
       const sectionEl = document.getElementById('recent-section');
       const cardsEl = document.getElementById('cards-recent');
       const loadMoreEl = document.getElementById('load-more-recent');
@@ -368,6 +381,14 @@ export async function renderHomePage() {
       applyRecentFilters();
     });
 
+    // Text filter: filters both sections by title substring as the user types.
+    document.getElementById('home-text-filter')?.addEventListener('input', e => {
+      textFilter = e.target.value;
+      updateFilterBadge();
+      applyRecentFilters();
+      applyPopularFilters();
+    });
+
     // Filters popover: toggle open, close on outside click.
     const filterWrap = document.getElementById('home-filter-wrap');
     const filterToggle = document.getElementById('home-filter-toggle');
@@ -387,7 +408,7 @@ export async function renderHomePage() {
 
     // Active-filter badge: count specific tier + source + store selections.
     function updateFilterBadge() {
-      const n = tierSel.size + sourceSel.size + storeSel.size;
+      const n = tierSel.size + sourceSel.size + storeSel.size + (textFilter.trim() ? 1 : 0);
       filterToggle?.classList.toggle('has-filters', n > 0);
       if (filterBadge) {
         filterBadge.textContent = String(n);
@@ -419,6 +440,9 @@ export async function renderHomePage() {
       const sortSel = document.getElementById('home-sort-select');
       if (sortSel) sortSel.value = 'recent';
       currentSort = 'recent';
+      const textInput = document.getElementById('home-text-filter');
+      if (textInput) textInput.value = '';
+      textFilter = '';
       tierSel = new Set();
       sourceSel = new Set();
       storeSel = new Set();

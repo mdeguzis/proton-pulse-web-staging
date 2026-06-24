@@ -162,6 +162,52 @@
   cursor: pointer;
 }
 
+/* Text filter box: filters the shown games by title substring. Full width of
+   the panel so it stretches wider automatically on the wider desktop panel. */
+.filter-panel--stack .home-filter-text {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color .1s;
+}
+.filter-panel--stack .home-filter-text:focus { border-color: var(--accent); }
+
+/* Desktop: the narrow row-wrap of groups made the variable-width pills wrap
+   raggedly. On wider screens lay the panel out as a single vertical column of
+   full-width groups, each group an even pill grid so they align in tidy
+   columns. Mobile keeps the compact stack from the max-width:560 rule above. */
+@media (min-width: 561px) {
+  .filter-panel--stack.open {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 14px;
+    min-width: 540px;
+  }
+  .filter-panel--stack .filter-item,
+  .filter-panel--stack .pg-filter-group {
+    width: 100%;
+    min-width: 0;
+  }
+  .filter-panel--stack .pg-filter-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+  .filter-panel--stack .pg-filter-group-label { grid-column: 1 / -1; }
+  .filter-panel--stack .pg-filter {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* .filter-checks / .filter-check removed -- filter groups now use
    .pg-filter-group + .pg-filter pill buttons (css/shared/filters.css) */
 
