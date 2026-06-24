@@ -26,11 +26,14 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
   const thumbInner = primarySrc
     ? `<img class="game-card-thumb" src="${primarySrc}" data-appid="${aid}" alt="" loading="lazy" onerror="window.__steamImgLoad(this)">`
     : `<div class="game-card-thumb game-card-thumb--missing">Box art missing</div>`;
-  const thumbHtml = `<div class="game-card-thumb-wrap">${thumbInner}</div>`;
+  // Both positions are rendered; CSS (driven by data-store-pill-pos on <html>)
+  // shows one and hides the other based on the site preference.
+  const storeKey = storePill ? esc(String(storePill).toLowerCase()) : '';
+  const storeTag = storePill
+    ? `<span class="game-card-store-tag game-card-store-pill--${storeKey}">${esc(storePill)}</span>`
+    : '';
+  const thumbHtml = `<div class="game-card-thumb-wrap">${thumbInner}${storeTag}</div>`;
 
-  // Rating pill. A real tier colours the pill; an explicit badge (e.g. "Pulse")
-  // is shown as-is; otherwise fall back to a muted "No Rating" pill so every
-  // card carries a rating slot, including not-yet-rated catalog games.
   const label = tier ? tier.toUpperCase() : (badge || 'No Rating');
   const isNoRating = !tier && !badge;
   let badgeStyle = '';
@@ -41,10 +44,8 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
     badgeStyle = `style="background:${badgeBg};color:${badgeColor || '#fff'}"`;
   }
   const badgeHtml = `<span class="game-card-badge${isNoRating ? ' game-card-badge--unrated' : ''}" ${badgeStyle}>${esc(label)}</span>`;
-  // Store pill sits inline with the rating on desktop; drops to row 2 on mobile
-  // via the @media rule on .game-card-pills in cards.css.
   const storePillHtml = storePill
-    ? `<span class="game-card-store-pill game-card-store-pill--${esc(String(storePill).toLowerCase())}">${esc(storePill)}</span>`
+    ? `<span class="game-card-store-pill game-card-store-pill--${storeKey}">${esc(storePill)}</span>`
     : '';
   const pillsRowHtml = `<div class="game-card-pills">${badgeHtml}${storePillHtml}</div>`;
   const sourceLabelHtml = sourceLabel

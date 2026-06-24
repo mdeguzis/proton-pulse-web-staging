@@ -42,25 +42,27 @@ if (toggle) {
   });
 }
 
-// Store pill preference: show/hide the store badge on game cards site-wide.
-const STORE_PILL_KEY = 'pp:store-pill';
-function applyStorePill(on) {
-  if (on) {
-    document.documentElement.removeAttribute('data-store-pill');
+// Store pill position: 'right' (inline with rating) or 'art' (thumbnail overlay).
+const STORE_PILL_POS_KEY = 'pp:store-pill-pos';
+function applyStorePillPos(pos) {
+  if (pos === 'art') {
+    document.documentElement.setAttribute('data-store-pill-pos', 'art');
   } else {
-    document.documentElement.setAttribute('data-store-pill', 'off');
+    document.documentElement.removeAttribute('data-store-pill-pos');
   }
 }
-const storePillToggle = document.getElementById('opt-store-pill');
-if (storePillToggle) {
-  const stored = localStorage.getItem(STORE_PILL_KEY);
-  const on = stored !== 'off';
-  storePillToggle.checked = on;
-  applyStorePill(on);
-  storePillToggle.addEventListener('change', () => {
-    const val = storePillToggle.checked ? 'on' : 'off';
-    localStorage.setItem(STORE_PILL_KEY, val);
-    applyStorePill(storePillToggle.checked);
-    console.log('[options] store-pill:', val);
+const storePillGroup = document.getElementById('opt-store-pill-pos');
+if (storePillGroup) {
+  const stored = localStorage.getItem(STORE_PILL_POS_KEY) || 'right';
+  storePillGroup.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.checked = r.value === stored;
+    r.addEventListener('change', () => {
+      if (r.checked) {
+        localStorage.setItem(STORE_PILL_POS_KEY, r.value);
+        applyStorePillPos(r.value);
+        console.log('[options] store-pill-pos:', r.value);
+      }
+    });
   });
+  applyStorePillPos(stored);
 }

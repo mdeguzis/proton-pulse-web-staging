@@ -361,9 +361,9 @@
   // (avoids a flash of the wrong mode / running animations).
   initTheme();
   initMotion();
-  // Store pill preference: hide badges globally when turned off in options.
-  if (localStorage.getItem('pp:store-pill') === 'off') {
-    document.documentElement.setAttribute('data-store-pill', 'off');
+  // Store pill position preference: 'art' = thumbnail overlay, 'right' (default) = rating column.
+  if (localStorage.getItem('pp:store-pill-pos') === 'art') {
+    document.documentElement.setAttribute('data-store-pill-pos', 'art');
   }
 
   // inject favicon if the page doesn't already have one

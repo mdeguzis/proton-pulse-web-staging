@@ -51,9 +51,10 @@ describe('renderGameCard store tag', () => {
     expect(pills).toContain('game-card-badge');
   });
 
-  test('no store pill is rendered as a thumbnail overlay (game-card-store-tag)', () => {
+  test('both overlay and right-column pill are rendered (CSS picks which is visible)', () => {
     const html = renderGameCard({ href: '#/app/gog:1', appId: 'gog:1', title: 'X', sub: '', storePill: 'GOG' });
-    expect(html).not.toContain('game-card-store-tag');
+    expect(html).toContain('game-card-store-tag game-card-store-pill--gog');
+    expect(html).toContain('game-card-store-pill game-card-store-pill--gog');
   });
 });
 

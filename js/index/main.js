@@ -316,7 +316,7 @@ import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=3e34559
 
     // S/M/L card size (saved preference, shared key with app page)
     const SIZE_KEY = 'pp:grid-size';
-    const SIZES = ['sm', 'md', 'lg'];
+    const SIZES = ['sm', 'md', 'lg', 'xl'];
     function savedSize() {
       try { const s = localStorage.getItem(SIZE_KEY); return SIZES.includes(s) ? s : 'md'; } catch { return 'md'; }
     }

@@ -66,11 +66,10 @@ describe('store filter group in the home Filters popover', () => {
 });
 
 describe('store pill rendering', () => {
-  test('renderGameCard renders the store pill inside game-card-pills alongside the rating', () => {
+  test('renderGameCard renders both overlay and right-column pill; CSS controls position', () => {
     expect(cardSrc).toContain('storePill');
-    // pill is in game-card-pills (right column), no longer a thumbnail overlay
     expect(cardSrc).toContain('game-card-store-pill game-card-store-pill--');
-    expect(cardSrc).not.toContain('game-card-store-tag');
+    expect(cardSrc).toContain('game-card-store-tag game-card-store-pill--');
     expect(cardSrc).toContain('game-card-thumb-wrap');
   });
   test('cards.css defines a colour per store', () => {
