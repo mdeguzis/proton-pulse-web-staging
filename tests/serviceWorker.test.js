@@ -24,10 +24,25 @@ describe('service worker -- image cache', () => {
 
   test('cache-first: serves a cache hit, otherwise fetches and stores', () => {
     expect(swSrc).toContain('const hit = await cache.match(req);');
-    expect(swSrc).toContain('if (hit) { stats.hits++; return hit; }');
+    expect(swSrc).toContain('return await fetchAndCache(cache, req);');
     // caches ok and opaque (cross-origin no-cors covers) responses
     expect(swSrc).toContain('res.ok || res.type === \'opaque\'');
-    expect(swSrc).toContain('cache.put(req, res.clone())');
+    expect(swSrc).toContain('await cache.put(req, res.clone());');
+  });
+
+  test('stale-while-revalidate: serves instantly, refreshes only past max-age', () => {
+    expect(swSrc).toContain('const MAX_AGE_MS =');
+    expect(swSrc).toContain('const cachedAt = await tsGet(req.url);');
+    expect(swSrc).toContain('(Date.now() - cachedAt) > MAX_AGE_MS');
+    expect(swSrc).toContain('event.waitUntil(revalidate(cache, req));');
+    expect(swSrc).toContain('async function revalidate(cache, req)');
+  });
+
+  test('per-URL timestamps are tracked in IndexedDB for the max-age check', () => {
+    expect(swSrc).toContain('async function tsGet(key)');
+    expect(swSrc).toContain('async function tsSet(key, val)');
+    expect(swSrc).toContain('await tsSet(req.url, Date.now());');
+    expect(swSrc).toContain("indexedDB.open(TS_DB, 1)");
   });
 
   test('trims the cache to the cap (FIFO) so it does not grow without bound', () => {
@@ -56,7 +71,7 @@ describe('service worker -- registration and deploy wiring', () => {
 describe('service worker -- cache analytics', () => {
   test('sw counts hits and misses', () => {
     expect(swSrc).toContain('const stats = { hits: 0, misses: 0 }');
-    expect(swSrc).toContain('if (hit) { stats.hits++; return hit; }');
+    expect(swSrc).toContain('stats.hits++;');
     expect(swSrc).toContain('stats.misses++;');
   });
 
