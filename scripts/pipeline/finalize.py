@@ -739,6 +739,8 @@ def generate_search_index(
     output_path: Path,
     gog_catalog: dict[str, str] | None = None,
     epic_catalog: dict[str, str] | None = None,
+    steam_catalog: dict[str, str] | None = None,
+    protondb_known_app_ids: set[str] | None = None,
 ) -> None:
     """Generate search-index.json with overall tier + report counts per game.
 
@@ -749,6 +751,13 @@ def generate_search_index(
     GOG and Epic games from their respective catalogs that have no local report
     data are emitted as stub entries (tier="", counts=0) so users can search for
     them and submit their first report before any data exists.
+
+    Steam apps get the same treatment, scoped to the intersection with
+    protondb_known_app_ids (signal + probe catalogs) so the index does not
+    balloon to the full ~250k Steam catalog -- only Steam apps ProtonDB knows
+    about are worth surfacing as searchable stubs. The frontend already falls
+    through to a live ProtonDB lookup on /app/<id>, so the stub just makes the
+    app findable by name or id before the next pipeline run ingests its data.
     """
     app_ids = sorted(
         {app_id for app_id, _ in index_keys},
@@ -785,6 +794,26 @@ def generate_search_index(
                 stubs += 1
         if stubs:
             log(f"[search-index] Added {stubs:,} Epic catalog stubs (no reports yet)")
+
+    if steam_catalog and protondb_known_app_ids:
+        stubs = 0
+        skipped_no_signal = 0
+        for app_id, title in sorted(steam_catalog.items(), key=lambda kv: kv[1].lower()):
+            if app_id in seen_ids:
+                continue
+            if not title:
+                continue
+            if app_id not in protondb_known_app_ids:
+                skipped_no_signal += 1
+                continue
+            entries.append([str(app_id), title, "", 0, 0, "steam"])
+            seen_ids.add(str(app_id))
+            stubs += 1
+        if stubs:
+            log(
+                f"[search-index] Added {stubs:,} Steam catalog stubs "
+                f"(ProtonDB-known apps with no local data; {skipped_no_signal:,} skipped without signal)"
+            )
 
     index_file = output_path / "search-index.json"
     index_file.write_text(json.dumps(entries, separators=(",", ":")))
@@ -1429,7 +1458,20 @@ def finalize_output(output_dir, skip_probe: bool = False):
 
     generate_app_indexes(full_index_keys, data_output_path)
     generate_index_html(full_index_keys, output_path)
-    generate_search_index(full_index_keys, data_output_path, output_path, gog_catalog=gog_catalog, epic_catalog=epic_catalog)
+    # ProtonDB-known set scopes the Steam stub pass: signal (full ProtonDB
+    # compatibility report) plus probe (apps we have actively confirmed). Apps
+    # outside this set are mostly tools/demos/soundtracks and not worth
+    # surfacing as searchable stubs.
+    protondb_known_app_ids = set((protondb_signal_catalog or {}).keys()) | set((protondb_probe_catalog or {}).keys())
+    generate_search_index(
+        full_index_keys,
+        data_output_path,
+        output_path,
+        gog_catalog=gog_catalog,
+        epic_catalog=epic_catalog,
+        steam_catalog=steam_catalog,
+        protondb_known_app_ids=protondb_known_app_ids,
+    )
     # Fill in releaseYear column on same-name collisions (e.g. Prey 2006 vs
     # Prey 2017). Runs against the freshly written search-index.json so it can
     # detect collisions before the file is consumed by the homepage / app page.
