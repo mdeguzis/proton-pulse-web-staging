@@ -2,6 +2,8 @@ import { escapeHtml } from '../utils.js?v=bd5a67c2';
 
 let chartInstance = null;
 let reportsChartInstance = null;
+let imgRoutesChartInstance = null;
+let dataCacheChartInstance = null;
 
 // Pipeline-emitted JSON files we want to expose freshness/cache stats for.
 // Adding a new one here surfaces it in the Data Cache section automatically.
@@ -60,12 +62,79 @@ async function _probeDataFile(name) {
   }
 }
 
+function _renderDataCacheChart(rows) {
+  const canvas = document.getElementById('data-cache-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (dataCacheChartInstance) { dataCacheChartInstance.destroy(); dataCacheChartInstance = null; }
+  // Bars are "age as % of max-age". Above 100% = stale, color red. 50-100% =
+  // warming, color yellow. <50% = fresh, color green. Files without a max-age
+  // header are charted at 0 with a neutral grey bar.
+  const labels = rows.map(r => r.name);
+  const pcts = rows.map(r => {
+    if (!r.ok || r.ageSecs == null || !r.maxAge) return 0;
+    return Math.round((r.ageSecs / r.maxAge) * 100);
+  });
+  const colors = pcts.map(p => p === 0 ? 'rgba(120,120,120,0.5)' : p > 100 ? '#ff5566' : p > 50 ? '#d4b36a' : '#4caf80');
+  dataCacheChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Age vs max-age', data: pcts, backgroundColor: colors, borderWidth: 0 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.x}% of TTL elapsed` } },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#888', callback: v => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          suggestedMax: 120,
+        },
+        y: { ticks: { color: '#888', font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderImgRoutesChart() {
+  const canvas = document.getElementById('img-routes-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (imgRoutesChartInstance) { imgRoutesChartInstance.destroy(); imgRoutesChartInstance = null; }
+  const counts = window.__imgRouteCounts || {};
+  const routes = [
+    { key: 'cloudflare',           label: 'Cloudflare',  color: '#5c8bd6' },
+    { key: 'game-images-json',     label: 'game-images', color: '#d4b36a' },
+    { key: 'nonsteam-images-json', label: 'nonsteam',    color: '#7a3fcf' },
+    { key: 'hidden',               label: 'hidden',      color: '#ff5566' },
+  ];
+  const data = routes.map(r => Number(counts[r.key]) || 0);
+  imgRoutesChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: routes.map(r => r.label),
+      datasets: [{ label: 'Hits', data, backgroundColor: routes.map(r => r.color), borderWidth: 0 }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#888' }, grid: { display: false } },
+        y: { ticks: { color: '#888', stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+      },
+    },
+  });
+}
+
 async function loadDataCacheTable() {
   const target = document.getElementById('data-cache-table');
   if (!target) return;
   // Initial placeholder is already in the rendered HTML; we only overwrite
   // once the probes resolve so the synchronous initial render is stable.
   const rows = await Promise.all(DATA_FILES.map(_probeDataFile));
+  _renderDataCacheChart(rows);
   target.innerHTML = `
     <table class="admin-table">
       <thead><tr>
@@ -147,6 +216,14 @@ function destroyChart() {
   if (reportsChartInstance) {
     reportsChartInstance.destroy();
     reportsChartInstance = null;
+  }
+  if (imgRoutesChartInstance) {
+    imgRoutesChartInstance.destroy();
+    imgRoutesChartInstance = null;
+  }
+  if (dataCacheChartInstance) {
+    dataCacheChartInstance.destroy();
+    dataCacheChartInstance = null;
   }
 }
 
@@ -301,16 +378,19 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
     </div>
     <div id="sec-data-cache" style="margin-top:20px">
       <div class="analytics-section-title">Pipeline data cache <button type="button" class="admin-sort-btn" id="data-cache-refresh" style="margin-left:10px;font-size:0.72rem">Refresh</button></div>
+      <div class="analytics-chart-wrap" style="height:200px"><canvas id="data-cache-chart"></canvas></div>
       <div id="data-cache-table"><p class="admin-empty">Probing data files...</p></div>
     </div>
     <div id="sec-img-routes" style="margin-top:20px">
       <div class="analytics-section-title">Image route hits (this session)</div>
+      <div class="analytics-chart-wrap" style="height:200px"><canvas id="img-routes-chart"></canvas></div>
       ${renderImgRoutes()}
     </div>
   `;
 
   wireJumpNav(content, NAV_SECTIONS);
   loadDataCacheTable();
+  renderImgRoutesChart();
   content.querySelector('#data-cache-refresh')?.addEventListener('click', loadDataCacheTable);
 
   content.querySelectorAll('[data-days]').forEach(btn => {
