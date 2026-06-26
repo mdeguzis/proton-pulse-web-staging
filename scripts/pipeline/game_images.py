@@ -42,7 +42,12 @@ def _url_is_ok(url: str, timeout: int = 8) -> bool:
         return False
 
 
-def _fetch_steam_header(app_id: str, timeout: int = 10) -> str | None:
+def _fetch_steam_header(app_id: str, timeout: int = 10) -> tuple[str | None, bool]:
+    """Return (header_url, delisted). delisted=True means Steam confirmed the
+    app is not retrievable (success: false in the appdetails payload). A
+    transient network failure leaves delisted=False so we do not falsely
+    mark a live app as delisted on a flaky run.
+    """
     url = STEAM_APPDETAILS_URL.format(appid=app_id)
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
@@ -50,11 +55,11 @@ def _fetch_steam_header(app_id: str, timeout: int = 10) -> str | None:
             data = json.loads(resp.read().decode("utf-8"))
         app_data = data.get(str(app_id), {})
         if not app_data.get("success"):
-            return None
-        return app_data.get("data", {}).get("header_image") or None
+            return None, True
+        return app_data.get("data", {}).get("header_image") or None, False
     except Exception as exc:
         log(f"[game-images] WARN: Steam appdetails fetch failed for {app_id}: {exc}")
-        return None
+        return None, False
 
 
 def _collect_all_app_ids(data_dir: Path) -> list[str]:
@@ -193,11 +198,18 @@ def build_game_images(output_dir) -> dict[str, str]:
             cache[app_id] = {"status": "ok", "probed_at": today}
         else:
             log(f"[game-images] {app_id}: standard URL 404, fetching from Steam API")
-            real_url = _fetch_steam_header(app_id)
+            real_url, delisted = _fetch_steam_header(app_id)
             if real_url:
                 url_clean = real_url.split("?")[0]
                 cache[app_id] = {"status": "hashed", "url": url_clean, "probed_at": today}
                 log(f"[game-images] {app_id}: hashed URL -> {url_clean}")
+            elif delisted:
+                # Steam confirmed the app is gone. Distinct from "missing"
+                # (transient API hiccup) -- delisted is a positive signal we
+                # surface as a chip on the frontend so users know why there
+                # is no Steam page to visit.
+                cache[app_id] = {"status": "delisted", "probed_at": today}
+                log(f"[game-images] {app_id}: appdetails returned success=false (delisted)")
             else:
                 cache[app_id] = {"status": "missing", "probed_at": today}
                 log(f"[game-images] {app_id}: no image found via Steam API")
@@ -213,3 +225,46 @@ def build_game_images(output_dir) -> dict[str, str]:
     log(f"[game-images] wrote {len(frontend)} hashed URL(s) to {frontend_path.name}")
 
     return frontend
+
+
+def enrich_search_index_with_delisted(output_dir) -> None:
+    """Write a delisted=True flag into column 7 of search-index.json for any
+    Steam app the cache marked as delisted (appdetails returned success=false).
+
+    Read-modify-write of search-index in place. Pads rows to length 8 so column
+    7 lands consistently regardless of whether column 6 (releaseYear) was
+    populated by release_years.py.
+    """
+    output_dir = Path(output_dir)
+    index_path = output_dir / "search-index.json"
+    cache_path = output_dir / "game-images-cache.json"
+    if not index_path.exists() or not cache_path.exists():
+        return
+    try:
+        entries = json.loads(index_path.read_text(encoding="utf-8"))
+        cache = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log(f"[delisted] WARN: could not read input files: {exc}")
+        return
+    if not isinstance(entries, list) or not isinstance(cache, dict):
+        return
+
+    delisted_ids = {aid for aid, e in cache.items() if isinstance(e, dict) and e.get("status") == "delisted"}
+    if not delisted_ids:
+        log("[delisted] no delisted Steam apps in cache, skipping enrich")
+        return
+
+    updated = 0
+    for row in entries:
+        if not isinstance(row, list) or len(row) < 1:
+            continue
+        if str(row[0]) in delisted_ids:
+            # Pad to 8 columns: [id, title, tier, pdb, pulse, appType, releaseYear, delisted]
+            while len(row) < 8:
+                row.append(None)
+            row[7] = True
+            updated += 1
+
+    if updated:
+        index_path.write_text(json.dumps(entries, separators=(",", ":")), encoding="utf-8")
+        log(f"[delisted] flagged {updated} entries as delisted in search-index.json")
