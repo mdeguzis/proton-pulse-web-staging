@@ -67,17 +67,31 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
     const t = appType || 'steam';
     return STORE_PILL_CLASS[t] || 'game-card-store-pill--steam';
   }
+  // The store badge renders both a text label and an icon every time. CSS on
+  // <html data-store-display="icon"> hides .store-text and shows .store-icon
+  // so the user pref can swap between the two without re-rendering cards.
+  function storeIconHtml(t, label) {
+    if (t !== 'steam' && t !== 'gog' && t !== 'epic') return '';
+    return `<span class="store-icon store-icon--${t}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg></span>`;
+  }
   function storePill(appType) {
     const t = appType || 'steam';
     const label = STORE_LABEL[t] || 'Steam';
     const cls = storeColorClass(t);
-    return `<span class="game-card-store-pill ${cls}">${label}</span>`;
+    return `<span class="game-card-store-pill ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
   }
   function storeTag(appType) {
     const t = appType || 'steam';
     const label = STORE_LABEL[t] || 'Steam';
     const cls = storeColorClass(t);
-    return `<span class="game-card-store-tag ${cls}">${label}</span>`;
+    return `<span class="game-card-store-tag ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
+  }
+  // Store segment that sits inside the bottom-bar strip. CSS controls
+  // visibility based on data-store-pill-pos (bar-right / bar-segment).
+  function stripStoreHtml(appType) {
+    const t = appType || 'steam';
+    const label = STORE_LABEL[t] || 'Steam';
+    return `<span class="pg-card-strip-store game-card-strip-store store-icon store-icon--${t}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg><span class="store-text">${label}</span></span>`;
   }
   const SECTION_LABEL = { steam: 'Popular on Steam', gog: 'Popular GOG Games', epic: 'Popular Epic Games' };
   const SECTION_SUB = {
@@ -133,9 +147,10 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
             ${storePill(g.appType)}
           </div>
         </div>
-        <div class="pg-card-strip" data-tier="${stripTier}">
+        <div class="pg-card-strip" data-tier="${stripTier}" data-store="${g.appType || 'steam'}">
           <span class="pg-card-strip-tier">${stripLabel}</span>
           ${storePill(g.appType)}
+          ${stripStoreHtml(g.appType)}
         </div>
       </a>`;
   }

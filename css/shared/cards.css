@@ -153,6 +153,72 @@
 .game-card-store-pill--gog   { background: #7a3fcf; color: #fff; }
 .game-card-store-pill--epic  { background: #555; color: #eee; }
 .game-card-store-pill--non-steam { background: #444; color: #ddd; }
+
+/* Round store icon -- the .store-icon span wraps the SVG glyph and gets a
+   tight square footprint. By default it is hidden inside the store pill;
+   the data-store-display="icon" attribute on <html> hides the text instead
+   and shows the icon. */
+.store-icon { display: none; }
+.store-icon svg { width: 18px; height: 18px; display: block; }
+[data-store-display="icon"] .store-text { display: none; }
+[data-store-display="icon"] .store-icon { display: inline-flex; align-items: center; }
+/* Store pill chrome collapses to just the icon when display=icon so we do
+   not paint a colored background around the icon's own circle. */
+[data-store-display="icon"] .game-card-store-pill,
+[data-store-display="icon"] .game-card-store-tag {
+  background: transparent !important;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Bottom-bar strip store segment. Hidden by default; revealed by the
+   bar-right or bar-segment placement preferences. */
+.game-card-strip-store { display: none; }
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .game-card-strip-store {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .game-card-strip-store .store-text {
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip {
+  /* Two-tone strip: tier color fills the leading 75%, store color fills
+     the trailing 25%. The store segment's background overrides the strip's
+     own tier background via specificity. */
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  padding: 0;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip-tier {
+  align-self: center;
+  text-align: center;
+  padding: 0 14px;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip-store {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip[data-store="steam"] .game-card-strip-store { background: #1689d0; }
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip[data-store="gog"] .game-card-strip-store   { background: #7a3fcf; }
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip[data-store="epic"] .game-card-strip-store  { background: #2a2a2a; }
+/* When the icon preference is on inside the segment, hide the text label
+   and let the round icon do the talking. */
+[data-store-display="icon"][data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip-store .store-text { display: none; }
 @media (max-width: 600px) {
   .game-card-pills { flex-direction: column; align-items: flex-end; gap: 4px; }
 }
@@ -213,6 +279,10 @@
   padding: 2px 8px;
 }
 [data-card-layout="strip"] .game-card-right { display: none; }
+/* When a bar-* placement is active the strip-store segment is shown -- hide
+   the inline pill inside the strip so we don't render the store twice. */
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .game-card-strip .game-card-store-pill,
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip .game-card-store-pill { display: none; }
 .load-more-btn {
   display: block;
   margin: 12px auto 0;

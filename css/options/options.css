@@ -80,3 +80,4 @@
 }
 .option-radio:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .option-radio input { display: none; }
+.option-radio--disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }

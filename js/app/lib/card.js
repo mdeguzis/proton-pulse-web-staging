@@ -29,8 +29,13 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
   // Both positions are rendered; CSS (driven by data-store-pill-pos on <html>)
   // shows one and hides the other based on the site preference.
   const storeKey = storePill ? esc(String(storePill).toLowerCase()) : '';
+  const storeIcon = storeKey === 'steam' || storeKey === 'gog' || storeKey === 'epic'
+    ? `<span class="store-icon store-icon--${storeKey}" title="${esc(storePill)}" aria-label="${esc(storePill)}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${storeKey}"/></svg></span>`
+    : '';
+  // Both the text pill (game-card-store-tag) and the round icon are rendered
+  // so CSS can pick which the user prefers via data-store-display on <html>.
   const storeTag = storePill
-    ? `<span class="game-card-store-tag game-card-store-pill--${storeKey}">${esc(storePill)}</span>`
+    ? `<span class="game-card-store-tag game-card-store-pill--${storeKey}"><span class="store-text">${esc(storePill)}</span>${storeIcon}</span>`
     : '';
   const thumbHtml = `<div class="game-card-thumb-wrap">${thumbInner}${storeTag}</div>`;
 
@@ -45,7 +50,7 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
   }
   const badgeHtml = `<span class="game-card-badge${isNoRating ? ' game-card-badge--unrated' : ''}" ${badgeStyle}>${esc(label)}</span>`;
   const storePillHtml = storePill
-    ? `<span class="game-card-store-pill game-card-store-pill--${storeKey}">${esc(storePill)}</span>`
+    ? `<span class="game-card-store-pill game-card-store-pill--${storeKey}"><span class="store-text">${esc(storePill)}</span>${storeIcon}</span>`
     : '';
   const pillsRowHtml = `<div class="game-card-pills">${badgeHtml}${storePillHtml}</div>`;
   const sourceLabelHtml = sourceLabel
@@ -58,7 +63,14 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
   // <html> flips it in for both visibility and the right-column hide.
   const stripTier = tier ? String(tier).toLowerCase() : '';
   const stripLabel = tier ? tier.toUpperCase() : 'NO RATING';
-  const stripHtml = `<div class="game-card-strip" data-tier="${esc(stripTier)}"><span class="game-card-strip-tier">${esc(stripLabel)}</span>${storePillHtml}</div>`;
+  // Store segment inside the strip. CSS hides it by default and reveals it
+  // when data-store-pill-pos is 'bar-right' (chip on the trailing edge) or
+  // 'bar-segment' (last 1/4 of the bar in the store color, two-tone with
+  // the tier).
+  const stripStoreHtml = storePill
+    ? `<span class="game-card-strip-store store-icon store-icon--${storeKey}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${storeKey}"/></svg><span class="store-text">${esc(storePill)}</span></span>`
+    : '';
+  const stripHtml = `<div class="game-card-strip" data-tier="${esc(stripTier)}" data-store="${storeKey}"><span class="game-card-strip-tier">${esc(stripLabel)}</span>${storePillHtml}${stripStoreHtml}</div>`;
 
   // Strip is a sibling of the row (not inside the body) so it can extend
   // the full card width including under the thumbnail when strip mode is on.
