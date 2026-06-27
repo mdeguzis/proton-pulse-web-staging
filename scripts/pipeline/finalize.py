@@ -32,6 +32,7 @@ from .common import (
 from .gog_catalog import load_gog_catalog, load_gog_covers
 from .epic_catalog import load_epic_catalog, load_epic_covers
 from .metadata import bootstrap_all_app_metadata, read_app_metadata
+from .data_versions import write_data_versions_json
 from .game_images import build_game_images, enrich_search_index_with_delisted
 from .most_played import build_most_played
 from .release_years import enrich_search_index_with_release_years
@@ -1527,6 +1528,10 @@ def finalize_output(output_dir, skip_probe: bool = False):
     enrich_search_index_with_delisted(output_path)
     _backfill_most_played_header_images(output_path, overrides)
     write_proton_versions_json(output_path)
+    # Hash every emitted data file and write data-versions.json so the
+    # frontend can cache-bust each data fetch individually. Must run LAST so
+    # the hashes reflect every other generator's final output. See #119.
+    write_data_versions_json(output_path)
     log_summary(state["parsed_count"], data_output_path, output_path, pipeline_start, state["backfilled_keys"])
     flush_steam_title_cache()
     log("Done finalizing output.")

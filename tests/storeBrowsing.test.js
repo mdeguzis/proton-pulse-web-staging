@@ -117,7 +117,11 @@ describe('non-Steam box art', () => {
 describe('search index loads from prod on staging', () => {
   test('loadSearchIndex uses USES_PROD_DATA + SITE_ROOT, not a hardcoded host check', () => {
     expect(searchSrc).toContain('USES_PROD_DATA');
-    expect(searchSrc).toContain('`${SITE_ROOT}/search-index.json`');
+    // Routes through dataUrl() for cache-busting (#119). The prod URL is
+    // built from SITE_ROOT + the cache-busted filename, not a hardcoded
+    // host.
+    expect(searchSrc).toContain('SITE_ROOT');
+    expect(searchSrc).toMatch(/dataUrl\(['"]search-index\.json['"]\)/);
     expect(searchSrc).not.toContain("'https://www.proton-pulse.com/search-index.json'");
   });
 });

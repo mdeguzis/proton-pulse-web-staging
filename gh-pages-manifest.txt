@@ -102,6 +102,7 @@ js/lib/supabase-client.js
 js/lib/analytics.js
 js/lib/topbar.js
 js/lib/toast.js
+js/lib/data-url.js
 js/lib/gh-gist.js
 js/lib/gh-auth.js
 js/lib/scoring/gameStats.js

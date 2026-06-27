@@ -10,6 +10,7 @@ import {
   fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
   unpublishReport,
 } from '../api/configs.js?v=93128a98';
+import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=1c2e2599';
 
 /**
@@ -125,7 +126,7 @@ export function initMyReports(ctx) {
           fetchMyUserConfigs(protonPulseUserId, cid, s),
           fetchMyCloudConfigs(protonPulseUserId, s),
         ]),
-        fetch('search-index.json').then(r => r.ok ? r.json() : []).catch(() => []),
+        dataUrl('search-index.json').then(u => fetch(u)).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const merged = mergeMyReportRows(publishedRows, cloudRows);
       if (Array.isArray(searchIndex) && searchIndex.length) {
