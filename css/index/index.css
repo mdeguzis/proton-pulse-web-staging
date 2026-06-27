@@ -322,6 +322,63 @@
   font-size: 0.62rem;
   padding: 2px 8px;
 }
+/* Hide the inline pill on the bar when one of the bar-* placements is on --
+   either the chip on the trailing edge or the two-tone segment takes over. */
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .pg-card-strip .game-card-store-pill,
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip .game-card-store-pill { display: none; }
+
+/* Strip store segment for pg-cards. Hidden unless a bar-* placement is set. */
+.pg-card-strip-store { display: none; }
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .pg-card-strip-store {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-right"] .pg-card-strip-store .store-text {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Two-tone segment: tier color in the leading 3/4, store color in the last
+   1/4. The strip becomes a grid so the segment owns its own column. */
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip-tier {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip-store {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom-right-radius: 10px;
+}
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip[data-store="steam"] .pg-card-strip-store { background: #1689d0; }
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip[data-store="gog"]   .pg-card-strip-store { background: #7a3fcf; }
+[data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip[data-store="epic"]  .pg-card-strip-store { background: #2a2a2a; }
+/* When the user has store-display=icon AND bar-segment is on, hide the text
+   so the segment shows just the round icon. */
+[data-store-display="icon"][data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip-store .store-text { display: none; }
 [data-card-layout="strip"] .pg-right { display: none; }
 /* Suppress link underline on the card AND every text-bearing descendant
    in every state. Browsers apply :focus underlines to the inner spans

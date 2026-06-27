@@ -42,18 +42,25 @@ if (toggle) {
   });
 }
 
-// Store pill position: 'right' (inline with rating) or 'art' (thumbnail overlay).
+// Store pill position. Values:
+//   'right'       - inline with the rating pill in the right column
+//   'art'         - overlaid on the thumbnail corner
+//   'bar-right'   - chip pinned to the trailing edge of the bottom-bar layout
+//   'bar-segment' - last 1/4 of the bottom bar in store color (two-tone with tier)
+// bar-* values only have an effect when card-layout is 'strip'.
 const STORE_PILL_POS_KEY = 'pp:store-pill-pos';
+const STORE_PILL_POS_VALUES = ['right', 'art', 'bar-right', 'bar-segment'];
 function applyStorePillPos(pos) {
-  if (pos === 'art') {
-    document.documentElement.setAttribute('data-store-pill-pos', 'art');
+  if (pos && pos !== 'right') {
+    document.documentElement.setAttribute('data-store-pill-pos', pos);
   } else {
     document.documentElement.removeAttribute('data-store-pill-pos');
   }
 }
 const storePillGroup = document.getElementById('opt-store-pill-pos');
 if (storePillGroup) {
-  const stored = localStorage.getItem(STORE_PILL_POS_KEY) || 'right';
+  let stored = localStorage.getItem(STORE_PILL_POS_KEY) || 'right';
+  if (!STORE_PILL_POS_VALUES.includes(stored)) stored = 'right';
   storePillGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {
@@ -67,6 +74,33 @@ if (storePillGroup) {
   applyStorePillPos(stored);
 }
 
+// Store display: 'text' shows the store name as a pill; 'icon' shows a small
+// round monogram icon instead. Either choice combines with store-pill-pos to
+// pick where the badge sits.
+const STORE_DISPLAY_KEY = 'pp:store-display';
+function applyStoreDisplay(mode) {
+  if (mode === 'icon') {
+    document.documentElement.setAttribute('data-store-display', 'icon');
+  } else {
+    document.documentElement.removeAttribute('data-store-display');
+  }
+}
+const storeDisplayGroup = document.getElementById('opt-store-display');
+if (storeDisplayGroup) {
+  const stored = localStorage.getItem(STORE_DISPLAY_KEY) || 'text';
+  storeDisplayGroup.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.checked = r.value === stored;
+    r.addEventListener('change', () => {
+      if (r.checked) {
+        localStorage.setItem(STORE_DISPLAY_KEY, r.value);
+        applyStoreDisplay(r.value);
+        console.log('[options] store-display:', r.value);
+      }
+    });
+  });
+  applyStoreDisplay(stored);
+}
+
 // Card layout: 'right' (rating pill in right column) or 'strip' (rating row
 // beneath the title so long names get the full card width). Mirrors the
 // store-pill-pos pattern: a single attribute on <html> drives the CSS swap.
@@ -76,6 +110,32 @@ function applyCardLayout(pos) {
     document.documentElement.setAttribute('data-card-layout', 'strip');
   } else {
     document.documentElement.removeAttribute('data-card-layout');
+  }
+  updateConditionalOptions();
+}
+// Disable any option labeled data-requires="card-layout=strip" when the card
+// layout is not 'strip'. If the user had a bar-* store position chosen and
+// switches back to the right layout, fall back to 'right' so the rendered
+// card stays consistent.
+function updateConditionalOptions() {
+  const layout = document.documentElement.getAttribute('data-card-layout') || 'right';
+  document.querySelectorAll('.option-radio[data-requires]').forEach(label => {
+    const req = label.getAttribute('data-requires');
+    const [key, val] = req.split('=');
+    let active = false;
+    if (key === 'card-layout') active = layout === val;
+    label.classList.toggle('option-radio--disabled', !active);
+    const input = label.querySelector('input[type="radio"]');
+    if (input) input.disabled = !active;
+  });
+  if (layout !== 'strip') {
+    const cur = localStorage.getItem(STORE_PILL_POS_KEY);
+    if (cur && cur.startsWith('bar-')) {
+      localStorage.setItem(STORE_PILL_POS_KEY, 'right');
+      applyStorePillPos('right');
+      const right = document.querySelector('#opt-store-pill-pos input[value="right"]');
+      if (right) right.checked = true;
+    }
   }
 }
 const cardLayoutGroup = document.getElementById('opt-card-layout');

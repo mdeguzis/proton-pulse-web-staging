@@ -58,6 +58,21 @@
       <circle cx="9.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
       <circle cx="14.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
     </symbol>
+    <!-- Round store glyphs for the "store badge: icon" preference. Each is a
+         filled circle in the brand color with a white monogram on top. SVG
+         viewBox 0 0 24 24, used inline via <use href="#icon-store-..."/>. -->
+    <symbol id="icon-store-steam" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="12" fill="#1689d0"/>
+      <text x="12" y="17" text-anchor="middle" font-family="-apple-system, sans-serif" font-weight="800" font-size="15" fill="#fff">S</text>
+    </symbol>
+    <symbol id="icon-store-gog" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="12" fill="#7a3fcf"/>
+      <text x="12" y="17" text-anchor="middle" font-family="-apple-system, sans-serif" font-weight="800" font-size="15" fill="#fff">G</text>
+    </symbol>
+    <symbol id="icon-store-epic" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="12" fill="#2a2a2a"/>
+      <text x="12" y="17" text-anchor="middle" font-family="-apple-system, sans-serif" font-weight="800" font-size="15" fill="#fff">E</text>
+    </symbol>
   </defs>
 </svg>`;
 
@@ -365,13 +380,25 @@
   initTheme();
   initMotion();
   // Store pill position preference: 'art' = thumbnail overlay, 'right' (default) = rating column.
-  if (localStorage.getItem('pp:store-pill-pos') === 'art') {
-    document.documentElement.setAttribute('data-store-pill-pos', 'art');
+  // Store badge placement: 'art' (overlay on thumbnail), 'right' (default
+   // pill column), 'bar-right' (sits at the trailing edge of the bottom-bar
+   // strip), 'bar-segment' (last quarter of the bottom-bar strip in store
+   // color, two-tone with the tier). The bar-* values only paint when
+   // data-card-layout="strip" is also set; they fall back to 'right'
+   // otherwise (no visual change). */
+  const storePillPos = localStorage.getItem('pp:store-pill-pos');
+  if (storePillPos && storePillPos !== 'right') {
+    document.documentElement.setAttribute('data-store-pill-pos', storePillPos);
   }
   // Card layout preference: 'strip' = rating row under title (more title width
   // on mobile), default = rating pill in right column.
   if (localStorage.getItem('pp:card-layout') === 'strip') {
     document.documentElement.setAttribute('data-card-layout', 'strip');
+  }
+  // Store badge display preference: 'icon' = round colored glyph, default
+  // = text pill ('STEAM', 'GOG', 'EPIC').
+  if (localStorage.getItem('pp:store-display') === 'icon') {
+    document.documentElement.setAttribute('data-store-display', 'icon');
   }
 
   // inject favicon if the page doesn't already have one
