@@ -3,7 +3,6 @@
    Use renderGameCard() in js/app/lib/card.js to generate the HTML.
    Mobile: thumbnail shrinks to 60x28, title stays bold, sub truncates.        */
 .game-card {
-  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--s1);
@@ -16,10 +15,6 @@
   cursor: pointer;
   transition: box-shadow 0.15s, background 0.15s, transform 0.05s;
 }
-/* Reserve room for the absolutely-positioned strip in strip mode so the
-   card grows by the strip height instead of overlapping the row content.
-   The padding-bottom must match the strip's fixed height below. */
-[data-card-layout="strip"] .game-card { padding-bottom: 32px; }
 .game-card-row {
   display: flex;
   align-items: center;
@@ -162,18 +157,16 @@
    Toggle lives in options.html as "Rating layout". See #111. */
 .game-card-strip { display: none; }
 [data-card-layout="strip"] .game-card-strip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 26px;
+  flex: 0 0 26px;
+  width: 100%;
   padding: 0 14px;
   background: var(--s2);
   color: var(--muted);
+  box-sizing: border-box;
 }
 [data-card-layout="strip"] .game-card-strip .game-card-store-pill {
   position: absolute;
