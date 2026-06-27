@@ -54,7 +54,10 @@
 /* Desktop: give the report rows more presence with a bigger boxart and
    roomier padding. Steam header ratio (~2.14:1) is preserved. */
 @media (min-width: 760px) {
-  .game-card { gap: 18px; padding: 11px 18px 11px 11px; }
+  /* Padding goes on .game-card-row so the bottom-bar strip (a sibling) can
+     still reach the card's bottom and side edges. See the matching note
+     on the size-modifier rules below. */
+  .game-card-row { gap: 18px; padding: 11px 18px 11px 11px; }
   .game-card-thumb { width: 138px; height: 64px; border-radius: 8px; }
   .game-card-title { font-size: 1.04rem; }
   .game-card-sub { font-size: 0.82rem; }
@@ -163,6 +166,9 @@
   gap: 8px;
   flex: 0 0 26px;
   width: 100%;
+  /* margin-top adds breathing space between the row text and the rating
+     strip so the title/sub aren't sandwiched against the bar. */
+  margin-top: 6px;
   padding: 0 14px;
   background: var(--s2);
   color: var(--muted);
