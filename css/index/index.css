@@ -236,12 +236,15 @@
 .pg-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
+  border: 0;
+  /* box-shadow outline so the inside strip can fill edge-to-edge; see
+     the matching .game-card rule for the rationale. */
+  box-shadow: 0 0 0 1px var(--border);
   border-radius: 10px;
   background: var(--card);
   overflow: hidden;
   text-decoration: none;
-  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+  transition: box-shadow 0.15s, background 0.15s, transform 0.05s;
 }
 .pg-card-row {
   display: flex;
@@ -286,7 +289,7 @@
   padding: 2px 8px;
 }
 [data-card-layout="strip"] .pg-right { display: none; }
-.pg-card:hover { border-color: var(--accent); }
+.pg-card:hover { box-shadow: 0 0 0 1px var(--accent); }
 .pg-card:active { transform: translateY(1px); }
 .pg-thumb-wrap {
   position: relative;

@@ -6,13 +6,18 @@
   display: flex;
   flex-direction: column;
   background: var(--s1);
-  border: 1px solid var(--border);
+  border: 0;
+  /* box-shadow draws the outline OUTSIDE the box so the inside content
+     (including a tier strip at the bottom) can fill edge-to-edge without
+     a 1px border peeking between the strip background and the card's
+     rounded corner. */
+  box-shadow: 0 0 0 1px var(--border);
   border-radius: 10px;
   overflow: hidden;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+  transition: box-shadow 0.15s, background 0.15s, transform 0.05s;
 }
 .game-card-row {
   display: flex;
@@ -20,7 +25,7 @@
   gap: 14px;
   padding: 8px 14px 8px 8px;
 }
-.game-card:hover { border-color: var(--accent); text-decoration: none; }
+.game-card:hover { box-shadow: 0 0 0 1px var(--accent); text-decoration: none; }
 .game-card:active { transform: translateY(1px); }
 .game-card-thumb-wrap {
   position: relative;
