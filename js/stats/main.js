@@ -2,6 +2,7 @@
 // chart rendering by delegating to utils, filters, and charts modules.
 
 import { FILTER_DIMS, dimDef, label, fmt } from './utils.js?v=9bcdac4f';
+import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
 import {
   applyFilter, getFilter, getOpenDropdown, setOpenDropdown,
   renderDropdownButton, toggleFilterValue, clearFilter,
@@ -293,9 +294,11 @@ function renderAll() {
 // Restore filter from URL on load
 restoreFilterFromUrl();
 
-// Fetch stats.json (required) and coverage-summary.json (optional) in parallel
+// Fetch stats.json (required) and coverage-summary.json (optional) in parallel.
+// dataUrl appends a content-hash buster from data-versions.json so a new
+// pipeline run invalidates the cache only when the file actually changes.
 Promise.all([
-  fetch('stats.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+  dataUrl('stats.json').then(u => fetch(u)).then(r => r.ok ? r.json() : Promise.reject(r.status)),
   fetch('coverage-summary.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
 ])
   .then(([statsPayload, coveragePayload]) => {

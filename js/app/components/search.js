@@ -6,6 +6,7 @@ import { renderGamePage } from './game-page.js?v=565f22df';
 import { STEAM_IMG, SITE_ROOT, USES_PROD_DATA, storeLabelFromAppId } from '../config.js?v=df5b5024';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=f5dda5b6';
 import { renderGameCard } from '../lib/card.js?v=20b34baa';
+import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 
 // Search index + results UX -- factored out of app.js.
 // Loaded as a classic script BEFORE app.js so its globals
@@ -105,9 +106,13 @@ export async function loadSearchIndex() {
     // Localhost and staging (.github.io) have no pipeline data of their own, so
     // pull the production search-index just like CDN/data do (USES_PROD_DATA).
     // On the real domain this stays relative.
+    // dataUrl appends ?v=<content-hash> from data-versions.json so a new
+    // pipeline run invalidates the browser/CDN cache for this file only.
+    // Staging/local resolves through USES_PROD_DATA on the host pattern.
+    const bustedName = await dataUrl('search-index.json');
     const SEARCH_URL = USES_PROD_DATA
-      ? `${SITE_ROOT}/search-index.json`
-      : 'search-index.json';
+      ? `${SITE_ROOT}/${bustedName}`
+      : bustedName;
     const r = await fetch(SEARCH_URL);
     searchIndex = r.ok ? await r.json() : [];
   } catch { searchIndex = []; }

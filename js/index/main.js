@@ -1,5 +1,6 @@
 // Entry module for index.html (homepage). Migrated from index.js.
 import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=e7fe3ce0';
+import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
 
 // Homepage-only logic. Universal nav chrome (banner, nav row, mobile drawer,
 // search dropdown, auth indicator) lives in topbar.js.
@@ -128,7 +129,7 @@ import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=e7fe3ce
   async function loadSearchIndex() {
     if (searchIndexCache) return searchIndexCache;
     try {
-      const resp = await fetch('search-index.json');
+      const resp = await fetch(await dataUrl('search-index.json'));
       if (resp.ok) searchIndexCache = await resp.json();
     } catch (_) {}
     return searchIndexCache || [];
@@ -183,7 +184,7 @@ import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=e7fe3ce
   }
 
   try {
-    const resp = await fetch('most_played.json', { cache: 'no-store' });
+    const resp = await fetch(await dataUrl('most_played.json'));
     if (!resp.ok) {
       console.debug('[popular-games] most_played.json fetch not ok', { status: resp.status });
       return;
