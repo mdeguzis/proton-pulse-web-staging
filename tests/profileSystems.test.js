@@ -775,7 +775,7 @@ describe('mergeMyReportRows', () => {
 
     expect(rows).toEqual([
       expect.objectContaining({
-        app_id: 570,
+        app_id: '570',
         published: true,
         cloud: false,
         unpublished: false,
@@ -797,7 +797,7 @@ describe('mergeMyReportRows', () => {
 
     expect(rows).toEqual([
       expect.objectContaining({
-        app_id: 730,
+        app_id: '730',
         published: false,
         cloud: true,
         unpublished: true,
@@ -823,7 +823,7 @@ describe('mergeMyReportRows', () => {
     // published. unpublished=true only applies to cloud-only rows with no report.
     expect(rows).toEqual([
       expect.objectContaining({
-        app_id: 1091500,
+        app_id: '1091500',
         published: true,
         cloud: true,
         unpublished: false,
@@ -846,12 +846,39 @@ describe('mergeMyReportRows', () => {
 
     expect(rows).toEqual([
       expect.objectContaining({
-        app_id: 620,
+        app_id: '620',
         cloud: true,
         published: true,
         unpublished: false,
       }),
     ]);
+    expect(ctx.__getMyReportBadges(rows[0])).toEqual([
+      { label: 'Cloud', tone: 'cloud' },
+      { label: 'Published', tone: 'published' },
+    ]);
+  });
+
+  test('collapses one game into a single row when published app_id is a string and cloud app_id is a number (issue #131)', async () => {
+    const { ctx } = makeCtx(null);
+    await flush();
+
+    // user_configs.app_id is a text column (string from the API);
+    // user_proton_configs.app_id is bigint (number). The merge must treat them
+    // as the same game instead of emitting two rows.
+    const rows = ctx.__mergeMyReportRows([
+      { app_id: '2358720', title: 'Black Myth: Wukong', rating: 'platinum', id: 22, created_at: '2026-06-28T23:42:56Z' },
+    ], [
+      { app_id: 2358720, app_name: 'Black Myth: Wukong', updated_at: '2026-06-28T23:41:43Z', is_published: false },
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual(expect.objectContaining({
+      app_id: '2358720',
+      cloud: true,
+      published: true,
+      unpublished: false,
+      rating: 'platinum',
+    }));
     expect(ctx.__getMyReportBadges(rows[0])).toEqual([
       { label: 'Cloud', tone: 'cloud' },
       { label: 'Published', tone: 'published' },

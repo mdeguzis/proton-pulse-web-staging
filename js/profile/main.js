@@ -9,7 +9,7 @@ import {
   getProtonPulseUserIdFromSession, getShowUsername, setShowUsername,
   escapeHtml, formatSystemUpdated, getWebClientIdProfile,
   getPluginLinkCodeFromLocation, getSteamIdFromSession,
-} from './utils.js?v=a77e8ddf';
+} from './utils.js?v=38d77229';
 import {
   deleteAllMyData, fetchAllMyData, checkMyDataExists,
 } from './api/configs.js?v=93128a98';
