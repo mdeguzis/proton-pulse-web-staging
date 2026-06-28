@@ -317,14 +317,29 @@
 [data-card-layout="strip"][data-store-pill-pos="art-corner"] .game-card-strip .game-card-store-pill,
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip .game-card-store-pill,
 [data-card-layout="strip"][data-store-pill-pos="bar-segment"] .game-card-strip .game-card-store-pill { display: none; }
-/* bar-icon: round store glyph sits inside the strip next to the tier
+/* bar-icon: round store glyph sits flush to the right of the tier
    label. Icon-only (no text) regardless of the global store-display
-   pref, since this placement is specifically about the icon look. */
+   pref, since this placement is specifically about the icon look.
+   No shadow, no background, no padding -- just the glyph next to the
+   text. The tier-color gradient on the strip already provides the
+   backdrop. */
+[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip {
+  gap: 6px;
+}
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip-store {
   display: inline-flex;
   align-items: center;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
 }
-[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip-store > svg { display: block; }
+[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip-store > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .game-card-strip-store > .store-text { display: none; }
 .load-more-btn {
   display: block;

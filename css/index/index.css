@@ -350,12 +350,25 @@
 [data-card-layout="strip"][data-store-pill-pos="art-corner"] .pg-card-strip .game-card-store-pill,
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip .game-card-store-pill,
 [data-card-layout="strip"][data-store-pill-pos="bar-segment"] .pg-card-strip .game-card-store-pill { display: none; }
-/* bar-icon: round store glyph on the strip next to the tier label. */
+/* bar-icon: round store glyph flush right of the tier label. No shadow,
+   no background -- the tier-color gradient is the backdrop. */
+[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip {
+  gap: 6px;
+}
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip-store {
   display: inline-flex;
   align-items: center;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
 }
-[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip-store > svg { display: block; }
+[data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip-store > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 [data-card-layout="strip"][data-store-pill-pos="bar-icon"] .pg-card-strip-store > .store-text { display: none; }
 
 /* Strip store segment for pg-cards. Hidden unless bar-segment is set. The
