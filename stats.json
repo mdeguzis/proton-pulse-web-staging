@@ -1,0 +1,829 @@
+{
+  "generated_at": "2026-06-28T04:23:41Z",
+  "total_reports": 213787,
+  "total_games": 22495,
+  "games_with_pulse": 4,
+  "by_source": {
+    "protondb": 213779,
+    "pulse": 8
+  },
+  "by_rating": {
+    "borked": 39487,
+    "platinum": 26441,
+    "gold": 130441,
+    "bronze": 4226,
+    "silver": 12330,
+    "pending": 862
+  },
+  "by_gpu_vendor": {
+    "amd": 107714,
+    "nvidia": 94153,
+    "intel": 9833,
+    "other": 2029,
+    "unknown": 58
+  },
+  "by_cpu_brand": {
+    "intel": 66055,
+    "amd": 147283,
+    "other": 391,
+    "unknown": 58
+  },
+  "by_os_family": {
+    "fedora": 19546,
+    "steamos": 32785,
+    "arch": 75087,
+    "gentoo": 2028,
+    "other": 27842,
+    "ubuntu": 38541,
+    "bazzite": 5998,
+    "nixos": 3184,
+    "debian": 5724,
+    "opensuse": 3049,
+    "unknown": 3
+  },
+  "by_store": {
+    "steam": 213787
+  },
+  "by_proton_type": {
+    "proton-stable": 213481,
+    "other": 45,
+    "proton-experimental": 260,
+    "ge-proton": 1
+  },
+  "by_device_family": {
+    "desktop": 181769,
+    "steam-deck-lcd": 31911,
+    "steam-deck-oled": 49,
+    "unknown": 58
+  },
+  "by_year": {
+    "2024": 41052,
+    "2025": 50302,
+    "2023": 29774,
+    "2022": 31865,
+    "2020": 12048,
+    "2026": 27725,
+    "2021": 19287,
+    "2019": 1512,
+    "2018": 222
+  },
+  "by_year_source": {
+    "2024": {
+      "protondb": 41052
+    },
+    "2025": {
+      "protondb": 50302
+    },
+    "2023": {
+      "protondb": 29774
+    },
+    "2022": {
+      "protondb": 31865
+    },
+    "2020": {
+      "protondb": 12048
+    },
+    "2026": {
+      "protondb": 27717,
+      "pulse": 8
+    },
+    "2021": {
+      "protondb": 19287
+    },
+    "2019": {
+      "protondb": 1512
+    },
+    "2018": {
+      "protondb": 222
+    }
+  },
+  "by_rating_x_gpu_vendor": {
+    "amd": {
+      "borked": 17520,
+      "platinum": 13240,
+      "gold": 68912,
+      "silver": 5923,
+      "bronze": 1901,
+      "pending": 218
+    },
+    "nvidia": {
+      "borked": 18796,
+      "gold": 55239,
+      "platinum": 11728,
+      "bronze": 2089,
+      "silver": 5747,
+      "pending": 554
+    },
+    "intel": {
+      "borked": 2597,
+      "gold": 5219,
+      "platinum": 1223,
+      "bronze": 204,
+      "silver": 555,
+      "pending": 35
+    },
+    "other": {
+      "borked": 571,
+      "platinum": 250,
+      "gold": 1071,
+      "silver": 105,
+      "bronze": 32
+    },
+    "unknown": {
+      "pending": 55,
+      "borked": 3
+    }
+  },
+  "by_rating_x_cpu_brand": {
+    "intel": {
+      "borked": 13827,
+      "gold": 38755,
+      "platinum": 7720,
+      "bronze": 1377,
+      "silver": 3880,
+      "pending": 496
+    },
+    "amd": {
+      "platinum": 18650,
+      "borked": 25569,
+      "gold": 91486,
+      "silver": 8428,
+      "bronze": 2840,
+      "pending": 310
+    },
+    "other": {
+      "borked": 88,
+      "gold": 200,
+      "platinum": 71,
+      "silver": 22,
+      "bronze": 9,
+      "pending": 1
+    },
+    "unknown": {
+      "pending": 55,
+      "borked": 3
+    }
+  },
+  "by_rating_x_os_family": {
+    "fedora": {
+      "borked": 3140,
+      "platinum": 3206,
+      "gold": 11676,
+      "bronze": 359,
+      "silver": 1146,
+      "pending": 19
+    },
+    "steamos": {
+      "platinum": 2660,
+      "borked": 4231,
+      "gold": 23877,
+      "silver": 1567,
+      "bronze": 449,
+      "pending": 1
+    },
+    "arch": {
+      "borked": 13939,
+      "gold": 44022,
+      "platinum": 10841,
+      "bronze": 1604,
+      "silver": 4464,
+      "pending": 217
+    },
+    "gentoo": {
+      "borked": 398,
+      "gold": 1189,
+      "platinum": 250,
+      "silver": 129,
+      "bronze": 53,
+      "pending": 9
+    },
+    "other": {
+      "borked": 6055,
+      "gold": 16261,
+      "silver": 1726,
+      "platinum": 2974,
+      "bronze": 623,
+      "pending": 203
+    },
+    "ubuntu": {
+      "borked": 8489,
+      "gold": 22735,
+      "platinum": 3890,
+      "silver": 2259,
+      "bronze": 787,
+      "pending": 381
+    },
+    "bazzite": {
+      "platinum": 979,
+      "gold": 3790,
+      "borked": 805,
+      "silver": 327,
+      "bronze": 97
+    },
+    "nixos": {
+      "gold": 1804,
+      "silver": 206,
+      "platinum": 523,
+      "borked": 576,
+      "bronze": 73,
+      "pending": 2
+    },
+    "debian": {
+      "gold": 3239,
+      "borked": 1316,
+      "platinum": 680,
+      "silver": 347,
+      "bronze": 117,
+      "pending": 25
+    },
+    "opensuse": {
+      "gold": 1848,
+      "platinum": 438,
+      "silver": 159,
+      "borked": 535,
+      "bronze": 64,
+      "pending": 5
+    },
+    "unknown": {
+      "borked": 3
+    }
+  },
+  "by_rating_x_source": {
+    "protondb": {
+      "borked": 39485,
+      "platinum": 26437,
+      "gold": 130439,
+      "bronze": 4226,
+      "silver": 12330,
+      "pending": 862
+    },
+    "pulse": {
+      "borked": 2,
+      "platinum": 4,
+      "gold": 2
+    }
+  },
+  "by_rating_x_store": {
+    "steam": {
+      "borked": 39487,
+      "platinum": 26441,
+      "gold": 130441,
+      "bronze": 4226,
+      "silver": 12330,
+      "pending": 862
+    }
+  },
+  "by_rating_x_device_family": {
+    "desktop": {
+      "borked": 35301,
+      "gold": 107291,
+      "platinum": 23817,
+      "bronze": 3784,
+      "silver": 10769,
+      "pending": 807
+    },
+    "steam-deck-lcd": {
+      "platinum": 2612,
+      "borked": 4171,
+      "gold": 23128,
+      "silver": 1559,
+      "bronze": 441
+    },
+    "steam-deck-oled": {
+      "platinum": 12,
+      "gold": 22,
+      "borked": 12,
+      "silver": 2,
+      "bronze": 1
+    },
+    "unknown": {
+      "pending": 55,
+      "borked": 3
+    }
+  },
+  "by_year_rating": {
+    "2024": {
+      "borked": 7175,
+      "gold": 24862,
+      "silver": 2229,
+      "platinum": 5984,
+      "bronze": 802
+    },
+    "2025": {
+      "platinum": 8339,
+      "borked": 7657,
+      "gold": 30538,
+      "silver": 2895,
+      "bronze": 873
+    },
+    "2023": {
+      "borked": 5477,
+      "platinum": 4026,
+      "gold": 17973,
+      "silver": 1723,
+      "bronze": 575
+    },
+    "2022": {
+      "borked": 6315,
+      "gold": 19575,
+      "bronze": 647,
+      "platinum": 3507,
+      "silver": 1821
+    },
+    "2020": {
+      "borked": 3646,
+      "gold": 7224,
+      "silver": 818,
+      "bronze": 360
+    },
+    "2026": {
+      "platinum": 4585,
+      "gold": 17331,
+      "borked": 3702,
+      "bronze": 507,
+      "silver": 1600
+    },
+    "2021": {
+      "gold": 12395,
+      "borked": 5240,
+      "silver": 1207,
+      "bronze": 445
+    },
+    "2019": {
+      "gold": 543,
+      "borked": 275,
+      "bronze": 17,
+      "silver": 37,
+      "pending": 640
+    },
+    "2018": {
+      "pending": 222
+    }
+  },
+  "stale_borked_count": 883,
+  "stale_borked_cutoff_year": 2024,
+  "worth_retesting": [
+    [
+      "1190340",
+      "",
+      24,
+      2022
+    ],
+    [
+      "1527890",
+      "",
+      11,
+      2023
+    ],
+    [
+      "1058650",
+      "",
+      9,
+      2022
+    ],
+    [
+      "354620",
+      "",
+      7,
+      2023
+    ],
+    [
+      "714370",
+      "",
+      7,
+      2024
+    ],
+    [
+      "1256380",
+      "",
+      7,
+      2024
+    ],
+    [
+      "1284820",
+      "Desktop Kanojo",
+      7,
+      2024
+    ],
+    [
+      "1559390",
+      "",
+      7,
+      2023
+    ],
+    [
+      "2309440",
+      "",
+      7,
+      2024
+    ],
+    [
+      "661290",
+      "",
+      6,
+      2024
+    ],
+    [
+      "1520470",
+      "",
+      6,
+      2024
+    ],
+    [
+      "313980",
+      "",
+      6,
+      2023
+    ],
+    [
+      "617610",
+      "",
+      6,
+      2024
+    ],
+    [
+      "1230170",
+      "",
+      5,
+      2023
+    ],
+    [
+      "259340",
+      "",
+      5,
+      2024
+    ],
+    [
+      "1379550",
+      "",
+      5,
+      2022
+    ],
+    [
+      "423890",
+      "Gods and Idols",
+      5,
+      2021
+    ],
+    [
+      "1117160",
+      "",
+      5,
+      2023
+    ],
+    [
+      "1342790",
+      "",
+      5,
+      2021
+    ],
+    [
+      "1147750",
+      "Fishy",
+      5,
+      2024
+    ],
+    [
+      "221020",
+      "",
+      5,
+      2022
+    ],
+    [
+      "947890",
+      "",
+      5,
+      2022
+    ],
+    [
+      "584880",
+      "",
+      4,
+      2024
+    ],
+    [
+      "270830",
+      "",
+      4,
+      2023
+    ],
+    [
+      "16620",
+      "Monster Trucks Nitro",
+      4,
+      2023
+    ],
+    [
+      "1956740",
+      "",
+      4,
+      2024
+    ],
+    [
+      "954270",
+      "LOGistICAL 2",
+      4,
+      2020
+    ],
+    [
+      "611850",
+      "",
+      4,
+      2024
+    ],
+    [
+      "485900",
+      "",
+      4,
+      2024
+    ],
+    [
+      "1358840",
+      "",
+      4,
+      2024
+    ]
+  ],
+  "top_games": [
+    [
+      "1091500",
+      "Cyberpunk 2077",
+      2602
+    ],
+    [
+      "1245620",
+      "ELDEN RING",
+      2043
+    ],
+    [
+      "730",
+      "Counter-Strike 2",
+      1957
+    ],
+    [
+      "553850",
+      "HELLDIVERS 2",
+      1935
+    ],
+    [
+      "1172470",
+      "Apex Legends",
+      1741
+    ],
+    [
+      "2073850",
+      "THE FINALS",
+      1592
+    ],
+    [
+      "230410",
+      "Warframe",
+      1578
+    ],
+    [
+      "2767030",
+      "Marvel Rivals",
+      1557
+    ],
+    [
+      "1086940",
+      "Baldur's Gate 3",
+      1478
+    ],
+    [
+      "1174180",
+      "Red Dead Redemption 2",
+      1373
+    ],
+    [
+      "2246340",
+      "Monster Hunter Wilds",
+      1255
+    ],
+    [
+      "526870",
+      "Satisfactory",
+      1228
+    ],
+    [
+      "782330",
+      "",
+      1217
+    ],
+    [
+      "2357570",
+      "Overwatch 2",
+      993
+    ],
+    [
+      "381210",
+      "Dead by Daylight",
+      949
+    ],
+    [
+      "1808500",
+      "ARC Raiders",
+      933
+    ],
+    [
+      "1551360",
+      "Forza Horizon 5",
+      871
+    ],
+    [
+      "1151640",
+      "",
+      779
+    ],
+    [
+      "1240440",
+      "",
+      774
+    ],
+    [
+      "1237970",
+      "Titanfall 2",
+      774
+    ],
+    [
+      "990080",
+      "Hogwarts Legacy",
+      770
+    ],
+    [
+      "2183900",
+      "Warhammer 40,000: Space Marine 2",
+      756
+    ],
+    [
+      "1172620",
+      "Sea of Thieves: 2024 Edition",
+      756
+    ],
+    [
+      "1145360",
+      "Hades",
+      741
+    ],
+    [
+      "1716740",
+      "Starfield",
+      738
+    ],
+    [
+      "284160",
+      "BeamNG.drive",
+      703
+    ],
+    [
+      "739630",
+      "Phasmophobia",
+      683
+    ],
+    [
+      "440",
+      "Team Fortress 2",
+      668
+    ],
+    [
+      "3321460",
+      "Crimson Desert",
+      659
+    ],
+    [
+      "1422450",
+      "Deadlock",
+      639
+    ],
+    [
+      "1903340",
+      "Clair Obscur: Expedition 33",
+      639
+    ],
+    [
+      "438100",
+      "VRChat",
+      625
+    ],
+    [
+      "1144200",
+      "Ready or Not",
+      617
+    ],
+    [
+      "1293830",
+      "Forza Horizon 4",
+      615
+    ],
+    [
+      "1172380",
+      "STAR WARS Jedi: Fallen Order",
+      589
+    ],
+    [
+      "397540",
+      "Borderlands 3",
+      585
+    ],
+    [
+      "1794680",
+      "",
+      584
+    ],
+    [
+      "2694490",
+      "Path of Exile 2",
+      581
+    ],
+    [
+      "322170",
+      "Geometry Dash",
+      556
+    ],
+    [
+      "1361210",
+      "Warhammer 40,000: Darktide",
+      534
+    ],
+    [
+      "1446780",
+      "MONSTER HUNTER RISE",
+      530
+    ],
+    [
+      "236390",
+      "War Thunder",
+      516
+    ],
+    [
+      "1328670",
+      "Mass Effect Legendary Edition",
+      496
+    ],
+    [
+      "949230",
+      "Cities: Skylines II",
+      490
+    ],
+    [
+      "1237950",
+      "STAR WARS Battlefront II",
+      480
+    ],
+    [
+      "227300",
+      "Euro Truck Simulator 2",
+      475
+    ],
+    [
+      "1113000",
+      "",
+      473
+    ],
+    [
+      "671860",
+      "BattleBit Remastered",
+      472
+    ],
+    [
+      "2379780",
+      "Balatro",
+      471
+    ],
+    [
+      "2623190",
+      "The Elder Scrolls IV: Oblivion Remastered",
+      469
+    ]
+  ],
+  "framegen_total_responses": 2,
+  "framegen_yes_count": 1,
+  "framegen_yes_rate_pct": 50.0,
+  "by_device_x_framegen": {
+    "steam-deck-lcd": {
+      "yes": 1,
+      "no": 1
+    }
+  },
+  "by_gpu_x_framegen": {
+    "amd": {
+      "yes": 1,
+      "no": 1
+    }
+  },
+  "by_vram_x_framegen": {
+    "unknown": {
+      "yes": 1,
+      "no": 1
+    }
+  },
+  "by_rating_x_framegen": {
+    "gold": {
+      "yes": 1
+    },
+    "platinum": {
+      "no": 1
+    }
+  },
+  "top_games_needing_framegen": []
+}

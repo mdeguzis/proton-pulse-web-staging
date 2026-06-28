@@ -1,0 +1,18 @@
+[
+  {
+    "appId": "220",
+    "cpu": "AMD Ryzen 7 1700 Eight-Core",
+    "duration": "unreported",
+    "gpu": "AMD Radeon VII",
+    "gpuDriver": "4.5 Mesa 19.2.0-devel (git-78f33620e8)",
+    "kernel": "5.1.6-arch1-1-ARCH",
+    "notes": "",
+    "os": "Linux",
+    "protonVersion": "4.2-6",
+    "ram": "32 GB",
+    "rating": "pending",
+    "timestamp": 1559982079,
+    "title": "Half-Life 2",
+    "source": "protondb"
+  }
+]
