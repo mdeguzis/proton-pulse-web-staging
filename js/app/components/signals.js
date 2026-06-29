@@ -94,8 +94,11 @@ export function renderSignalStrip(r) {
         neutralLabel: (r.source || '').toLowerCase() === 'protondb'
           ? 'Anonymous report - cannot be verified'
           : 'Not confirmed' }),
+    // Framegen flips the usual yes=good convention: "yes, required" means the
+    // game can't hold a frame rate on its own (bad), "no, not required" means
+    // it runs smoothly without help (good). Matches how the user reads it.
     renderSignalIcon('framegen', fr.requiresFramegen, 'Framegen required for smooth play',
-      { positiveState: 'warn', neutralLabel: formNeutral }),
+      { positiveState: 'bad', negativeState: 'good', neutralLabel: formNeutral }),
   ].filter(Boolean);
   return `<div class="signal-strip">${icons.join('')}</div>`;
 }

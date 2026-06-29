@@ -10,7 +10,7 @@ import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=aba6619f
 import { enhanceAuthorBlocks } from './author.js?v=2316d334';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=48037483';
-import { renderCard } from './report-card.js?v=ec94c31c';
+import { renderCard } from './report-card.js?v=f6d301ed';
 import { loadSearchIndex, searchIndex } from './search.js?v=28b593a1';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=df5b5024';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=e7fe3ce0';
@@ -870,11 +870,20 @@ export async function renderGamePage(appId) {
     _showFlagModal(btn);
   });
 
-  // Scroll to a specific report if the URL has #report-{id} after the app hash
+  // Scroll to a specific report if the URL has #report-{id} after the app hash.
+  // The fixed topbar would cover the report's top edge under plain
+  // scrollIntoView, so compute the scroll target manually and back the
+  // position off by the topbar height plus a small gap. The anchor now sits
+  // on the .report-block wrapper around the header card + summary, so the
+  // top of the visible report aligns with the top of the viewport.
   const anchorMatch = location.hash.match(/#(report-[a-z0-9]+)$/i);
   if (anchorMatch) {
     setTimeout(() => {
-      el.querySelector(`#${anchorMatch[1]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const target = el.querySelector(`#${anchorMatch[1]}`);
+      if (!target) return;
+      const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+      const top = target.getBoundingClientRect().top + window.scrollY - topbarH - 12;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }, 150);
   }
 }

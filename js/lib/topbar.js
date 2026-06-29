@@ -58,6 +58,32 @@
       <circle cx="9.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
       <circle cx="14.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
     </symbol>
+    <!-- Store glyphs for the "store badge: icon" preference. Each retains
+         the brand's actual outline rather than being forced into a circle:
+         Steam is its own round mark on a blue circle; GOG is a white disc
+         with the purple "gog" wordmark; Epic is the shield-with-tab badge
+         in dark grey with the white "EPIC" wordmark. -->
+    <symbol id="icon-store-steam" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="12" fill="#1689d0"/>
+      <g transform="translate(4 4) scale(0.667)" fill="#fff">
+        <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658a3.37 3.37 0 011.912-.59c.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61a2.563 2.563 0 001.314 1.25 2.557 2.557 0 003.337-1.375 2.534 2.534 0 00-1.373-3.331 2.567 2.567 0 00-1.878-.03l1.523.63a1.885 1.885 0 011.013 2.455 1.892 1.892 0 01-2.463 1.011zm11.415-9.301a3.014 3.014 0 00-3.015-3.014 3.013 3.013 0 100 6.027 3.013 3.013 0 003.015-3.013zm-5.273-.004a2.26 2.26 0 014.521 0 2.26 2.26 0 01-4.521 0z"/>
+      </g>
+    </symbol>
+    <symbol id="icon-store-gog" viewBox="0 0 24 24">
+      <!-- GOG's brand mark is a white disc with the purple 'gog' wordmark
+           inside a thin purple ring. Stylized as a clean text mark since
+           the real type face isn't web-available. -->
+      <circle cx="12" cy="12" r="11.5" fill="#fff" stroke="#7a3fcf" stroke-width="1.2"/>
+      <text x="12" y="16" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-weight="900" font-size="10" fill="#7a3fcf" letter-spacing="-0.5">gog</text>
+    </symbol>
+    <symbol id="icon-store-epic" viewBox="0 0 24 24">
+      <!-- Epic's brand mark is a shield-shaped badge (rounded rectangle
+           with a downward V-tab at the bottom) in dark slate, with the
+           white 'EPIC' wordmark above the tab. -->
+      <path d="M4 2 L20 2 Q22 2 22 4 L22 16 L12 22 L2 16 L2 4 Q2 2 4 2 Z" fill="#2a2a2a"/>
+      <text x="12" y="14" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-weight="900" font-size="6.5" fill="#fff" letter-spacing="0.3">EPIC</text>
+      <path d="M9 16 L15 16 L12 19 Z" fill="#fff"/>
+    </symbol>
   </defs>
 </svg>`;
 
@@ -364,14 +390,44 @@
   // (avoids a flash of the wrong mode / running animations).
   initTheme();
   initMotion();
-  // Store pill position preference: 'art' = thumbnail overlay, 'right' (default) = rating column.
-  if (localStorage.getItem('pp:store-pill-pos') === 'art') {
-    document.documentElement.setAttribute('data-store-pill-pos', 'art');
+  // Defaults: store badge sits in the bar (bar-inline) on mobile, in the
+  // card corner (art-corner) on desktop. Both viewports default to the
+  // text label until the round brand glyphs read consistently across
+  // stores. Mobile picks bar-inline because the card-corner tag steals
+  // useful width from the title row at narrow screens.
+  const _isDesktop = window.matchMedia('(min-width: 760px)').matches;
+
+  // Store badge placement. Other values: 'right' (legacy column), 'art'
+  // (thumbnail overlay), 'art-corner' (card top-right), 'bar-inline'
+  // (next to tier in the strip), 'bar-segment' (split strip).
+  // Migrations: dropped 'bar-right' -> 'bar-segment'; renamed 'bar-icon'
+  // -> 'bar-inline' once it started honoring the store-display pref.
+  let storePillPos = localStorage.getItem('pp:store-pill-pos');
+  if (storePillPos === 'bar-right') {
+    storePillPos = 'bar-segment';
+    localStorage.setItem('pp:store-pill-pos', 'bar-segment');
+  } else if (storePillPos === 'bar-icon') {
+    storePillPos = 'bar-inline';
+    localStorage.setItem('pp:store-pill-pos', 'bar-inline');
   }
-  // Card layout preference: 'strip' = rating row under title (more title width
-  // on mobile), default = rating pill in right column.
-  if (localStorage.getItem('pp:card-layout') === 'strip') {
-    document.documentElement.setAttribute('data-card-layout', 'strip');
+  if (!storePillPos) storePillPos = _isDesktop ? 'art-corner' : 'bar-inline';
+  if (storePillPos !== 'right') {
+    document.documentElement.setAttribute('data-store-pill-pos', storePillPos);
+  }
+  // Card layout preference. Default is 'strip' on both viewports (tier in
+  // a colored bar across the full bottom of the card). 'right' falls back
+  // to the column pill; 'combo' shows the tier + store as a two-tone
+  // corner chip and hides the strip / right column entirely.
+  const cardLayoutPref = localStorage.getItem('pp:card-layout') || 'strip';
+  if (cardLayoutPref === 'strip' || cardLayoutPref === 'combo') {
+    document.documentElement.setAttribute('data-card-layout', cardLayoutPref);
+  }
+  // Store badge display. Default is 'text' on both viewports until the
+  // round brand glyphs read consistently at small sizes; 'icon' is still
+  // available as an opt-in for users who want the compact look.
+  const storeDisplayPref = localStorage.getItem('pp:store-display') || 'text';
+  if (storeDisplayPref === 'icon') {
+    document.documentElement.setAttribute('data-store-display', 'icon');
   }
 
   // inject favicon if the page doesn't already have one
@@ -704,21 +760,6 @@
         const safe = display.replace(/[<>&]/g, function (c) {
           return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
         });
-        // Build the counts subline only if either count is present; older
-        // search-index.json deployments without these fields render the old
-        // way (no subline, no tier badge)
-        const counts = [];
-        if (r.protondbCount) counts.push(r.protondbCount + ' ProtonDB');
-        if (r.pulseCount) counts.push(r.pulseCount + ' Pulse');
-        const countsHtml = counts.length
-          ? '<span class="sd-counts">' + counts.join(' + ') + '</span>'
-          : '';
-        const tierHtml = r.tier
-          ? '<span class="sd-tier tier-' + r.tier + '">' + r.tier + '</span>'
-          : '';
-        // Store badge + appId on the right edge. Long ids (e.g. epic hashes)
-        // would otherwise dominate the row -- the pill + truncated mono text
-        // is the same visual treatment used on the app.html cards.
         const idStr = String(r.appId);
         const inferredStore = r.appType
           ? r.appType
@@ -728,20 +769,24 @@
         const storeLabel = inferredStore === 'gog' ? 'GOG'
                          : inferredStore === 'epic' ? 'Epic'
                          : 'Steam';
-        const storeHtml = '<span class="sd-store sd-store--' + inferredStore + '">' + storeLabel + '</span>';
-        // Order on the right side: appId (truncated) -> store badge (far right).
-        // Store pill goes last so it sits at the trailing edge of the row, in
-        // line with the convention on the app.html cards.
+        // Split chip on the trailing edge that mirrors the .game-card combo
+        // corner chip (tier color on the left, store color on the right).
+        // The app id is the row-two subline (replacing the old report-count
+        // line) so the thumbnail flows straight into the title.
+        const tierAttr = r.tier ? r.tier.toLowerCase() : '';
+        const tierLabel = r.tier ? r.tier.toUpperCase() : 'NO RATING';
+        const comboHtml = '<span class="sd-combo" data-tier="' + tierAttr + '" data-store="' + inferredStore + '">' +
+                          '<span class="sd-combo-tier">' + tierLabel + '</span>' +
+                          '<span class="sd-combo-store">' + storeLabel + '</span>' +
+                          '</span>';
         return '<a href="app.html#/app/' + r.appId + '" role="option" data-idx="' + idx + '">' +
                '<img loading="lazy" data-appid="' + r.appId + '" src="' + steamHeader(r.appId) + '" alt="" ' +
                  'onerror="window.__steamImgLoad && window.__steamImgLoad(this)">' +
                '<span class="sd-meta">' +
                  '<span class="sd-title">' + safe + '</span>' +
-                 countsHtml +
+                 '<span class="sd-appid" title="' + idStr + '">' + idStr + '</span>' +
                '</span>' +
-               tierHtml +
-               '<span class="sd-appid" title="' + idStr + '">' + idStr + '</span>' +
-               storeHtml +
+               comboHtml +
                '</a>';
       }).join('');
       dropdown.innerHTML = html;

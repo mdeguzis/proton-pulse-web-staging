@@ -9,10 +9,10 @@
 <title>Admin — Proton Pulse</title>
 <meta name="color-scheme" content="dark">
 <link rel="stylesheet" href="css/shared/base.css?v=45c7e06d">
-<link rel="stylesheet" href="css/shared/topbar.css?v=f4f0510d">
-<link rel="stylesheet" href="css/shared/site.css?v=4d518a51">
-<link rel="stylesheet" href="css/shared/cards.css?v=b75e75b2">
-<link rel="stylesheet" href="css/admin/admin.css?v=4609c726">
+<link rel="stylesheet" href="css/shared/topbar.css?v=2d6b5e52">
+<link rel="stylesheet" href="css/shared/site.css?v=5fac0fae">
+<link rel="stylesheet" href="css/shared/cards.css?v=564a6733">
+<link rel="stylesheet" href="css/admin/admin.css?v=fa00589e">
 </head>
 <body>
 
@@ -54,7 +54,8 @@
           <input type="text" id="all-reports-search" class="admin-input admin-input--wide" placeholder="Search by app ID or title...">
           <select id="all-reports-status-filter" class="admin-select">
             <option value="">All statuses</option>
-            <option value="clean" selected>Clean</option>
+            <option value="clean" selected>Approved (clean)</option>
+            <option value="pending">Pending approval</option>
             <option value="flagged">Flagged</option>
             <option value="hidden">Hidden</option>
           </select>
@@ -70,9 +71,10 @@
           <button class="admin-btn" id="all-reports-refresh-btn">Refresh</button>
         </div>
         <div class="admin-legend">
+          <span class="admin-badge admin-badge--ok">approved</span> visible to the public &nbsp;&middot;&nbsp;
+          <span class="admin-badge admin-badge--info">pending</span> waiting on the daily approval pipeline &nbsp;&middot;&nbsp;
           <span class="admin-badge admin-badge--warn">flagged</span> queued for mod review &nbsp;&middot;&nbsp;
-          <span class="admin-badge admin-badge--muted">hidden</span> shadow-banned, not visible to users &nbsp;&middot;&nbsp;
-          blank = visible and clean
+          <span class="admin-badge admin-badge--muted">hidden</span> shadow-banned, not visible to users
         </div>
         <div id="all-reports-count" class="admin-counts" hidden></div>
         <div id="all-reports-loading" class="admin-loading">Loading reports...</div>
@@ -320,7 +322,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="js/lib/supabase-client.js?v=04813aa1"></script>
 <script src="js/lib/analytics.js?v=89bd7747"></script>
-<script src="js/lib/topbar.js?v=7e8205f8"></script>
+<script src="js/lib/topbar.js?v=449040e3"></script>
 <script src="js/lib/toast.js?v=7bb23014"></script>
 <script type="module" src="js/admin/main.js?v=9ffcb709"></script>
 </body>

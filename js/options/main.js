@@ -42,18 +42,42 @@ if (toggle) {
   });
 }
 
-// Store pill position: 'right' (inline with rating) or 'art' (thumbnail overlay).
+// Store pill position. Values:
+//   'right'       - inline with the rating pill in the right column
+//   'art'         - overlaid on the thumbnail corner
+//   'bar-right'   - chip pinned to the trailing edge of the bottom-bar layout
+//   'bar-segment' - last 1/4 of the bottom bar in store color (two-tone with tier)
+// bar-* values only have an effect when card-layout is 'strip'.
 const STORE_PILL_POS_KEY = 'pp:store-pill-pos';
+const STORE_PILL_POS_VALUES = ['right', 'art', 'art-corner', 'bar-inline', 'bar-segment'];
+// Migrations: the old 'bar-right' chip variant collapsed into 'bar-segment';
+// 'bar-icon' was renamed to 'bar-inline' once it learned to honor the
+// store-display preference instead of always rendering the icon.
+{
+  const cur = localStorage.getItem(STORE_PILL_POS_KEY);
+  if (cur === 'bar-right') localStorage.setItem(STORE_PILL_POS_KEY, 'bar-segment');
+  else if (cur === 'bar-icon') localStorage.setItem(STORE_PILL_POS_KEY, 'bar-inline');
+}
 function applyStorePillPos(pos) {
-  if (pos === 'art') {
-    document.documentElement.setAttribute('data-store-pill-pos', 'art');
+  if (pos && pos !== 'right') {
+    document.documentElement.setAttribute('data-store-pill-pos', pos);
   } else {
     document.documentElement.removeAttribute('data-store-pill-pos');
   }
 }
+// Store badge placement default is viewport-aware: desktop has room for a
+// card-corner tag, mobile would lose too much title width so the bar-inline
+// badge next to the rating reads better. Display defaults to text on both
+// (matches topbar.js) until the round brand glyphs read consistently
+// across stores.
+const _IS_DESKTOP = window.matchMedia('(min-width: 760px)').matches;
+const _DEFAULT_STORE_PILL_POS = _IS_DESKTOP ? 'art-corner' : 'bar-inline';
+const _DEFAULT_STORE_DISPLAY  = 'text';
+
 const storePillGroup = document.getElementById('opt-store-pill-pos');
 if (storePillGroup) {
-  const stored = localStorage.getItem(STORE_PILL_POS_KEY) || 'right';
+  let stored = localStorage.getItem(STORE_PILL_POS_KEY) || _DEFAULT_STORE_PILL_POS;
+  if (!STORE_PILL_POS_VALUES.includes(stored)) stored = _DEFAULT_STORE_PILL_POS;
   storePillGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {
@@ -67,20 +91,74 @@ if (storePillGroup) {
   applyStorePillPos(stored);
 }
 
+// Store display: 'text' shows the store name as a pill; 'icon' shows a small
+// round monogram icon instead. Either choice combines with store-pill-pos to
+// pick where the badge sits.
+const STORE_DISPLAY_KEY = 'pp:store-display';
+function applyStoreDisplay(mode) {
+  if (mode === 'icon') {
+    document.documentElement.setAttribute('data-store-display', 'icon');
+  } else {
+    document.documentElement.removeAttribute('data-store-display');
+  }
+}
+const storeDisplayGroup = document.getElementById('opt-store-display');
+if (storeDisplayGroup) {
+  const stored = localStorage.getItem(STORE_DISPLAY_KEY) || _DEFAULT_STORE_DISPLAY;
+  storeDisplayGroup.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.checked = r.value === stored;
+    r.addEventListener('change', () => {
+      if (r.checked) {
+        localStorage.setItem(STORE_DISPLAY_KEY, r.value);
+        applyStoreDisplay(r.value);
+        console.log('[options] store-display:', r.value);
+      }
+    });
+  });
+  applyStoreDisplay(stored);
+}
+
 // Card layout: 'right' (rating pill in right column) or 'strip' (rating row
 // beneath the title so long names get the full card width). Mirrors the
 // store-pill-pos pattern: a single attribute on <html> drives the CSS swap.
 const CARD_LAYOUT_KEY = 'pp:card-layout';
+const CARD_LAYOUTS_WITH_ATTR = new Set(['strip', 'combo']);
 function applyCardLayout(pos) {
-  if (pos === 'strip') {
-    document.documentElement.setAttribute('data-card-layout', 'strip');
+  if (CARD_LAYOUTS_WITH_ATTR.has(pos)) {
+    document.documentElement.setAttribute('data-card-layout', pos);
   } else {
     document.documentElement.removeAttribute('data-card-layout');
+  }
+  updateConditionalOptions();
+}
+// Disable any option labeled data-requires="card-layout=strip" when the card
+// layout is not 'strip'. If the user had a bar-* store position chosen and
+// switches back to the right layout, fall back to 'right' so the rendered
+// card stays consistent.
+function updateConditionalOptions() {
+  const layout = document.documentElement.getAttribute('data-card-layout') || 'right';
+  document.querySelectorAll('.option-radio[data-requires]').forEach(label => {
+    const req = label.getAttribute('data-requires');
+    const [key, val] = req.split('=');
+    let active = false;
+    if (key === 'card-layout') active = layout === val;
+    label.classList.toggle('option-radio--disabled', !active);
+    const input = label.querySelector('input[type="radio"]');
+    if (input) input.disabled = !active;
+  });
+  if (layout !== 'strip') {
+    const cur = localStorage.getItem(STORE_PILL_POS_KEY);
+    if (cur && cur.startsWith('bar-')) {
+      localStorage.setItem(STORE_PILL_POS_KEY, 'right');
+      applyStorePillPos('right');
+      const right = document.querySelector('#opt-store-pill-pos input[value="right"]');
+      if (right) right.checked = true;
+    }
   }
 }
 const cardLayoutGroup = document.getElementById('opt-card-layout');
 if (cardLayoutGroup) {
-  const stored = localStorage.getItem(CARD_LAYOUT_KEY) || 'right';
+  const stored = localStorage.getItem(CARD_LAYOUT_KEY) || 'strip';
   cardLayoutGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {
@@ -92,6 +170,26 @@ if (cardLayoutGroup) {
     });
   });
   applyCardLayout(stored);
+}
+
+// Default layout: 'list' (horizontal cards) or 'grid' (Steam-style tile
+// grid). Each browse page also has its own quick toggle, but this radio
+// is the persistent baseline. Shared storage key with the browse pages.
+const GRID_LAYOUT_KEY = 'pp:grid-layout';
+const GRID_LAYOUT_VALUES = ['list', 'grid'];
+const gridLayoutGroup = document.getElementById('opt-grid-layout');
+if (gridLayoutGroup) {
+  let stored = localStorage.getItem(GRID_LAYOUT_KEY) || 'grid';
+  if (!GRID_LAYOUT_VALUES.includes(stored)) stored = 'grid';
+  gridLayoutGroup.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.checked = r.value === stored;
+    r.addEventListener('change', () => {
+      if (r.checked) {
+        localStorage.setItem(GRID_LAYOUT_KEY, r.value);
+        console.log('[options] grid-layout:', r.value);
+      }
+    });
+  });
 }
 
 // Reports per page: how many cards app.html preloads per section before "Load
@@ -109,5 +207,19 @@ if (loadCountGroup) {
         console.log('[options] load-count:', r.value);
       }
     });
+  });
+}
+
+// Reset to defaults: drop every browser-local preference key this page owns
+// then reload, so the controls and the page re-evaluate from system
+// defaults (OS reduced-motion, no card-layout attribute, etc).
+const resetBtn = document.getElementById('opt-reset');
+if (resetBtn) {
+  const RESET_KEYS = [MOTION_KEY, STORE_PILL_POS_KEY, STORE_DISPLAY_KEY, CARD_LAYOUT_KEY, GRID_LAYOUT_KEY, LOAD_COUNT_KEY];
+  resetBtn.addEventListener('click', () => {
+    if (!confirm('Reset all site preferences on this device to their defaults?')) return;
+    RESET_KEYS.forEach(k => localStorage.removeItem(k));
+    console.log('[options] cleared preferences:', RESET_KEYS);
+    window.location.reload();
   });
 }

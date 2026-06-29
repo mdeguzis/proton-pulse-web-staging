@@ -67,17 +67,51 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
     const t = appType || 'steam';
     return STORE_PILL_CLASS[t] || 'game-card-store-pill--steam';
   }
+  // The store badge renders both a text label and an icon every time. CSS on
+  // <html data-store-display="icon"> hides .store-text and shows .store-icon
+  // so the user pref can swap between the two without re-rendering cards.
+  function storeIconHtml(t, label) {
+    if (t !== 'steam' && t !== 'gog' && t !== 'epic') return '';
+    return `<span class="store-icon store-icon--${t}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg></span>`;
+  }
   function storePill(appType) {
     const t = appType || 'steam';
     const label = STORE_LABEL[t] || 'Steam';
     const cls = storeColorClass(t);
-    return `<span class="game-card-store-pill ${cls}">${label}</span>`;
+    return `<span class="game-card-store-pill ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
   }
   function storeTag(appType) {
     const t = appType || 'steam';
     const label = STORE_LABEL[t] || 'Steam';
     const cls = storeColorClass(t);
-    return `<span class="game-card-store-tag ${cls}">${label}</span>`;
+    return `<span class="game-card-store-tag ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
+  }
+  // Card-level corner piece for the 'art-corner' placement. Rendered as a
+  // direct child of <a class="pg-card"> so it anchors to the whole card's
+  // top-right edge instead of the thumbnail.
+  function cornerTag(appType) {
+    const t = appType || 'steam';
+    const label = STORE_LABEL[t] || 'Steam';
+    const cls = storeColorClass(t);
+    return `<span class="pg-card-corner-tag game-card-corner-tag ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
+  }
+  // Store segment that sits inside the bottom-bar strip. CSS controls
+  // visibility based on data-store-pill-pos (bar-right / bar-segment).
+  function stripStoreHtml(appType) {
+    const t = appType || 'steam';
+    const label = STORE_LABEL[t] || 'Steam';
+    return `<span class="pg-card-strip-store game-card-strip-store store-icon store-icon--${t}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg><span class="store-text">${label}</span></span>`;
+  }
+  // Two-tone combined corner chip for the 'combo' card layout. Tier on the
+  // left, store on the right, both colored. CSS hides this unless
+  // data-card-layout="combo" is set on <html>.
+  function comboTag(rating, appType) {
+    const t = appType || 'steam';
+    const storeLabel = STORE_LABEL[t] || 'Steam';
+    const rated = KNOWN_TIERS.has(rating);
+    const tier = rated ? rating : '';
+    const tierLabel = rated ? RATING_LABEL[rating].toUpperCase() : 'NO RATING';
+    return `<span class="pg-card-combo-tag game-card-combo-tag" data-tier="${tier}" data-store="${t}"><span class="combo-tier">${tierLabel}</span><span class="combo-store">${storeLabel}</span></span>`;
   }
   const SECTION_LABEL = { steam: 'Popular on Steam', gog: 'Popular GOG Games', epic: 'Popular Epic Games' };
   const SECTION_SUB = {
@@ -105,7 +139,6 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
   }
 
   function pgCardHtml(g) {
-    if (currentLayout === 'list') return pgListRowHtml(g);
     const img = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${encodeURIComponent(g.appId)}/header.jpg`;
     const peak = fmtPeak(g.peak);
     const rating = String(g.rating || '').toLowerCase();
@@ -119,6 +152,8 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
     const stripLabel = rated ? RATING_LABEL[rating].toUpperCase() : 'NO RATING';
     return `
       <a class="pg-card" href="app.html#/app/${encodeURIComponent(g.appId)}">
+        ${cornerTag(g.appType)}
+        ${comboTag(rating, g.appType)}
         <div class="pg-card-row">
           <div class="pg-thumb-wrap">
             <img class="pg-thumb" src="${img}" data-appid="${g.appId}" alt="" loading="lazy" onerror="window.__steamImgLoad(this)">
@@ -126,31 +161,24 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
           </div>
           <div class="pg-info">
             <div class="pg-title">${esc(g.title)}</div>
-            ${peak ? `<div class="pg-sub">${peak} peak players</div>` : ''}
+            ${peak ? `<div class="pg-sub"><span class="pg-sub-count">${peak}</span><span class="pg-sub-suffix"> peak players</span></div>` : ''}
           </div>
           <div class="pg-right">
             <span class="pg-badge ${badgeClass}">${rLabel}</span>
             ${storePill(g.appType)}
           </div>
         </div>
-        <div class="pg-card-strip" data-tier="${stripTier}">
+        <div class="pg-card-strip" data-tier="${stripTier}" data-store="${g.appType || 'steam'}">
           <span class="pg-card-strip-tier">${stripLabel}</span>
           ${storePill(g.appType)}
+          ${stripStoreHtml(g.appType)}
         </div>
       </a>`;
   }
 
-  function pgListRowHtml(g) {
-    const rating = String(g.rating || '').toLowerCase();
-    const rated = KNOWN_TIERS.has(rating);
-    const rLabel = rated ? RATING_LABEL[rating] : '?';
-    const peak = fmtPeak(g.peak);
-    return `<a class="pg-list-row" href="app.html#/app/${encodeURIComponent(g.appId)}">
-      <span class="pg-list-tier pg-badge ${rated ? `pg-${rating}` : 'pg-unrated'}">${rLabel}</span>
-      <span class="pg-list-title">${esc(g.title)}</span>
-      <span class="pg-list-meta">${storePill(g.appType)}${peak ? ' ' + peak + ' peak' : ''}</span>
-    </a>`;
-  }
+  // The previous super-condensed pgListRowHtml is gone -- the two layouts
+  // now are 'list' (horizontal cards from pgCardHtml) and 'grid' (the same
+  // cards re-flowed into Steam-style vertical tiles by CSS).
 
   try {
     const resp = await fetch(await dataUrl('most_played.json'));
@@ -352,8 +380,11 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
     // S/M/L card size (saved preference, shared key with app page)
     const SIZE_KEY = 'pp:grid-size';
     const SIZES = ['sm', 'md', 'lg', 'xl'];
+    // Default 'lg' on desktop so wider viewports get roomier cards by default;
+    // mobile stays on 'md' to keep more rows on screen.
+    const DEFAULT_SIZE = window.matchMedia('(min-width: 760px)').matches ? 'lg' : 'md';
     function savedSize() {
-      try { const s = localStorage.getItem(SIZE_KEY); return SIZES.includes(s) ? s : 'md'; } catch { return 'md'; }
+      try { const s = localStorage.getItem(SIZE_KEY); return SIZES.includes(s) ? s : DEFAULT_SIZE; } catch { return DEFAULT_SIZE; }
     }
     function applySize(size) {
       SIZES.forEach(s => list.classList.remove(`pg-list--${s}`));
@@ -371,17 +402,20 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
       });
     });
 
-    // Grid/List layout (saved preference, shared key with app page)
+    // Layout: 'list' (horizontal cards, the new default) or 'grid'
+    // (Steam-style vertical tile grid). Both layouts use the same card
+    // markup; CSS reshapes them. Storage key is shared with the app page.
     const LAYOUT_KEY = 'pp:grid-layout';
     function savedLayout() {
       try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'grid'; } catch { return 'grid'; }
     }
     function applyLayout(layout) {
       currentLayout = layout;
-      const isList = layout === 'list';
-      list.classList.toggle('pg-list--list-mode', isList);
+      list.classList.toggle('pg-list--tile-mode', layout === 'grid');
       document.querySelectorAll('.pg-layout-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
-      setSizeEnabled(!isList);
+      // S/M/L/XL sizing stays available in both layouts now -- it controls
+      // tile column width in grid mode.
+      setSizeEnabled(true);
       renderPopular();
     }
     document.querySelectorAll('.pg-layout-btn').forEach(btn => {

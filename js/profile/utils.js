@@ -538,9 +538,14 @@ export function mergeMyReportRows(publishedRows, cloudRows) {
   const merged = new Map();
 
   function ensureRow(appId) {
-    if (!merged.has(appId)) {
-      merged.set(appId, {
-        app_id: appId,
+    // Normalize the key to a string. user_configs.app_id is a text column (API
+    // returns "2358720") while user_proton_configs.app_id is bigint (returns
+    // 2358720), so keying on the raw value splits one game into two rows because
+    // the published report and the cloud config never collapse. See issue #131.
+    const key = String(appId);
+    if (!merged.has(key)) {
+      merged.set(key, {
+        app_id: key,
         title: '',
         rating: '',
         updated_at: '',
@@ -556,7 +561,7 @@ export function mergeMyReportRows(publishedRows, cloudRows) {
         flagged_reason: null,
       });
     }
-    return merged.get(appId);
+    return merged.get(key);
   }
 
   for (const row of publishedRows || []) {
