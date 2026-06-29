@@ -390,10 +390,16 @@
   // (avoids a flash of the wrong mode / running animations).
   initTheme();
   initMotion();
-  // Store badge placement. Default is 'bar-inline' (paired with the strip
-  // card layout, the store sits flush right of the tier label as a brand
-  // pill or icon). Other values: 'right' (legacy column), 'art' (thumbnail
-  // overlay), 'art-corner' (card top-right), 'bar-segment' (split strip).
+  // Defaults differ by viewport. Mobile loses too much width to a corner
+  // tag, so the bar-inline badge next to the rating reads better; desktop
+  // has plenty of room for an art-corner tag + a full text label, which
+  // is more skim-friendly when scanning a dense grid. User picks override
+  // both defaults via the options page.
+  const _isDesktop = window.matchMedia('(min-width: 760px)').matches;
+
+  // Store badge placement. Other values: 'right' (legacy column), 'art'
+  // (thumbnail overlay), 'art-corner' (card top-right), 'bar-inline'
+  // (next to tier in the strip), 'bar-segment' (split strip).
   // Migrations: dropped 'bar-right' -> 'bar-segment'; renamed 'bar-icon'
   // -> 'bar-inline' once it started honoring the store-display pref.
   let storePillPos = localStorage.getItem('pp:store-pill-pos');
@@ -404,20 +410,21 @@
     storePillPos = 'bar-inline';
     localStorage.setItem('pp:store-pill-pos', 'bar-inline');
   }
-  if (!storePillPos) storePillPos = 'bar-inline';
+  if (!storePillPos) storePillPos = _isDesktop ? 'art-corner' : 'bar-inline';
   if (storePillPos !== 'right') {
     document.documentElement.setAttribute('data-store-pill-pos', storePillPos);
   }
-  // Card layout preference. Default is 'strip' (tier in a colored bar across
-  // the full bottom of the card -- better on mobile because the title row
-  // gets the full card width). 'right' falls back to the column pill.
+  // Card layout preference. Default is 'strip' on both viewports (tier in
+  // a colored bar across the full bottom of the card). 'right' falls back
+  // to the column pill.
   const cardLayoutPref = localStorage.getItem('pp:card-layout') || 'strip';
   if (cardLayoutPref === 'strip') {
     document.documentElement.setAttribute('data-card-layout', 'strip');
   }
-  // Store badge display. Default is 'icon' (round brand glyph). 'text' uses
-  // the text label ('STEAM', 'GOG', 'EPIC').
-  const storeDisplayPref = localStorage.getItem('pp:store-display') || 'icon';
+  // Store badge display. Default depends on viewport: 'icon' on mobile
+  // (saves space next to the rating), 'text' on desktop (room for the
+  // full STEAM/GOG/EPIC label, easier to scan).
+  const storeDisplayPref = localStorage.getItem('pp:store-display') || (_isDesktop ? 'text' : 'icon');
   if (storeDisplayPref === 'icon') {
     document.documentElement.setAttribute('data-store-display', 'icon');
   }

@@ -88,6 +88,11 @@
   margin-left: 2px;
 }
 .option-radio:has(input:checked) .option-default-tag { color: var(--accent); opacity: 0.7; }
+/* The viewport-specific default tags exist on both options at once in the
+   markup; CSS hides whichever one doesn't apply at the current width.
+   Mirrors the 760px breakpoint that topbar.js uses to pick the default. */
+@media (max-width: 759px) { .option-default-tag--desktop { display: none; } }
+@media (min-width: 760px) { .option-default-tag--mobile  { display: none; } }
 .option-default-note { font-size: 0.78rem; color: var(--muted); margin-top: 4px; flex-basis: 100%; }
 
 .options-reset { margin-top: 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

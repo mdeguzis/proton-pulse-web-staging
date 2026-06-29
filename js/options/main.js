@@ -65,10 +65,15 @@ function applyStorePillPos(pos) {
     document.documentElement.removeAttribute('data-store-pill-pos');
   }
 }
+// Defaults differ by viewport (matches topbar.js). Picked once at page load.
+const _IS_DESKTOP = window.matchMedia('(min-width: 760px)').matches;
+const _DEFAULT_STORE_PILL_POS = _IS_DESKTOP ? 'art-corner' : 'bar-inline';
+const _DEFAULT_STORE_DISPLAY  = _IS_DESKTOP ? 'text' : 'icon';
+
 const storePillGroup = document.getElementById('opt-store-pill-pos');
 if (storePillGroup) {
-  let stored = localStorage.getItem(STORE_PILL_POS_KEY) || 'bar-inline';
-  if (!STORE_PILL_POS_VALUES.includes(stored)) stored = 'bar-inline';
+  let stored = localStorage.getItem(STORE_PILL_POS_KEY) || _DEFAULT_STORE_PILL_POS;
+  if (!STORE_PILL_POS_VALUES.includes(stored)) stored = _DEFAULT_STORE_PILL_POS;
   storePillGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {
@@ -95,7 +100,7 @@ function applyStoreDisplay(mode) {
 }
 const storeDisplayGroup = document.getElementById('opt-store-display');
 if (storeDisplayGroup) {
-  const stored = localStorage.getItem(STORE_DISPLAY_KEY) || 'icon';
+  const stored = localStorage.getItem(STORE_DISPLAY_KEY) || _DEFAULT_STORE_DISPLAY;
   storeDisplayGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {

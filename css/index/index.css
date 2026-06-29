@@ -574,6 +574,25 @@
 @media (max-width: 600px) {
   .pg-list--lg .pg-thumb { width: 100px; height: 47px; }
 }
+/* Desktop bump for each size step. Mirrors the matching .cards--XX rules
+   in css/app/home.css so home and app browser scale the same way. */
+@media (min-width: 760px) {
+  .pg-list--sm .pg-thumb { width: 92px; height: 43px; }
+  .pg-list--md .pg-thumb { width: 120px; height: 56px; }
+  .pg-list--lg .pg-thumb { width: 170px; height: 79px; }
+  .pg-list--xl .pg-thumb { width: 240px; height: 112px; }
+  .pg-list--sm .pg-card-row { gap: 12px; padding: 8px 12px 8px 8px; }
+  .pg-list--md .pg-card-row { gap: 16px; padding: 10px 14px 10px 10px; }
+  .pg-list--lg .pg-card-row { gap: 22px; padding: 14px 20px 14px 12px; }
+  .pg-list--xl .pg-card-row { gap: 26px; padding: 18px 24px 18px 14px; }
+  .pg-list--sm .pg-title { font-size: 0.95rem; }
+  .pg-list--md .pg-title { font-size: 1.05rem; }
+  .pg-list--lg .pg-title { font-size: 1.18rem; }
+  .pg-list--xl .pg-title { font-size: 1.32rem; }
+  .pg-list--md .pg-sub { font-size: 0.82rem; }
+  .pg-list--lg .pg-sub { font-size: 0.9rem; }
+  .pg-list--xl .pg-sub { font-size: 0.98rem; }
+}
 
 /* List mode */
 .pg-list--list-mode { gap: 2px !important; }
