@@ -243,8 +243,8 @@ export async function renderHomePage() {
             <button class="home-size-btn home-size-btn--desktop-only" data-size="xl" type="button" title="Extra large cards">XL</button>
           </div>
           <div class="home-layout-toggle">
-            <button class="home-layout-btn active" data-layout="list" title="List of horizontal cards (default)">List</button>
-            <button class="home-layout-btn" data-layout="grid" title="Grid of Steam-style tiles">Grid</button>
+            <button class="home-layout-btn" data-layout="list" title="List of horizontal cards">List</button>
+            <button class="home-layout-btn active" data-layout="grid" title="Grid of Steam-style tiles (default)">Grid</button>
           </div>
         </div>
       </div>
@@ -556,7 +556,7 @@ export async function renderHomePage() {
     // storage key with the home page.
     const LAYOUT_KEY = 'pp:grid-layout';
     function _savedLayout() {
-      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'list'; } catch { return 'list'; }
+      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'grid'; } catch { return 'grid'; }
     }
     function applyLayout(layout) {
       currentLayout = layout;

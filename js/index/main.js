@@ -407,7 +407,7 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
     // markup; CSS reshapes them. Storage key is shared with the app page.
     const LAYOUT_KEY = 'pp:grid-layout';
     function savedLayout() {
-      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'list'; } catch { return 'list'; }
+      try { const l = localStorage.getItem(LAYOUT_KEY); return (l === 'list' || l === 'grid') ? l : 'grid'; } catch { return 'grid'; }
     }
     function applyLayout(layout) {
       currentLayout = layout;

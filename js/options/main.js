@@ -175,8 +175,8 @@ const GRID_LAYOUT_KEY = 'pp:grid-layout';
 const GRID_LAYOUT_VALUES = ['list', 'grid'];
 const gridLayoutGroup = document.getElementById('opt-grid-layout');
 if (gridLayoutGroup) {
-  let stored = localStorage.getItem(GRID_LAYOUT_KEY) || 'list';
-  if (!GRID_LAYOUT_VALUES.includes(stored)) stored = 'list';
+  let stored = localStorage.getItem(GRID_LAYOUT_KEY) || 'grid';
+  if (!GRID_LAYOUT_VALUES.includes(stored)) stored = 'grid';
   gridLayoutGroup.querySelectorAll('input[type="radio"]').forEach(r => {
     r.checked = r.value === stored;
     r.addEventListener('change', () => {
