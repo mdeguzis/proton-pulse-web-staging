@@ -5,7 +5,7 @@ import { getWebClientId } from '../../shared/submit.js?v=1a4ae53c';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=1f02f4a6';
 import { renderAuthorBlock } from './author.js?v=2316d334';
 import { buildFormRows } from './config-cards.js?v=c67740f8';
-import { renderSignalStrip } from './signals.js?v=a918ea75';
+import { renderSignalStrip } from './signals.js?v=a23da3df';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=df5b5024';
 import { confColor, confTextColor, configKey, daysAgo, esc, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=f5dda5b6';
 
@@ -49,8 +49,17 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
   // Source badge used to render top-right of each card (Pulse / ProtonDB).
   // Removed - the same info already appears in the "Source" row at the bottom
   // of the card, so two pills said the same thing and crowded the right column.
+  // Anchor id wraps the whole report (header card + summary body) so
+  // scrolling to a permalink lands on the top of the visible block, not
+  // partway through where the .card header used to carry the id. Header
+  // and body keep their existing classes/styling.
+  const _anchorId = (() => {
+    const id = r.reportId != null ? `r${r.reportId}` : (r.clientId ? `c${r.clientId.slice(0, 8)}` : '');
+    return id ? `report-${id}` : '';
+  })();
   return `
-    <div class="card" id="${(() => { const id = r.reportId != null ? `r${r.reportId}` : (r.clientId ? `c${r.clientId.slice(0, 8)}` : ''); return id ? `report-${id}` : ''; })()}">
+    <div class="report-block"${_anchorId ? ` id="${_anchorId}"` : ''}>
+    <div class="card">
       ${renderAuthorBlock(r)}
       <div class="card-body">
         <div class="proton">${esc(r.protonVersion || 'Unknown')}</div>
@@ -104,6 +113,7 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
         ${renderPermalink(r)}
         ${r.clientId && r.clientId === getWebClientId() ? `<button class="action-btn action-btn-danger delete-report-btn" data-app-id="${r.appId || ''}" title="Delete your report">Delete</button>` : ''}
       </div>
+    </div>
     </div>`;
 }
 
