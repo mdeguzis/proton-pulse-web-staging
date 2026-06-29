@@ -65,8 +65,14 @@ export async function renderAllReports(session) {
 
     tbody.innerHTML = reports.map(r => {
       const appId   = r.app_id ? escapeHtml(String(r.app_id)) : null;
+      // Public-app permalink only resolves when the report is actually
+      // visible there: approved, not flagged, not hidden. For pending,
+      // flagged, or hidden rows fall back to the game's report list.
+      const isPublic = appId && !r.is_pending && !r.is_flagged && !r.is_hidden;
       const appLink = appId
-        ? `<a class="admin-link" href="app.html#/app/${appId}" target="_blank">App ${appId}</a>`
+        ? (isPublic
+            ? `<a class="admin-link" href="app.html#/app/${appId}#report-r${escapeHtml(String(r.id))}" target="_blank" title="Open this report on the public page">App ${appId}</a>`
+            : `<a class="admin-link" href="app.html#/app/${appId}" target="_blank" title="Open the game's report list">App ${appId}</a>`)
         : 'Unknown';
       const rid    = escapeHtml(String(r.id));
       const title  = escapeHtml(r.title || '');
