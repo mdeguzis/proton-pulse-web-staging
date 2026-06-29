@@ -58,11 +58,11 @@
       <circle cx="9.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
       <circle cx="14.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/>
     </symbol>
-    <!-- Round store glyphs for the "store badge: icon" preference. Filled
-         circle in the brand color with the brand glyph centered on top.
-         Glyph paths are the simpleicons.org SVG paths (24x24 viewBox)
-         scaled into a 16x16 area centered at (4,4) so they sit cleanly
-         inside the colored circle. -->
+    <!-- Store glyphs for the "store badge: icon" preference. Each retains
+         the brand's actual outline rather than being forced into a circle:
+         Steam is its own round mark on a blue circle; GOG is a white disc
+         with the purple "gog" wordmark; Epic is the shield-with-tab badge
+         in dark grey with the white "EPIC" wordmark. -->
     <symbol id="icon-store-steam" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="12" fill="#1689d0"/>
       <g transform="translate(4 4) scale(0.667)" fill="#fff">
@@ -70,16 +70,19 @@
       </g>
     </symbol>
     <symbol id="icon-store-gog" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="12" fill="#7a3fcf"/>
-      <g transform="translate(4 4) scale(0.667)" fill="#fff">
-        <path d="M5.866 2.064C2.63 2.064 0 4.696 0 7.93v8.142c0 3.234 2.63 5.864 5.866 5.864h12.27c3.234 0 5.864-2.63 5.864-5.864V7.93c0-3.234-2.63-5.866-5.864-5.866H5.866zm-.16 2.97h2.756c1.07 0 1.937.867 1.937 1.935V13.4c0 1.07-.867 1.937-1.937 1.937h-.812V13.4h.812V7H5.706v6.4h1.94v3.42H5.706c-1.07 0-1.94-.866-1.94-1.937V6.969c0-1.068.87-1.935 1.94-1.935zm6.66 0h2.756c1.069 0 1.937.867 1.937 1.935V13.4c0 1.07-.868 1.937-1.937 1.937h-2.755c-1.071 0-1.94-.866-1.94-1.937V6.969c0-1.068.869-1.935 1.94-1.935zm.812 1.965v6.4h1.13V7h-1.13zm5.92 0h2.756v1.93H20.07v6.402h1.939V11.4h-1.124V9.467h3.063v5.87c0 1.071-.86 1.938-1.93 1.938H19.1c-1.071 0-1.94-.867-1.94-1.937V6.969c0-1.068.869-1.935 1.94-1.935z"/>
-      </g>
+      <!-- GOG's brand mark is a white disc with the purple 'gog' wordmark
+           inside a thin purple ring. Stylized as a clean text mark since
+           the real type face isn't web-available. -->
+      <circle cx="12" cy="12" r="11.5" fill="#fff" stroke="#7a3fcf" stroke-width="1.2"/>
+      <text x="12" y="16" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-weight="900" font-size="10" fill="#7a3fcf" letter-spacing="-0.5">gog</text>
     </symbol>
     <symbol id="icon-store-epic" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="12" fill="#2a2a2a"/>
-      <g transform="translate(4 4) scale(0.667)" fill="#fff">
-        <path d="M3.537 0C2.165 0 1.66.506 1.66 1.879v15.732c0 .28 0 .43.018.604 0 .078 0 .15.05.224.07.36.279.434.836.633l4.853 1.92c.726.279 1.024.4 1.301.4.28 0 .555-.121 1.305-.4l4.846-1.92c.563-.198.78-.273.836-.633a.92.92 0 0 0 .05-.224 5.72 5.72 0 0 0 .022-.604V1.882c0-1.373-.512-1.879-1.881-1.879H3.537zm14.92 4.715h.961v8.519h-.961V4.715zM6.057 4.978h2.16c.781 0 1.198.42 1.198 1.205v3.9c0 .785-.417 1.205-1.198 1.205h-1.05v3.064h-1.11V4.978zm5.41 0h2.745v.985h-1.635v8.39h-1.11V4.978zm-4.3.985v3.34h.844c.26 0 .346-.103.346-.366V6.328c0-.262-.085-.365-.346-.365h-.844z"/>
-      </g>
+      <!-- Epic's brand mark is a shield-shaped badge (rounded rectangle
+           with a downward V-tab at the bottom) in dark slate, with the
+           white 'EPIC' wordmark above the tab. -->
+      <path d="M4 2 L20 2 Q22 2 22 4 L22 16 L12 22 L2 16 L2 4 Q2 2 4 2 Z" fill="#2a2a2a"/>
+      <text x="12" y="14" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-weight="900" font-size="6.5" fill="#fff" letter-spacing="0.3">EPIC</text>
+      <path d="M9 16 L15 16 L12 19 Z" fill="#fff"/>
     </symbol>
   </defs>
 </svg>`;
