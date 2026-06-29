@@ -682,7 +682,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--green-hi, #beee11);
+  /* Subdued Steam-blue CTA. The previous neon-green pill (--green-hi /
+     #beee11) clashed with the dark blue theme and competed with the
+     hero atom's own brand-green accents. */
+  background: var(--accent, #66c0f4);
   border: 0;
   color: #0b1116;
   font-size: 0.78rem;
@@ -697,13 +700,13 @@
   font-family: inherit;
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 0 0 1px rgba(190, 238, 17, 0.35), 0 4px 18px var(--green-glow, rgba(190, 238, 17, 0.35));
+  box-shadow: 0 0 0 1px var(--accent-soft, rgba(102, 192, 244, 0.16)), 0 4px 18px var(--accent-glow, rgba(102, 192, 244, 0.35));
   transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
 }
 .submit-report-btn:hover {
-  background: #d8ff3b;
+  background: var(--accent-hi, #aedcff);
   text-decoration: none;
-  box-shadow: 0 0 0 1px rgba(216, 255, 59, 0.55), 0 4px 22px var(--green-glow, rgba(190, 238, 17, 0.45));
+  box-shadow: 0 0 0 1px var(--accent-soft, rgba(102, 192, 244, 0.32)), 0 4px 22px var(--accent-glow, rgba(102, 192, 244, 0.45));
 }
 .submit-report-btn:active { transform: translateY(1px); }
 .submit-report-btn:disabled {

@@ -315,6 +315,12 @@
 [data-card-layout="combo"] .pg-card-combo-tag[data-store="epic"] .combo-store { background: #2a2a2a; }
 [data-card-layout="combo"] .pg-right { display: none; }
 [data-card-layout="combo"] .pg-card-strip { display: none; }
+/* Combo owns the rating + store presentation; suppress the artwork overlay
+   tag, dedicated card-corner tag, and any inline store pill so they don't
+   peek out from behind the chip. */
+[data-card-layout="combo"] .game-card-store-tag,
+[data-card-layout="combo"] .pg-card-corner-tag,
+[data-card-layout="combo"] .game-card-store-pill { display: none; }
 
 .pg-card-corner-tag { display: none; }
 [data-store-pill-pos="art-corner"] .pg-card-corner-tag {
@@ -504,7 +510,16 @@
   color: #c8a050;
   margin-top: 2px;
   font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+/* Drop the " peak players" suffix when the card is too narrow for it
+   (small list rows, all tile-mode tiles). Mobile drops the suffix at sm
+   only; tile mode always drops it because the column width can be as
+   tight as 140px. */
+.pg-list--sm .pg-sub-suffix,
+.pg-list--tile-mode .pg-sub-suffix { display: none; }
 .pg-right {
   display: flex;
   flex-direction: row;

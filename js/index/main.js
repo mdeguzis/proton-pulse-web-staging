@@ -161,7 +161,7 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
           </div>
           <div class="pg-info">
             <div class="pg-title">${esc(g.title)}</div>
-            ${peak ? `<div class="pg-sub">${peak} peak players</div>` : ''}
+            ${peak ? `<div class="pg-sub"><span class="pg-sub-count">${peak}</span><span class="pg-sub-suffix"> peak players</span></div>` : ''}
           </div>
           <div class="pg-right">
             <span class="pg-badge ${badgeClass}">${rLabel}</span>

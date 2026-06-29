@@ -62,6 +62,12 @@
    bottom strip so they don't compete with the corner chip. */
 [data-card-layout="combo"] .game-card-right { display: none; }
 [data-card-layout="combo"] .game-card-strip { display: none; }
+/* Combo owns the entire rating + store presentation, so suppress every
+   other store placement (artwork overlay tag, dedicated card-corner tag,
+   and any stray inline store pill) so the chip stands alone. */
+[data-card-layout="combo"] .game-card-store-tag,
+[data-card-layout="combo"] .game-card-corner-tag,
+[data-card-layout="combo"] .game-card-store-pill { display: none; }
 
 .game-card-corner-tag { display: none; }
 [data-store-pill-pos="art-corner"] .game-card-corner-tag {
