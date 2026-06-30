@@ -48,7 +48,9 @@ export function parseSteamSystemInfo(text) {
   if (gpu && !/^unknown$/i.test(gpu)) out.gpu = gpu.replace(/^(NVIDIA Corporation|Advanced Micro Devices.*?Inc\.\s*\[AMD\/ATI\]|AMD|Intel Corporation)\s*/i, '').replace(/^NVIDIA\s+/i, '').trim();
   const drv = m(/Driver Version:\s*(.+)/i);
   if (drv && !/^unknown$/i.test(drv)) out.gpuDriver = drv;
-  const ram = text.match(/RAM:\s*(\d+)\s*Mb/i);
+  // #152: anchor on start-of-line so "VRAM:" earlier in the buffer cannot
+  // steal the match.
+  const ram = text.match(/^\s*RAM:\s*(\d+)\s*Mb/im);
   if (ram) { const gb = Math.round(Number(ram[1]) / 1024); if (gb > 0) out.ram = `${gb} GB`; }
   const vram = text.match(/VRAM:\s*(\d+)\s*Mb/i);
   if (vram) out.vramMb = Number(vram[1]);

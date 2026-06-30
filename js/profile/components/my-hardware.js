@@ -8,7 +8,7 @@ import {
   parseSteamSystemInfo, inferGpuVendor,
   getMyHwSourceMeta, setMyHwSourceMeta, getMyHwFieldOrigins,
   setMyHwFieldOrigins, setMyHwFieldOrigin,
-} from '../utils.js?v=9a539c02';
+} from '../utils.js?v=94e4c20f';
 
 /**
  * Initialise the My Hardware pane. Call once after DOM is ready.

@@ -187,8 +187,10 @@ export function parseSteamSystemInfo(text) {
   const vram = text.match(/VRAM:\s*(\d+)\s*Mb/i);
   if (vram) out.vramMb = Number(vram[1]);
 
-  // RAM shows in megs, e.g. "RAM: 32677 Mb". Convert to whole GB for the form
-  const ram = text.match(/RAM:\s*(\d+)\s*Mb/i);
+  // RAM shows in megs, e.g. "RAM: 32677 Mb". Convert to whole GB for the form.
+  // #152: anchor on start-of-line so a "VRAM:" prefix earlier in the buffer
+  // does not steal the match (no word boundary anchor in plain text).
+  const ram = text.match(/^\s*RAM:\s*(\d+)\s*Mb/im);
   if (ram) {
     const gb = Math.round(Number(ram[1]) / 1024);
     if (gb > 0) out.ram = `${gb} GB`;

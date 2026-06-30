@@ -338,6 +338,151 @@ describe('mergeMyReportRows', () => {
   });
 });
 
+describe('parseSteamSystemInfo', () => {
+  test('returns empty object for empty / non-string input', () => {
+    expect(utils.parseSteamSystemInfo('')).toEqual({});
+    expect(utils.parseSteamSystemInfo(null)).toEqual({});
+    expect(utils.parseSteamSystemInfo(undefined)).toEqual({});
+    expect(utils.parseSteamSystemInfo(42)).toEqual({});
+  });
+
+  test('extracts CPU brand and infers vendor from brand when vendor line absent', () => {
+    const out = utils.parseSteamSystemInfo('CPU Brand: AMD Ryzen 7 5800X3D 8-Core Processor\n');
+    expect(out.cpu).toBe('AMD Ryzen 7 5800X3D 8-Core Processor');
+    expect(out.cpuVendor).toBe('amd');
+  });
+
+  test('CPU Vendor: GenuineIntel normalizes to intel', () => {
+    const out = utils.parseSteamSystemInfo('CPU Brand: Core i9-13900K\nCPU Vendor: GenuineIntel\n');
+    expect(out.cpuVendor).toBe('intel');
+  });
+
+  test('"unknown" cpu line treated as absent', () => {
+    const out = utils.parseSteamSystemInfo('CPU Brand: Unknown\n');
+    expect(out.cpu).toBeUndefined();
+  });
+
+  test('Operating System Version multi-line + stripping parentheticals + quotes', () => {
+    const sys = 'Operating System Version:\n    "Arch Linux (rolling)"\n';
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.os).toBe('Arch Linux');
+  });
+
+  test('OS Version single-line form', () => {
+    expect(utils.parseSteamSystemInfo('OS Version: SteamOS 3.5.17\n').os).toBe('SteamOS 3.5.17');
+  });
+
+  test('OS with only an "Unknown" payload drops the field', () => {
+    expect(utils.parseSteamSystemInfo('OS Version: Unknown\n').os).toBeUndefined();
+  });
+
+  test('Manufacturer + Model + Kernel fields', () => {
+    const sys = 'Manufacturer: Valve\nModel: Jupiter\nKernel Version: 6.5.0-valve22\n';
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.manufacturer).toBe('Valve');
+    expect(out.model).toBe('Jupiter');
+    expect(out.kernel).toBe('6.5.0-valve22');
+  });
+
+  test('GPU via Steam "Driver:" line strips NVIDIA Corporation prefix', () => {
+    const sys = 'Video Card:\n    Driver: NVIDIA Corporation NVIDIA GeForce RTX 4070\n';
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.gpu).toBe('GeForce RTX 4070');
+  });
+
+  test('GPU via Steam "Driver:" line strips AMD prefix', () => {
+    const sys = 'Video Card:\n    Driver: Advanced Micro Devices, Inc. Radeon RX 7800 XT\n';
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.gpu).toMatch(/Radeon RX 7800 XT/);
+  });
+
+  test('GPU Steam line "unknown" payload drops the field', () => {
+    const sys = 'Driver: unknown\n';
+    expect(utils.parseSteamSystemInfo(sys).gpu).toBeUndefined();
+  });
+
+  test('GPU via form "Video Card: <gpu>" single-line form', () => {
+    expect(utils.parseSteamSystemInfo('Video Card: Intel Arc B580\n').gpu).toBe('Intel Arc B580');
+  });
+
+  test('GPU Vendor explicit line lowercases the value', () => {
+    expect(utils.parseSteamSystemInfo('GPU Vendor: NVIDIA\n').gpuVendor).toBe('nvidia');
+  });
+
+  test('GPU driver line populates gpuDriver verbatim', () => {
+    expect(utils.parseSteamSystemInfo('Driver Version: Mesa 24.1.0\n').gpuDriver).toBe('Mesa 24.1.0');
+  });
+
+  test('VRAM in MB parses to number', () => {
+    expect(utils.parseSteamSystemInfo('VRAM: 8192 Mb\n').vramMb).toBe(8192);
+  });
+
+  test('RAM in MB converts to whole GB', () => {
+    expect(utils.parseSteamSystemInfo('RAM: 32677 Mb\n').ram).toBe('32 GB');
+    expect(utils.parseSteamSystemInfo('RAM: 16384 Mb\n').ram).toBe('16 GB');
+  });
+
+  test('RAM that rounds to 0 GB drops the field', () => {
+    expect(utils.parseSteamSystemInfo('RAM: 256 Mb\n').ram).toBeUndefined();
+  });
+
+  test('full Steam Deck OLED dump rolls up cleanly', () => {
+    const sys = [
+      'Manufacturer: Valve',
+      'Model: Galileo',
+      'CPU Brand: AMD Custom APU 0932',
+      'CPU Vendor: AuthenticAMD',
+      'Video Card:',
+      '    Driver: AMD AMD Custom GPU 0932',
+      'Driver Version: Mesa 24.1.0',
+      'VRAM: 1024 Mb',
+      'RAM: 16384 Mb',
+      'Operating System Version:',
+      '    "SteamOS 3.6 (Jupiter)"',
+      'Kernel Version: 6.5.0-valve22',
+    ].join('\n');
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.manufacturer).toBe('Valve');
+    expect(out.model).toBe('Galileo');
+    expect(out.cpu).toMatch(/AMD Custom APU 0932/);
+    expect(out.cpuVendor).toBe('amd');
+    expect(out.gpu).toBe('AMD Custom GPU 0932');
+    expect(out.gpuDriver).toBe('Mesa 24.1.0');
+    expect(out.vramMb).toBe(1024);
+    // #152: anchored RAM regex no longer matches inside "VRAM:".
+    expect(out.ram).toBe('16 GB');
+    expect(out.os).toBe('SteamOS 3.6');
+    expect(out.kernel).toBe('6.5.0-valve22');
+  });
+
+  test('VRAM line above RAM line still extracts RAM correctly (#152)', () => {
+    const sys = 'VRAM: 1024 Mb\nRAM: 32768 Mb\n';
+    const out = utils.parseSteamSystemInfo(sys);
+    expect(out.ram).toBe('32 GB');
+    expect(out.vramMb).toBe(1024);
+  });
+});
+
+describe('parseUploadedSystem', () => {
+  test('parses sysinfo_text and backfills gpuVendor when absent', () => {
+    const row = { sysinfo_text: 'Video Card: NVIDIA GeForce RTX 4070\n' };
+    const out = utils.parseUploadedSystem(row);
+    expect(out.gpu).toContain('GeForce RTX 4070');
+    expect(out.gpuVendor).toBe('nvidia');
+  });
+
+  test('preserves explicit gpuVendor when the sysinfo line already supplies it', () => {
+    const row = { sysinfo_text: 'Video Card: NVIDIA GeForce RTX 4070\nGPU Vendor: amd\n' };
+    const out = utils.parseUploadedSystem(row);
+    expect(out.gpuVendor).toBe('amd');
+  });
+
+  test('falsy row returns empty parse', () => {
+    expect(utils.parseUploadedSystem(null)).toEqual({});
+    expect(utils.parseUploadedSystem({})).toEqual({});
+  });
+});
+
 describe('getPluginLinkCodeFromLocation', () => {
   test('reads pluginLinkCode from search string', () => {
     expect(utils.getPluginLinkCodeFromLocation({ search: '?pluginLinkCode=ABC123', hash: '' })).toBe('ABC123');
