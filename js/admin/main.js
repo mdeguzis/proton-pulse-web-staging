@@ -6,7 +6,7 @@ import { renderFlagged, renderFlagDetail } from './components/flagged.js?v=5e2c6
 import { fetchBannedUsers, banUser, unbanUser } from './api/banned.js?v=0d6ec118';
 import { renderBanned } from './components/banned.js?v=7bb95620';
 import { fetchAllUsers } from './api/users.js?v=0acf098a';
-import { renderUsers } from './components/users.js?v=8907b4fa';
+import { renderUsers } from './components/users.js?v=6d46e622';
 import { fetchAdmins, addAdmin, removeAdmin, updateAdminRole } from './api/admins.js?v=2ad9f027';
 import { renderAdmins, renderNewAdminEditor } from './components/admins.js?v=04c577e8';
 import { fetchBannedPhrases, addBannedPhrase, removeBannedPhrase, toggleBannedPhrase } from './api/phrases.js?v=ac74cb89';
@@ -14,8 +14,8 @@ import { renderPhrases } from './components/phrases.js?v=5fb05dc2';
 import { loadWordlist, checkAgainstWordlist } from './api/wordlist.js?v=51c55965';
 import { fetchUserReports, fetchUserActivity } from './api/userDetail.js?v=2bb0cee1';
 import { renderUserDetail } from './components/userDetail.js?v=62542337';
-import { fetchAnalytics } from './api/analytics.js?v=79ced8b7';
-import { renderAnalytics } from './components/analytics.js?v=878b5818';
+import { fetchAnalytics } from './api/analytics.js?v=ad63b2e7';
+import { renderAnalytics } from './components/analytics.js?v=0e977dd7';
 import { renderCacheStatus } from './components/cache-status.js?v=0c6c0cb7';
 import { renderAllReports, updateAllReportsRow, renderAllReportsDetail } from './components/allReports.js?v=ff236263';
 import { patchReportFlags, fetchReportById } from './api/allReports.js?v=805161ee';
@@ -677,6 +677,9 @@ function wireEvents() {
       }
     }
     if (action === 'view-user-detail') {
+      // The trigger is now an anchor (#139) so stop the default # nav before
+      // routing to the detail view.
+      e.preventDefault();
       let user;
       try {
         user = JSON.parse(btn.dataset.userobj);
