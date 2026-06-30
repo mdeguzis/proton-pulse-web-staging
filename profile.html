@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/shared/topbar.css?v=2d6b5e52">
 <link rel="stylesheet" href="css/shared/site.css?v=e05a0f73">
 <link rel="stylesheet" href="css/shared/cards.css?v=16c748ed">
-<link rel="stylesheet" href="css/profile/profile.css?v=3b36d4de">
+<link rel="stylesheet" href="css/profile/profile.css?v=12c66ce9">
 </head>
 <body>
 
@@ -233,9 +233,12 @@
 
       <!-- Owned report/config rows from public Pulse reports plus cloud-synced plugin configs -->
       <div class="profile-section">
-        <div class="profile-section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="profile-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <span>My Reports</span>
-          <button type="button" class="profile-refresh-btn" id="my-configs-refresh-btn">Refresh</button>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="my-configs-pager" class="profile-pager" hidden></div>
+            <button type="button" class="profile-refresh-btn" id="my-configs-refresh-btn">Refresh</button>
+          </div>
         </div>
         <div class="profile-field">
           <div style="position:relative;margin-bottom:10px">
