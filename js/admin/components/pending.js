@@ -71,9 +71,12 @@ function showReviewDetail(report, session, onApproved) {
   detail.hidden = false;
 
   const val = (v) => (v != null && v !== '') ? String(v) : '(not set)';
+  // Fields are [label, value] or [label, value, opts]. opts.wrap=true is for
+  // long opaque tokens (md5 hash, UUIDs) so they break onto multiple lines
+  // instead of forcing horizontal scroll on narrow viewports.
   const fields = [
     ['Report ID', `#${String(report.id)}`],
-    ['Approval Hash', val(report._approval_hash)],
+    ['Approval Hash', val(report._approval_hash), { wrap: true }],
     ['App ID', val(report.app_id)],
     ['Title', val(report.title)],
     ['Source', val(report.source)],
@@ -93,8 +96,8 @@ function showReviewDetail(report, session, onApproved) {
     ['Game Owned', val(report.game_owned)],
     ['Config Key', val(report.config_key)],
     ['Notes', val(report.notes)],
-    ['Author', report.proton_pulse_user_id || report.client_id || 'anonymous'],
-    ['Client ID', val(report.client_id)],
+    ['Author', report.proton_pulse_user_id || report.client_id || 'anonymous', { wrap: true }],
+    ['Client ID', val(report.client_id), { wrap: true }],
     ['Submitted', report.created_at ? new Date(report.created_at).toLocaleString() : '?'],
     ['Updated', report.updated_at ? new Date(report.updated_at).toLocaleString() : '(not set)'],
   ];
@@ -115,12 +118,17 @@ function showReviewDetail(report, session, onApproved) {
       <div class="admin-subhead">Report Review</div>
       <table class="admin-table" style="margin-bottom:16px">
         <tbody>
-          ${fields.map(([label, value]) => `
+          ${fields.map(([label, value, opts]) => {
+            const wrapStyle = opts && opts.wrap
+              ? 'font-family:var(--mono);word-break:break-all;white-space:normal'
+              : '';
+            return `
             <tr>
               <td style="font-weight:600;color:var(--muted);width:140px">${escapeHtml(label)}</td>
-              <td>${escapeHtml(value)}</td>
+              <td${wrapStyle ? ` style="${wrapStyle}"` : ''}>${escapeHtml(value)}</td>
             </tr>
-          `).join('')}
+          `;
+          }).join('')}
           ${formResponsesHtml}
         </tbody>
       </table>
