@@ -168,6 +168,28 @@ describe('approveReport', () => {
     expect(hashes[0]).not.toBe(hashes[1]);
   });
 
+  test('row with all-falsy hashable fields still computes a deterministic hash', () => {
+    // computeHash applies `String(row.field || '')` to each contributing
+    // column. The OR-coalesce branches were uncovered until we exercised
+    // a row where every column was absent or null.
+    const hashes = [];
+    global.fetch = routedFetch({
+      'https://test.supabase.co/rest/v1/report_approvals?on_conflict=report_id': (_url, init) => {
+        hashes.push(JSON.parse(init.body).approval_hash);
+        return { __http: { ok: true, json: async () => [] } };
+      },
+    });
+    const empty = {
+      id: 99,
+      app_id: null, client_id: null, rating: null, notes: null,
+      os: null, gpu: null, created_at: null,
+    };
+    return approveReport(session, empty).then(() => approveReport(session, empty)).then(() => {
+      expect(hashes[0]).toMatch(/^[0-9a-f]{32}$/);
+      expect(hashes[0]).toBe(hashes[1]);
+    });
+  });
+
   test('equal content yields equal hashes (md5 determinism)', async () => {
     const hashes = [];
     global.fetch = routedFetch({

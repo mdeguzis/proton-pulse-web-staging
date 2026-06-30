@@ -545,6 +545,50 @@ describe('hashReportKey', () => {
 // Coverage-side test for escWithSpoilers. The behavioral suite lives in
 // tests/spoilerTags.test.js (loadEsm-based, no instrumentation credit).
 
+describe('downloadJson', () => {
+  // Save the original createElement that the esc() helper relies on so we
+  // can restore it after this test. Without that the rest of the file's
+  // esc-based assertions get a different element shape and fail.
+  const origCreateElement = global.document.createElement;
+  const origBlob = global.Blob;
+  const origCreateObjectURL = global.URL.createObjectURL;
+  const origRevokeObjectURL = global.URL.revokeObjectURL;
+
+  afterAll(() => {
+    global.document.createElement = origCreateElement;
+    global.Blob = origBlob;
+    global.URL.createObjectURL = origCreateObjectURL;
+    global.URL.revokeObjectURL = origRevokeObjectURL;
+  });
+
+  test('serializes obj as pretty JSON, creates a Blob, and triggers a download', () => {
+    const created = [];
+    const revoked = [];
+    global.Blob = function (parts, opts) { this.parts = parts; this.type = opts?.type; };
+    global.URL.createObjectURL = (b) => { created.push(b); return 'blob:fake'; };
+    global.URL.revokeObjectURL = (u) => { revoked.push(u); };
+    const clicked = [];
+    global.document.createElement = (tag) => {
+      const el = { tag, click() { clicked.push(el); } };
+      Object.defineProperty(el, 'href', { set(v) { el._href = v; }, get() { return el._href; } });
+      Object.defineProperty(el, 'download', { set(v) { el._download = v; }, get() { return el._download; } });
+      return el;
+    };
+
+    utils.downloadJson({ a: 1, b: ['x'] }, 'My Report / 2026');
+
+    expect(created).toHaveLength(1);
+    const body = created[0].parts[0];
+    expect(JSON.parse(body)).toEqual({ a: 1, b: ['x'] });
+    expect(created[0].type).toBe('application/json');
+    expect(clicked).toHaveLength(1);
+    // Non-filename-safe chars (space, slash) get replaced with underscores.
+    expect(clicked[0]._download).toBe('My_Report___2026.json');
+    expect(clicked[0]._href).toBe('blob:fake');
+    expect(revoked).toEqual(['blob:fake']);
+  });
+});
+
 describe('escWithSpoilers (require-loaded coverage)', () => {
   test('returns empty string for falsy input', () => {
     expect(escWithSpoilers('')).toBe('');

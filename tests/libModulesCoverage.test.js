@@ -240,4 +240,48 @@ describe('analytics.js track() core behavior', () => {
     expect(body.metadata.message).toBe('p-rej');
     expect(body.metadata.source).toBe('unhandledrejection');
   });
+
+  test('SupaAuth.getSession throwing synchronously falls back to anonymous', async () => {
+    // The catch branch in getCurrentSession (returning null) is hit only
+    // when SupaAuth.getSession throws synchronously instead of returning
+    // a rejected promise. Cover that line explicitly.
+    jest.resetModules();
+    global.window.SupaAuth = {
+      getSession: () => { throw new Error('SupaAuth not ready'); },
+    };
+    require('../js/lib/analytics.js');
+    fetchSpy.mockClear();
+    await global.window.ppTrack('page_view', {});
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body.proton_pulse_user_id).toBeNull();
+  });
+
+  test('DOMContentLoaded handler fires a page_view and wires auth_attempt links', async () => {
+    jest.resetModules();
+    let domReady;
+    const linkClickHandlers = [];
+    global.document = {
+      addEventListener: (event, fn) => { if (event === 'DOMContentLoaded') domReady = fn; },
+      querySelectorAll: () => [
+        { href: '/steam-callback?next=/', addEventListener: (_e, fn) => linkClickHandlers.push(fn) },
+        { href: '/something-else', addEventListener: jest.fn() }, // not a steam-callback link
+      ],
+    };
+    require('../js/lib/analytics.js');
+    expect(typeof domReady).toBe('function');
+    fetchSpy.mockClear();
+    domReady();
+    await new Promise((r) => setImmediate(r));
+    // page_view fires immediately
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).event_type).toBe('page_view');
+    // The steam-callback link got a click handler; the other link did not.
+    expect(linkClickHandlers).toHaveLength(1);
+    fetchSpy.mockClear();
+    await linkClickHandlers[0]();
+    await new Promise((r) => setImmediate(r));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).event_type).toBe('auth_attempt');
+  });
 });
