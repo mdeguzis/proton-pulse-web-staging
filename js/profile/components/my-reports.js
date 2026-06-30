@@ -5,7 +5,7 @@ import {
   getProtonPulseUserIdFromSession, escapeHtml, formatSystemUpdated,
   getWebClientIdProfile, getMyReportBadges, flaggedMessageHtml,
   mergeMyReportRows,
-} from '../utils.js?v=38d77229';
+} from '../utils.js?v=9a539c02';
 import {
   fetchMyUserConfigs, fetchMyCloudConfigs, deleteMyReportsEverywhere,
   unpublishReport,
@@ -67,7 +67,7 @@ export function initMyReports(ctx) {
       const viewHref = reportAnchor || appLink;
       const name = row.title || `App ${row.app_id}`;
       const badges = getMyReportBadges(row).map((badge) => (
-        `<span class="profile-configs-badge profile-configs-badge--${escapeHtml(badge.tone)}">${escapeHtml(badge.label)}</span>`
+        `<span class="profile-configs-badge profile-configs-badge--${escapeHtml(badge.tone)}"${badge.title ? ` title="${escapeHtml(badge.title)}"` : ''}>${escapeHtml(badge.label)}</span>`
       )).join('');
       const flaggedNote = row.flagged
         ? `<details class="profile-configs-flagged-details">
