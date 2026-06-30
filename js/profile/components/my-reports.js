@@ -11,7 +11,7 @@ import {
   unpublishReport,
 } from '../api/configs.js?v=0c5650ed';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
-import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=1c2e2599';
+import { showEditCloudConfigModal, showEditReportModal } from './edit-modals.js?v=a7c857d1';
 
 /**
  * Initialise the My Reports pane. Call once after DOM is ready.

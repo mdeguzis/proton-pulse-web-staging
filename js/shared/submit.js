@@ -306,6 +306,17 @@ export async function invalidateReportApproval(reportId, session) {
   }
 }
 
+// #22 follow-up: small expander that documents the formatting macros
+// recognised in notes. Rendered as a native <details>/<summary> so it
+// works without JS. Used on every UI that lets a user edit a notes field
+// (submit form + profile edit modal).
+export function notesFormattingHelpHtml() {
+  return `<details class="formatting-help">
+    <summary>Formatting help</summary>
+    <p>Wrap a spoiler in <code>{spoiler}your text{/spoiler}</code> to hide it behind a tap. Readers see a blurred span until they tap or focus + Enter on it.</p>
+  </details>`;
+}
+
 // Map of submit-form input name -> localStorage key (set on the profile page).
 // Kept here so the submit form can stay self-contained without importing profile.js
 export const MYHW_FORM_MAP = {
@@ -526,7 +537,7 @@ export async function populateSubmitForm(el) {
         <span id="derived-rating-badge" style="font-weight:700;padding:2px 10px;border-radius:3px">--</span>
       </div>
 
-      <div class="sf-section-label" style="margin-top:16px">Notes</div>
+      <div class="sf-section-label" style="margin-top:16px">Notes ${notesFormattingHelpHtml()}</div>
       <div class="sf-row"><textarea name="notes" rows="3" placeholder="How did it run? Any issues or tweaks?"></textarea></div>
 
       <div class="sf-row">
