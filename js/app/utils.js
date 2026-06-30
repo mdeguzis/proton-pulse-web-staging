@@ -238,7 +238,7 @@ export function escWithSpoilers(s) {
     // without needing a separate delegated handler.
     const onclick = "this.classList.toggle('revealed')";
     const onkey = "if(event.key==='Enter'||event.key===' '){event.preventDefault();this.classList.toggle('revealed');}";
-    out += `<span class="spoiler" role="button" tabindex="0" aria-label="Spoiler -- tap to reveal" onclick="${onclick}" onkeydown="${onkey}">${inner}</span>`;
+    out += `<span class="spoiler" role="button" tabindex="0" aria-label="Spoiler -- tap to reveal" onclick="${onclick}" onkeydown="${onkey}"><span class="spoiler-content">${inner}</span></span>`;
     lastIndex = SPOILER_RE.lastIndex;
   }
   out += esc(text.slice(lastIndex));

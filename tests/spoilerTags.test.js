@@ -104,4 +104,29 @@ describe('escWithSpoilers (#22)', () => {
     expect(out).toContain("event.key==='Enter'");
     expect(out).toContain("event.key===' '");
   });
+
+  test('content lives in a nested .spoiler-content span so CSS can swap a "Reveal" placeholder in', () => {
+    const { escWithSpoilers } = loadUtils();
+    const out = escWithSpoilers('{spoiler}hidden{/spoiler}');
+    expect(out).toContain('<span class="spoiler-content">hidden</span>');
+  });
+});
+
+describe('spoiler CSS shows a "Reveal spoiler text" placeholder', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const REPORTS_CSS = fs.readFileSync(
+    path.join(__dirname, '..', 'css', 'app', 'reports.css'),
+    'utf8'
+  );
+
+  test('.spoiler::before injects the Reveal spoiler text label', () => {
+    expect(REPORTS_CSS).toMatch(/\.spoiler::before \{ content: "Reveal spoiler text"/);
+  });
+
+  test('.spoiler hides the .spoiler-content child until .revealed', () => {
+    expect(REPORTS_CSS).toContain('.spoiler > .spoiler-content { display: none; }');
+    expect(REPORTS_CSS).toContain('.spoiler.revealed > .spoiler-content { display: inline; }');
+    expect(REPORTS_CSS).toContain('.spoiler.revealed::before { display: none; }');
+  });
 });

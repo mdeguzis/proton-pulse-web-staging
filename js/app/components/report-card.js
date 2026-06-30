@@ -7,7 +7,7 @@ import { renderAuthorBlock } from './author.js?v=2316d334';
 import { buildFormRows } from './config-cards.js?v=c67740f8';
 import { renderSignalStrip } from './signals.js?v=a23da3df';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=df5b5024';
-import { confColor, confTextColor, configKey, daysAgo, esc, escWithSpoilers, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=f53cd830';
+import { confColor, confTextColor, configKey, daysAgo, esc, escWithSpoilers, fmtDuration, fmtMinutes, hashReportKey, reportKey } from '../utils.js?v=9a30ef3e';
 
 export function renderPermalink(r) {
   let id = r.reportId != null ? `r${r.reportId}` : (r.clientId ? `c${r.clientId.slice(0, 8)}` : '');

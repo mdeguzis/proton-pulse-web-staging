@@ -617,31 +617,39 @@ a.card:active { transform: translateY(1px); }
 .card-summary .row:last-child { border-bottom: none; }
 .card-summary .label { color: var(--muted); min-width: 100px; }
 .card-summary .notes-full { white-space: pre-wrap; line-height: 1.5; color: #a0b4c4; }
-/* #22: blurred spoiler spans in notes. Click or focus+Enter toggles
-   .revealed which lifts the blur. The unrevealed state is intentionally
-   loud -- accent-bordered block + heavy blur -- so it reads as a
-   deliberate spoiler region rather than a faint visual artefact. */
+/* #22: spoiler spans render as a clear "Reveal spoiler text" button
+   until clicked. The actual content lives in a nested .spoiler-content
+   span that swaps in when .revealed is set. This is much more
+   discoverable than the previous blur-only treatment, which was hard
+   to spot on shorter spoilers. */
 .spoiler {
   display: inline-block;
-  filter: blur(10px);
   background: rgba(92,139,214,0.18);
   border: 1px solid rgba(92,139,214,0.55);
   color: var(--accent, #5c8bd6);
   border-radius: 3px;
-  padding: 0 6px;
+  padding: 1px 8px;
   cursor: pointer;
   user-select: none;
-  transition: filter 150ms ease, background 150ms ease;
+  font-weight: 600;
+  font-size: 0.9em;
+  transition: background 150ms ease;
 }
+.spoiler::before { content: "Reveal spoiler text"; }
+.spoiler > .spoiler-content { display: none; }
 .spoiler:hover { background: rgba(92,139,214,0.28); }
 .spoiler:focus-visible { outline: 2px solid var(--accent, #5c8bd6); outline-offset: 2px; }
 .spoiler.revealed {
-  filter: none;
-  background: rgba(92,139,214,0.06);
+  background: rgba(92,139,214,0.08);
   border-color: rgba(92,139,214,0.25);
   color: inherit;
   cursor: default;
+  font-weight: normal;
+  font-size: inherit;
+  user-select: text;
 }
+.spoiler.revealed::before { display: none; }
+.spoiler.revealed > .spoiler-content { display: inline; }
 /* Detail buttons snug up against the row above instead of drifting with a
    margin-top gap - keeps the card-summary stack visually tight */
 .details-btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0; justify-content: flex-end; }
