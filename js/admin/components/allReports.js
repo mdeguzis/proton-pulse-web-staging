@@ -186,23 +186,33 @@ export function renderAllReportsDetail(report, { onAction, onBack } = {}) {
   const isH = report.is_hidden;
   const isP = report.is_pending === true;
   const rid = escapeHtml(String(report.id));
-  // #146: pending detail gets Approve + Deny in front of Flag + Hide so
-  // moderators do not have to switch tabs to act on a pending report.
-  const pendingButtons = isP
-    ? `<button class="admin-btn admin-btn--ok" data-action="ar-approve" data-rid="${rid}">Approve</button>
-       <button class="admin-btn admin-btn--danger" data-action="ar-deny" data-rid="${rid}">Deny</button>`
-    : '';
-  const actionHtml = (isF || isH)
-    ? `<button class="admin-btn admin-btn--ok" data-action="ar-release" data-rid="${rid}">Release</button>`
-    : `${pendingButtons}
-       <button class="admin-btn admin-btn--warn" data-action="ar-flag" data-rid="${rid}">Flag</button>
-       <button class="admin-btn admin-btn--danger" data-action="ar-hide" data-rid="${rid}">Hide</button>`;
+  // #148: render the full moderation toolbar at the top-right of the
+  // panel and disable the buttons that do not apply to the current
+  // state. Approve/Deny only make sense while pending. Flag/Hide are
+  // disabled once that state is already set. Release is the inverse:
+  // only valid when the row is flagged or hidden. The title attribute
+  // explains the disabled reason on hover.
+  const btn = (action, label, kind, disabled, disabledTitle) => {
+    const d = disabled ? ' disabled' : '';
+    const t = disabled && disabledTitle ? ` title="${escapeHtml(disabledTitle)}"` : '';
+    return `<button class="admin-btn admin-btn--sm admin-btn--${kind}" data-action="${action}" data-rid="${rid}"${d}${t}>${label}</button>`;
+  };
+  const actionHtml = [
+    btn('ar-approve', 'Approve', 'ok',     !isP || isF || isH, !isP ? 'Already approved' : 'Flagged or hidden -- release first'),
+    btn('ar-deny',    'Deny',    'danger', !isP || isF || isH, !isP ? 'Already approved' : 'Flagged or hidden -- release first'),
+    btn('ar-flag',    'Flag',    'warn',   isF,                'Already flagged'),
+    btn('ar-hide',    'Hide',    'danger', isH,                'Already hidden'),
+    btn('ar-release', 'Release', 'ok',    !(isF || isH),       'Nothing to release'),
+  ].join(' ');
 
   detail.innerHTML = `
     <button class="admin-btn admin-btn--sm admin-btn--ghost" data-action="ar-back" style="margin-bottom:12px">&#8592; Back to list</button>
     <div class="admin-card">
-      <div class="admin-subhead">Report Detail</div>
-      <div id="ar-detail-status" style="margin-bottom:10px">${statusBadges(isF, isH, isP, report.flagged_reason)}</div>
+      <div class="ar-detail-header">
+        <div class="admin-subhead" style="margin:0">Report Detail</div>
+        <div id="ar-detail-actions" class="ar-detail-actions">${actionHtml}</div>
+      </div>
+      <div id="ar-detail-status" style="margin:10px 0">${statusBadges(isF, isH, isP, report.flagged_reason)}</div>
       <table class="admin-table" style="margin-bottom:16px">
         <tbody>
           ${fields.map(([label, value]) => `
@@ -213,7 +223,6 @@ export function renderAllReportsDetail(report, { onAction, onBack } = {}) {
           ${formResponsesHtml}
         </tbody>
       </table>
-      <div id="ar-detail-actions" style="display:flex;gap:8px">${actionHtml}</div>
       <div id="ar-detail-msg" style="font-size:0.8rem;margin-top:8px"></div>
     </div>`;
 
@@ -224,6 +233,10 @@ export function renderAllReportsDetail(report, { onAction, onBack } = {}) {
   detail.addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn || btn.dataset.action === 'ar-back') return;
+    // Disabled buttons should never trigger a fetch. The browser blocks the
+    // click event for `disabled` <button>, but a closest() walk could land
+    // here for a click on an inner element, so guard explicitly.
+    if (btn.disabled) return;
     const action = btn.dataset.action;
     const id     = btn.dataset.rid;
     if (!['ar-flag','ar-hide','ar-release','ar-approve','ar-deny'].includes(action) || !id) return;

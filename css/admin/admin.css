@@ -374,6 +374,23 @@
   opacity: 0.5;
 }
 
+/* #148: report detail header lays the subhead title flush left and the
+   moderation toolbar flush right so all actions sit above the fold.
+   Wraps to a second row on narrow viewports so nothing overflows. */
+.ar-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ar-detail-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .admin-btn--sm {
   font-size: 0.78rem;
   padding: 3px 10px;

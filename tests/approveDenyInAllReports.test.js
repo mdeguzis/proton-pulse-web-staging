@@ -47,18 +47,60 @@ describe('All Reports table row buttons (#146)', () => {
   });
 });
 
-describe('All Reports detail panel buttons (#146)', () => {
-  test('renders Approve + Deny in the action row when pending', () => {
-    expect(ALLREPS_CMP).toContain('pendingButtons');
+describe('All Reports detail panel toolbar (#146 + #148)', () => {
+  test('renders the full toolbar via a btn() helper, not contextual subsets', () => {
+    // #148: every report shows the same five buttons; disabled state is
+    // what changes by row state. A regression to the old "only show
+    // valid buttons" pattern would silently shrink the toolbar again.
+    expect(ALLREPS_CMP).toContain('const btn = (action, label, kind, disabled, disabledTitle)');
     const block = ALLREPS_CMP.slice(
-      ALLREPS_CMP.indexOf('const pendingButtons = isP'),
-      ALLREPS_CMP.indexOf('const pendingButtons = isP') + 600
+      ALLREPS_CMP.indexOf('const actionHtml = ['),
+      ALLREPS_CMP.indexOf('const actionHtml = [') + 800
     );
-    expect(block).toContain('data-action="ar-approve"');
-    expect(block).toContain('data-action="ar-deny"');
+    expect(block).toContain("btn('ar-approve', 'Approve'");
+    expect(block).toContain("btn('ar-deny',    'Deny'");
+    expect(block).toContain("btn('ar-flag',    'Flag'");
+    expect(block).toContain("btn('ar-hide',    'Hide'");
+    expect(block).toContain("btn('ar-release', 'Release'");
   });
 
-  test('action delegate whitelist now includes ar-approve and ar-deny', () => {
+  test('Approve/Deny disabled when row is not pending', () => {
+    // disabled flag passed to btn() is `!isP || isF || isH`.
+    const block = ALLREPS_CMP.slice(
+      ALLREPS_CMP.indexOf('const actionHtml = ['),
+      ALLREPS_CMP.indexOf('const actionHtml = [') + 1000
+    );
+    expect(block).toMatch(/btn\('ar-approve'[\s\S]{0,200}!isP \|\| isF \|\| isH/);
+    expect(block).toMatch(/btn\('ar-deny'[\s\S]{0,200}!isP \|\| isF \|\| isH/);
+  });
+
+  test('Flag disabled when already flagged, Hide disabled when already hidden', () => {
+    const block = ALLREPS_CMP.slice(
+      ALLREPS_CMP.indexOf('const actionHtml = ['),
+      ALLREPS_CMP.indexOf('const actionHtml = [') + 1000
+    );
+    expect(block).toMatch(/btn\('ar-flag'[\s\S]{0,200},\s*isF,\s*'Already flagged'/);
+    expect(block).toMatch(/btn\('ar-hide'[\s\S]{0,200},\s*isH,\s*'Already hidden'/);
+  });
+
+  test('Release disabled when nothing to release', () => {
+    const block = ALLREPS_CMP.slice(
+      ALLREPS_CMP.indexOf('const actionHtml = ['),
+      ALLREPS_CMP.indexOf('const actionHtml = [') + 1000
+    );
+    expect(block).toMatch(/btn\('ar-release'[\s\S]{0,200},\s*!\(isF \|\| isH\),\s*'Nothing to release'/);
+  });
+
+  test('toolbar lives in the top-right via .ar-detail-header / .ar-detail-actions', () => {
+    expect(ALLREPS_CMP).toContain('class="ar-detail-header"');
+    expect(ALLREPS_CMP).toContain('class="ar-detail-actions"');
+  });
+
+  test('click delegate ignores clicks on disabled buttons', () => {
+    expect(ALLREPS_CMP).toContain('if (btn.disabled) return');
+  });
+
+  test('action delegate whitelist still includes ar-approve and ar-deny', () => {
     expect(ALLREPS_CMP).toContain("['ar-flag','ar-hide','ar-release','ar-approve','ar-deny']");
   });
 
@@ -114,6 +156,27 @@ describe('main.js handlers for ar-approve / ar-deny (#146)', () => {
     const rowApproveIdx = MAIN_SRC.lastIndexOf("if (action === 'ar-approve') {");
     const block = MAIN_SRC.slice(rowApproveIdx, rowApproveIdx + 800);
     expect(block).toMatch(/updateAllReportsRow\(rid, false, false, null, false\)/);
+  });
+});
+
+describe('Report detail header layout (#148)', () => {
+  test('.ar-detail-header is a flex row that pushes the toolbar right', () => {
+    expect(ADMIN_CSS).toContain('.ar-detail-header {');
+    const block = ADMIN_CSS.slice(
+      ADMIN_CSS.indexOf('.ar-detail-header {'),
+      ADMIN_CSS.indexOf('.ar-detail-header {') + 400
+    );
+    expect(block).toContain('display: flex');
+    expect(block).toContain('justify-content: space-between');
+  });
+
+  test('.ar-detail-actions wraps on narrow viewports so buttons stay visible', () => {
+    expect(ADMIN_CSS).toContain('.ar-detail-actions {');
+    const block = ADMIN_CSS.slice(
+      ADMIN_CSS.indexOf('.ar-detail-actions {'),
+      ADMIN_CSS.indexOf('.ar-detail-actions {') + 300
+    );
+    expect(block).toContain('flex-wrap: wrap');
   });
 });
 
