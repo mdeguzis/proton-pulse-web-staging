@@ -110,6 +110,19 @@
   color: var(--muted);
 }
 
+/* Hidden-count strip sits directly beneath .search-summary; muted so it
+   reads as an informational aside rather than a search result. */
+.search-adult-note {
+  margin: -12px 0 18px;
+  padding: 8px 14px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-top: none;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.search-adult-note a { color: var(--accent, #5c8bd6); }
+
 .search-groups {
   display: flex;
   flex-direction: column;

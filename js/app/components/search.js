@@ -2,11 +2,12 @@
 
 import { estimateScore } from '../../shared/scoring.js?v=0dae1257';
 import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../api/reports.js?v=003f23c0';
-import { renderGamePage } from './game-page.js?v=d79ce4b8';
+import { renderGamePage } from './game-page.js?v=8934c3f7';
 import { STEAM_IMG, SITE_ROOT, USES_PROD_DATA, storeLabelFromAppId } from '../config.js?v=df5b5024';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=c7e1268c';
 import { renderGameCard } from '../lib/card.js?v=754da47b';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
+import { filterAdultEntries, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 
 // Search index + results UX -- factored out of app.js.
 // Loaded as a classic script BEFORE app.js so its globals
@@ -34,7 +35,10 @@ function _matchEntries(entries, query, limit) {
 // --- searchIndexMatches ---
 export function searchIndexMatches(query, limit) {
   const q = query.trim();
-  return _matchEntries(searchIndex, q, limit);
+  // Drop adult-flagged rows unless the user's "Show adult games" pref is on.
+  // filterAdultEntries is a no-op for rows without the adult column so
+  // pre-pipeline-run indices stay visible.
+  return filterAdultEntries(_matchEntries(searchIndex, q, limit));
 }
 
 // --- searchExtendedSteamMatches ---
@@ -42,7 +46,7 @@ export function searchIndexMatches(query, limit) {
 // loadExtendedSteamIndex() first when you want the long-tail Steam catalog.
 export function searchExtendedSteamMatches(query, limit) {
   const q = query.trim();
-  return _matchEntries(extendedSteamIndex, q, limit);
+  return filterAdultEntries(_matchEntries(extendedSteamIndex, q, limit));
 }
 
 // --- renderPulseSearchResult ---
@@ -89,16 +93,21 @@ export async function renderSearchPage(query) {
   // and only loads on this deliberate Enter-to-search path.
   await Promise.all([loadSearchIndex(), loadExtendedSteamIndex()]);
   const pulseResults = await withTimeout(fetchMatchingPulseConfigs(q), 2500, []);
-  const primaryResults = searchIndexMatches(q, 24);
-  // Pad the merged list up to a soft cap of 48 with extended Steam stubs,
-  // skipping any appId already covered by the primary index.
+  // Count adult-hidden hits so the summary line can call them out. Runs
+  // the raw match once to get the unfiltered set, then applies the
+  // filter for display. showAdultAllowed()=true means nothing is hidden.
+  const primaryRaw = _matchEntries(searchIndex, q, 24);
+  const primaryResults = filterAdultEntries(primaryRaw);
   const primaryIds = new Set(primaryResults.map(([id]) => String(id)));
   const extendedRoom = Math.max(0, 48 - primaryResults.length);
-  const extendedResults = extendedRoom
-    ? searchExtendedSteamMatches(q, extendedRoom + primaryIds.size)
+  const extendedRaw = extendedRoom
+    ? _matchEntries(extendedSteamIndex, q, extendedRoom + primaryIds.size)
         .filter(([id]) => !primaryIds.has(String(id)))
         .slice(0, extendedRoom)
     : [];
+  const extendedResults = filterAdultEntries(extendedRaw);
+  const hiddenAdultCount = (primaryRaw.length - primaryResults.length)
+                         + (extendedRaw.length - extendedResults.length);
   const indexResults = [...primaryResults, ...extendedResults];
   // Disambiguate same-name games (e.g. Prey 2006 vs Prey 2017) with a "(YEAR)"
   // suffix when the pipeline supplied a releaseYear (column 7 of search-index).
@@ -109,10 +118,14 @@ export async function renderSearchPage(query) {
     : new Map();
   const total = pulseResults.length + indexResults.length;
 
+  const adultNote = hiddenAdultCount > 0
+    ? `<div class="search-adult-note">${hiddenAdultCount} adult result${hiddenAdultCount === 1 ? '' : 's'} hidden by your <a href="options.html#opt-show-adult">Show adult games</a> preference.</div>`
+    : '';
   el.innerHTML = `
     <div class="search-summary">
       Search results for <strong>${esc(q)}</strong> - ${total} grouped hit${total === 1 ? '' : 's'}${pulseResults.length === 0 && indexResults.length > 0 ? ' - Proton Pulse config search may still be catching up' : ''}
     </div>
+    ${adultNote}
     <div class="search-groups">
       <section class="search-group">
         <div class="search-group-head">

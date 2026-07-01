@@ -84,13 +84,20 @@ describe('index page popular games rating filters', () => {
 
   test('popular list pages with a load more button', () => {
     expect(indexHtml).toContain('id="pg-load-more"');
-    expect(indexSrc).toContain('const PAGE_SIZE = 12');
-    expect(indexSrc).toContain('all.slice(0, shownCount)');
+    // Page size is computed off the current column count so the initial
+    // render always shows roughly TARGET_ROWS full rows.
+    expect(indexSrc).toContain('const TARGET_ROWS = 4');
+    expect(indexSrc).toContain('pageSizeForFullRows(list, TARGET_ROWS)');
+    expect(indexSrc).toContain('all.slice(0, shown)');
     expect(indexSrc).toContain('id="pg-load-more-btn"');
-    expect(indexSrc).toContain('shownCount += PAGE_SIZE');
+    // Load more picks up from the actual rendered count (not stale
+    // shownCount) because trimming orphans mutates the DOM under it.
+    expect(indexSrc).toContain('shownCount = rendered + pageSizeForFullRows(list, TARGET_ROWS)');
   });
 
   test('changing a filter restarts paging', () => {
-    expect(indexSrc).toContain('shownCount = PAGE_SIZE;');
+    // Filter change resets shownCount to the current row-based page size,
+    // not a hardcoded PAGE_SIZE constant.
+    expect(indexSrc).toContain('shownCount = pageSizeForFullRows(list, TARGET_ROWS);');
   });
 });

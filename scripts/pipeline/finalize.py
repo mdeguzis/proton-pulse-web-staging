@@ -26,7 +26,9 @@ from .common import (
     count_year_bucket_files,
     dir_to_app_id,
     fetch_json,
+    flush_steam_descriptors_cache,
     flush_steam_title_cache,
+    is_adult_app,
     log,
 )
 from .gog_catalog import load_gog_catalog, load_gog_covers
@@ -774,7 +776,17 @@ def generate_search_index(
         if not title:
             continue
         tier, pdb_count, pulse_count = _compute_game_summary(app_dir)
-        entries.append([app_id, title, tier, pdb_count, pulse_count, app_type_from_id(app_id)])
+        app_type = app_type_from_id(app_id)
+        # Adult flag lives at column 8. Steam descriptors are the source
+        # of truth; GOG / Epic entries stay unflagged (no equivalent
+        # API). Catalog-only stubs also skip the check to avoid burning
+        # ~50k+ appdetails calls on the first pipeline run -- if the
+        # game has no reports it likely never trends into a browse view.
+        # Columns 6 (release_year) + 7 (delisted) get filled in later by
+        # enrich_search_index_with_release_years / _with_delisted; pad
+        # them with None so column 8 (adult) sits at the expected index.
+        adult = is_adult_app(app_id) if app_type == "steam" else False
+        entries.append([app_id, title, tier, pdb_count, pulse_count, app_type, None, None, adult])
         seen_ids.add(app_id)
 
     if gog_catalog:
@@ -1587,4 +1599,5 @@ def finalize_output(output_dir, skip_probe: bool = False):
     write_data_versions_json(output_path)
     log_summary(state["parsed_count"], data_output_path, output_path, pipeline_start, state["backfilled_keys"])
     flush_steam_title_cache()
+    flush_steam_descriptors_cache()
     log("Done finalizing output.")
