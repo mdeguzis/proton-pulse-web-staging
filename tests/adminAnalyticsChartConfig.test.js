@@ -96,6 +96,21 @@ describe('admin analytics: tooltips show every series on hover + a total', () =>
   });
 });
 
+describe('y-axis has headroom above the tallest data point', () => {
+  test('sessions chart y-axis uses grace so the top line does not flatline at the ceiling', () => {
+    const block = dailyChartBlock();
+    // 15% grace scales cleanly whether the max is 30 or 3000.
+    expect(block).toMatch(/grace:\s*'15%'/);
+  });
+
+  test('reports chart y-axis uses absolute grace of 2 (integer counts need at least +1)', () => {
+    const block = reportsChartBlock();
+    // 15% of a max of 3 rounds to 0, so use a fixed grace on the small-
+    // integer stack so hovering a peak still shows the tooltip below it.
+    expect(block).toMatch(/grace:\s*2/);
+  });
+});
+
 describe('vertical hover guideline is wired on both charts', () => {
   test('_verticalHoverLine plugin is defined with an afterDraw hook', () => {
     // The plugin uses afterDraw + chart.tooltip._active[0].element.x to

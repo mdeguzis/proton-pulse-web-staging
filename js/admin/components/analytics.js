@@ -574,7 +574,9 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
           },
           scales: {
             x: { ticks: { color: '#888', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+            // grace adds ~15% headroom above the max value so the top data
+            // point doesn't sit flush against the chart ceiling.
+            y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true, grace: '15%' },
           },
         },
       });
@@ -664,6 +666,10 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
               grid: { color: 'rgba(255,255,255,0.05)' },
               beginAtZero: true,
               stacked: true,
+              // Reports are usually small integers (0-10 range), so a fixed
+              // 2-unit grace keeps a visible gap above the tallest stack
+              // where a % grace would round to 0.
+              grace: 2,
             },
           },
         },
