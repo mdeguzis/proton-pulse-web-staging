@@ -96,6 +96,20 @@ describe('admin analytics: tooltips show every series on hover + a total', () =>
   });
 });
 
+describe('line curves stay within the data (no bezier overshoot)', () => {
+  test('every dataset pairs tension with cubicInterpolationMode: monotone', () => {
+    // Without monotone, Chart.js's cubic bezier dips below equal-height
+    // neighbors and creates a visible divot between adjacent peaks --
+    // very obvious on a stacked area chart with flat plateaus.
+    const daily = dailyChartBlock();
+    const reports = reportsChartBlock();
+    // Sessions chart: 2 datasets.
+    expect((daily.match(/cubicInterpolationMode:\s*'monotone'/g) || []).length).toBe(2);
+    // Reports chart: 3 datasets (Web / Plugin / Other).
+    expect((reports.match(/cubicInterpolationMode:\s*'monotone'/g) || []).length).toBe(3);
+  });
+});
+
 describe('y-axis has headroom above the tallest data point', () => {
   test('both charts pad the y-axis max by +1 so the top line has a clean gap', () => {
     expect(dailyChartBlock()).toMatch(/grace:\s*1/);
