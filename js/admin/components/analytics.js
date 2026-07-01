@@ -37,6 +37,31 @@ function _formatAge(secs) {
   return `${Math.round(secs / 86400)}d`;
 }
 
+// Chart.js plugin: draws a 1px vertical crosshair at the hovered x position.
+// Chart.js gives us index-mode tooltips out of the box but does not draw a
+// visible guideline, so hovering feels imprecise. Register this per chart
+// via the `plugins: [_verticalHoverLine]` array in the Chart config.
+const _verticalHoverLine = {
+  id: 'verticalHoverLine',
+  afterDraw(chart) {
+    const active = chart.tooltip?._active;
+    if (!active || !active.length) return;
+    const x = active[0].element.x;
+    const top = chart.chartArea.top;
+    const bottom = chart.chartArea.bottom;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
 function _formatSize(bytes) {
   if (!Number.isFinite(bytes)) return '?';
   if (bytes < 1024) return `${bytes} B`;
@@ -421,9 +446,9 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
     </div>
     <div id="sec-daily" style="margin-bottom:6px">
       <span class="analytics-section-title">Daily activity</span>
-      <span style="float:right;font-size:0.75rem;color:var(--text-muted,#888)">
-        <span style="color:#5c8bd6">&#9644;</span> Sessions &nbsp;
-        <span style="color:#4caf80">&#9644;</span> Unique users
+      <span class="analytics-legend">
+        <span class="analytics-legend-item"><span class="analytics-legend-swatch" style="background:#5c8bd6"></span>Sessions</span>
+        <span class="analytics-legend-item"><span class="analytics-legend-swatch" style="background:#4caf80"></span>Unique users</span>
       </span>
     </div>
     <div class="analytics-chart-wrap">
@@ -432,10 +457,10 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
     <p class="chart-caption">Sessions and distinct authenticated users per day across the selected range.</p>
     <div id="sec-reports" style="margin-top:24px;margin-bottom:6px">
       <span class="analytics-section-title">Report submissions</span>
-      <span style="float:right;font-size:0.75rem;color:var(--text-muted,#888)">
-        <span style="color:#5c8bd6">&#9644;</span> Web
-        &nbsp;<span style="color:#4caf80">&#9644;</span> Plugin
-        &nbsp;<span style="color:#d4b36a">&#9644;</span> Other
+      <span class="analytics-legend">
+        <span class="analytics-legend-item"><span class="analytics-legend-swatch" style="background:#5c8bd6"></span>Web</span>
+        <span class="analytics-legend-item"><span class="analytics-legend-swatch" style="background:#4caf80"></span>Plugin</span>
+        <span class="analytics-legend-item"><span class="analytics-legend-swatch" style="background:#d4b36a"></span>Other</span>
       </span>
     </div>
     <div class="analytics-chart-wrap">
@@ -503,6 +528,7 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
     if (canvas) {
       chartInstance = new Chart(canvas, {
         type: 'line',
+        plugins: [_verticalHoverLine],
         data: {
           labels: daily.map(r => r.day),
           datasets: [
@@ -564,6 +590,7 @@ export function renderAnalytics(data, { daysBack, onChangeDays }) {
       // but defensively default each series to 0 here too.
       reportsChartInstance = new Chart(canvas, {
         type: 'line',
+        plugins: [_verticalHoverLine],
         data: {
           labels: reportsByDay.map(r => r.day),
           datasets: [

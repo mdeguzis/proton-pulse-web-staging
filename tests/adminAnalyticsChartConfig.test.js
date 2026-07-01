@@ -96,6 +96,55 @@ describe('admin analytics: tooltips show every series on hover + a total', () =>
   });
 });
 
+describe('vertical hover guideline is wired on both charts', () => {
+  test('_verticalHoverLine plugin is defined with an afterDraw hook', () => {
+    // The plugin uses afterDraw + chart.tooltip._active[0].element.x to
+    // paint a 1px dashed vertical line at the hovered index. If any of
+    // those anchors move, the guideline stops rendering silently.
+    expect(SRC).toMatch(/id:\s*'verticalHoverLine'/);
+    expect(SRC).toContain('afterDraw(chart)');
+    expect(SRC).toContain('chart.tooltip?._active');
+    expect(SRC).toContain('setLineDash([3, 3])');
+  });
+
+  test('both Chart() calls register the plugin via plugins: [_verticalHoverLine]', () => {
+    const daily = dailyChartBlock();
+    const reports = reportsChartBlock();
+    expect(daily).toContain('plugins: [_verticalHoverLine]');
+    expect(reports).toContain('plugins: [_verticalHoverLine]');
+  });
+});
+
+describe('legend swatches are colored blocks, not the &#9644; unicode line', () => {
+  test('renderAnalytics HTML uses analytics-legend + analytics-legend-swatch', () => {
+    expect(SRC).toContain('analytics-legend');
+    expect(SRC).toContain('analytics-legend-swatch');
+    // The old &#9644; character rendered as an off-color glyph in most
+    // fonts and was hard to read; make sure it's not lingering in the
+    // legend rows we just refactored.
+    expect(SRC).not.toContain('&#9644;');
+  });
+
+  test('swatch colors match the chart line colors', () => {
+    // Legend swatches inline-style background to the same hex as the
+    // dataset borderColor so the visual pairing is one-to-one.
+    expect(SRC).toMatch(/analytics-legend-swatch"\s+style="background:#5c8bd6"><\/span>Sessions/);
+    expect(SRC).toMatch(/analytics-legend-swatch"\s+style="background:#4caf80"><\/span>Unique users/);
+    expect(SRC).toMatch(/analytics-legend-swatch"\s+style="background:#5c8bd6"><\/span>Web/);
+    expect(SRC).toMatch(/analytics-legend-swatch"\s+style="background:#4caf80"><\/span>Plugin/);
+    expect(SRC).toMatch(/analytics-legend-swatch"\s+style="background:#d4b36a"><\/span>Other/);
+  });
+});
+
+describe('analytics-legend CSS shape', () => {
+  const CSS = fs.readFileSync(path.join(__dirname, '..', 'css', 'admin', 'admin.css'), 'utf8');
+  test('.analytics-legend + swatch styles exist in admin.css', () => {
+    expect(CSS).toContain('.analytics-legend {');
+    expect(CSS).toContain('.analytics-legend-item {');
+    expect(CSS).toContain('.analytics-legend-swatch {');
+  });
+});
+
 describe('_formatTooltipDate helper', () => {
   test('YYYY-MM-DD gets expanded to a readable weekday + month + day + year', () => {
     // The helper is module-local; exercise it via a tiny eval-in-scope trick
