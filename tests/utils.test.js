@@ -38,6 +38,7 @@ const {
   confTextColor,
   truncate,
   esc,
+  escWithSpoilers,
   cfgNa,
   configKey,
   hashReportKey,
@@ -534,5 +535,100 @@ describe('hashReportKey', () => {
 
   test('empty string returns a hash', () => {
     expect(hashReportKey('')).toMatch(/^h[0-9a-f]*$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// escWithSpoilers (#22)
+// ---------------------------------------------------------------------------
+//
+// Coverage-side test for escWithSpoilers. The behavioral suite lives in
+// tests/spoilerTags.test.js (loadEsm-based, no instrumentation credit).
+
+describe('downloadJson', () => {
+  // Save the original createElement that the esc() helper relies on so we
+  // can restore it after this test. Without that the rest of the file's
+  // esc-based assertions get a different element shape and fail.
+  const origCreateElement = global.document.createElement;
+  const origBlob = global.Blob;
+  const origCreateObjectURL = global.URL.createObjectURL;
+  const origRevokeObjectURL = global.URL.revokeObjectURL;
+
+  afterAll(() => {
+    global.document.createElement = origCreateElement;
+    global.Blob = origBlob;
+    global.URL.createObjectURL = origCreateObjectURL;
+    global.URL.revokeObjectURL = origRevokeObjectURL;
+  });
+
+  test('serializes obj as pretty JSON, creates a Blob, and triggers a download', () => {
+    const created = [];
+    const revoked = [];
+    global.Blob = function (parts, opts) { this.parts = parts; this.type = opts?.type; };
+    global.URL.createObjectURL = (b) => { created.push(b); return 'blob:fake'; };
+    global.URL.revokeObjectURL = (u) => { revoked.push(u); };
+    const clicked = [];
+    global.document.createElement = (tag) => {
+      const el = { tag, click() { clicked.push(el); } };
+      Object.defineProperty(el, 'href', { set(v) { el._href = v; }, get() { return el._href; } });
+      Object.defineProperty(el, 'download', { set(v) { el._download = v; }, get() { return el._download; } });
+      return el;
+    };
+
+    utils.downloadJson({ a: 1, b: ['x'] }, 'My Report / 2026');
+
+    expect(created).toHaveLength(1);
+    const body = created[0].parts[0];
+    expect(JSON.parse(body)).toEqual({ a: 1, b: ['x'] });
+    expect(created[0].type).toBe('application/json');
+    expect(clicked).toHaveLength(1);
+    // Non-filename-safe chars (space, slash) get replaced with underscores.
+    expect(clicked[0]._download).toBe('My_Report___2026.json');
+    expect(clicked[0]._href).toBe('blob:fake');
+    expect(revoked).toEqual(['blob:fake']);
+  });
+});
+
+describe('escWithSpoilers (require-loaded coverage)', () => {
+  test('returns empty string for falsy input', () => {
+    expect(escWithSpoilers('')).toBe('');
+    expect(escWithSpoilers(null)).toBe('');
+    expect(escWithSpoilers(undefined)).toBe('');
+  });
+
+  test('plain text passes through HTML-escaped, no markup', () => {
+    expect(escWithSpoilers('hello world')).toBe('hello world');
+    expect(escWithSpoilers('<script>x</script>')).toBe('&lt;script&gt;x&lt;/script&gt;');
+  });
+
+  test('wraps {spoiler}...{/spoiler} in a button-role span with nested .spoiler-content', () => {
+    const out = escWithSpoilers('{spoiler}hidden{/spoiler}');
+    expect(out).toContain('class="spoiler" role="button"');
+    expect(out).toContain('<span class="spoiler-content">hidden</span>');
+    expect(out).toContain('onclick=');
+    expect(out).toContain('onkeydown=');
+  });
+
+  test('escapes content inside spoilers (XSS-safe)', () => {
+    const out = escWithSpoilers('{spoiler}<img src=x onerror=alert(1)>{/spoiler}');
+    expect(out).not.toMatch(/<img\b/);
+    expect(out).toContain('&lt;img');
+  });
+
+  test('multiple spoilers in one string all wrap independently', () => {
+    const out = escWithSpoilers('before {spoiler}a{/spoiler} mid {spoiler}b{/spoiler} after');
+    const matches = out.match(/class="spoiler"/g) || [];
+    expect(matches).toHaveLength(2);
+  });
+
+  test('unclosed spoiler tag falls back to plain escaped text (no run-on)', () => {
+    const out = escWithSpoilers('hi {spoiler}forgot to close');
+    expect(out).not.toContain('class="spoiler"');
+    expect(out).toContain('{spoiler}forgot to close');
+  });
+
+  test('case-insensitive on the tag name', () => {
+    expect(escWithSpoilers('{SPOILER}x{/SPOILER}')).toContain('class="spoiler"');
+    expect(escWithSpoilers('{Spoiler}y{/spoiler}')).toContain('class="spoiler"');
   });
 });
