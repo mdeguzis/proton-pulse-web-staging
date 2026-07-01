@@ -26,3 +26,17 @@ export function filterAdult(rows) {
   if (showAdultAllowed()) return rows;
   return rows.filter(r => !r || r.adult !== true);
 }
+
+// search-index.json rows are arrays, not objects. The adult flag lives
+// at ADULT_COL_SEARCH_INDEX. Rows that don't yet have the column pass
+// through so pre-pipeline-run data stays visible.
+export const ADULT_COL_SEARCH_INDEX = 8;
+
+export function isAdultEntry(entry, col = ADULT_COL_SEARCH_INDEX) {
+  return Array.isArray(entry) && entry[col] === true;
+}
+
+export function filterAdultEntries(entries, col = ADULT_COL_SEARCH_INDEX) {
+  if (showAdultAllowed()) return entries;
+  return entries.filter(e => !isAdultEntry(e, col));
+}

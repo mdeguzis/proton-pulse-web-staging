@@ -11,7 +11,8 @@ import { enhanceAuthorBlocks } from './author.js?v=2316d334';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=48037483';
 import { renderCard } from './report-card.js?v=eae7957c';
-import { loadSearchIndex, searchIndex } from './search.js?v=f7b2fe47';
+import { loadSearchIndex, searchIndex } from './search.js?v=ff82d0c0';
+import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=df5b5024';
 import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=e7fe3ce0';
 import { confColor, confTextColor, configKey, daysAgo, downloadJson, esc, fmtMinutes, reportKey } from '../utils.js?v=c7e1268c';
@@ -143,6 +144,42 @@ export async function renderGamePage(appId) {
   window._ppMyUserId = '';
   if (window.SupaAuth) {
     try { const s = await window.SupaAuth.getSession(); window._ppMyUserId = s?.user?.id || ''; } catch {}
+  }
+
+  // Adult-content gate: if the search-index flags this appId as adult
+  // and the "Show adult games" preference is off, render a block page
+  // instead of loading reports. The block page offers a one-click
+  // reveal that turns the pref on and reloads.
+  if (!showAdultAllowed()) {
+    await loadSearchIndex();
+    const entry = (searchIndex || []).find(row => String(row[0]) === String(appId));
+    if (entry && isAdultEntry(entry)) {
+      const title = String(entry[1] || `App ${appId}`).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      el.innerHTML = `
+        <div class="state-box" style="max-width:520px;margin:40px auto;text-align:center">
+          <h2 style="margin-top:0">${title} is hidden</h2>
+          <p style="color:var(--muted)">
+            Steam has flagged this title as containing adult content. It is
+            hidden by your "Show adult games" preference.
+          </p>
+          <p style="color:var(--muted)">
+            You can turn this preference on to view the game. The setting is
+            saved locally in this browser.
+          </p>
+          <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button type="button" id="adult-reveal-btn" class="btn btn-primary">Show adult games and view</button>
+            <a href="index.html" class="btn">Back to home</a>
+          </div>
+        </div>`;
+      const revealBtn = document.getElementById('adult-reveal-btn');
+      if (revealBtn) {
+        revealBtn.addEventListener('click', () => {
+          try { localStorage.setItem('pp:show-adult', 'on'); } catch {}
+          location.reload();
+        });
+      }
+      return;
+    }
   }
 
   // Promise.all was hanging silently on Wukong (appId 2358720) when one of

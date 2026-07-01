@@ -37,6 +37,10 @@ function stubsForSearch(extraFetch) {
     esc: (s) => String(s),
     withTimeout: async (p) => p,
     renderGameCard: () => '',
+    // adult-filter helpers: pass-through so the extended-search tests
+    // exercise the raw match logic without needing localStorage.
+    filterAdultEntries: (rows) => rows,
+    isAdultEntry: () => false,
     document: {
       getElementById: () => ({ innerHTML: '', set innerHTML(_v) {}, classList: { add() {}, remove() {}, contains() { return false; } }, getBoundingClientRect: () => ({ top:0, left:0, right:0, bottom:0, width:0 }), addEventListener() {}, querySelectorAll: () => [], contains: () => false }),
       addEventListener: () => {},
@@ -176,10 +180,11 @@ describe('renderSearchPage source shape (#134 regression guards)', () => {
 
   test('merges extended matches into indexResults and dedupes by appId', () => {
     // The dedupe is what stops a Steam app that has both primary + extended
-    // representation from rendering twice. Keep the filter assertion strict
-    // enough to catch an accidental concat without dedupe.
+    // representation from rendering twice. renderSearchPage inlines the raw
+    // _matchEntries call so the adult-hidden count can be computed against
+    // the pre-filter set; the dedupe pattern is unchanged.
     expect(src).toContain('primaryIds.has(String(id))');
-    expect(src).toContain('searchExtendedSteamMatches(q,');
+    expect(src).toContain('_matchEntries(extendedSteamIndex, q,');
   });
 
   test('onSearchInput (dropdown) does NOT load the extended index', () => {

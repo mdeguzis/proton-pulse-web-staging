@@ -2,7 +2,7 @@
 import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=e7fe3ce0';
 import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
 import { padTileRows, watchTileRerender, pageSizeForFullRows } from '../lib/tile-pad.js?v=de862970';
-import { filterAdult } from '../lib/adult-filter.js?v=7630e414';
+import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
 
 // Homepage-only logic. Universal nav chrome (banner, nav row, mobile drawer,
 // search dropdown, auth indicator) lives in topbar.js.
