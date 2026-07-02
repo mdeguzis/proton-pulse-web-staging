@@ -37,7 +37,7 @@ async function _loadIndexes() {
 }
 
 // search-index shape: [appId, title, tier, pdb, pulse, appType, releaseYear, delisted, adult]
-function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, onlyMissing }) {
+function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, scope }) {
   const q = String(textFilter || '').trim().toLowerCase();
   const rows = [];
   for (const row of searchIndex) {
@@ -50,14 +50,29 @@ function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, 
     let cachedUrl = null;
     if (type === 'steam') cachedUrl = gameImages[appId] || null;
     else                   cachedUrl = nonSteam[appId] || null;
-    // "Missing" = no cached URL on file. For GOG/Epic that means the
-    // image is genuinely missing (no store CDN fallback exists). For
-    // Steam it usually means the standard CDN worked and no fallback
-    // was needed -- probing the row will confirm which case it is.
-    if (onlyMissing && cachedUrl) continue;
+    // scope filter: has = cached URL on file; missing = none.
+    if (scope === 'has'     && !cachedUrl) continue;
+    if (scope === 'missing' &&  cachedUrl) continue;
     rows.push({ appId, title, type, cachedUrl });
   }
   return rows;
+}
+
+// Initial status derived from what we already know without probing.
+// The pipeline only writes to game-images.json / nonsteam-images.json
+// when it had to resolve or fall back to something, so presence tells
+// us a lot:
+//   - Steam + cached URL   -> pipeline saved a fallback (standard CDN 404'd at build time)
+//   - Steam + no cached    -> standard Steam CDN presumed working (default state, not yet re-probed)
+//   - non-Steam + cached   -> we have a URL from the store's catalog
+//   - non-Steam + no cache -> genuinely missing (no store CDN fallback available)
+function _initialStatusHtml(r) {
+  if (r.type === 'steam') {
+    if (r.cachedUrl) return '<span class="admin-badge admin-badge--info" title="Pipeline stored a hashed fallback URL (standard CDN 404\'d at build time)">Fallback cached</span>';
+    return '<span class="admin-badge admin-badge--muted" title="No fallback needed; standard Steam CDN presumed working. Click Probe to verify.">Default CDN</span>';
+  }
+  if (r.cachedUrl) return '<span class="admin-badge admin-badge--info" title="Cached URL from the store\'s catalog">Cached</span>';
+  return '<span class="admin-badge admin-badge--warn" title="No cached URL and no standard CDN pattern for this store">Missing</span>';
 }
 
 function _renderShell() {
@@ -72,6 +87,7 @@ function _renderShell() {
       </select>
       <select id="boxart-scope" class="admin-select" title="Filter by cached URL state -- combine with the store dropdown for finer scoping">
         <option value="all">All entries</option>
+        <option value="has">Has box art (cached URL on file)</option>
         <option value="missing">Missing box art (no cached URL)</option>
       </select>
       <button class="admin-btn" id="boxart-probe-visible-btn" title="Probe every row on the current page">Probe visible page</button>
@@ -147,7 +163,7 @@ function _renderRow(r) {
       <td>${storeCell}</td>
       <td><code>${escapeHtml(r.appId)}</code></td>
       <td>${cachedCell}</td>
-      <td class="boxart-status">-</td>
+      <td class="boxart-status">${_initialStatusHtml(r)}</td>
       <td>
         <button class="admin-btn" data-action="probe" title="HEAD the canonical URL">Probe</button>
         <button class="admin-btn" data-action="refetch" title="Ask the store's API for the current header URL">Refetch</button>
@@ -287,7 +303,7 @@ export async function renderBoxartAdmin() {
     state.rows = _buildRows(indexes, {
       store: state.store,
       textFilter: state.textFilter,
-      onlyMissing: state.scope === 'missing',
+      scope: state.scope,
     });
     state.page = 0;
     _renderPage(state.rows, state.page);
