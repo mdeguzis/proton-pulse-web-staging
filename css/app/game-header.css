@@ -455,11 +455,18 @@
   align-items: center;
   justify-content: center;
   padding: 5px 4px;
-  border-radius: 3px;
+  border-radius: 6px;
   font-family: var(--mono);
   font-size: 0.66rem;
   letter-spacing: 0.04em;
   min-width: 0;
+  /* Chip depth: same treatment as the tier badge -- top highlight, dark
+     bottom edge, slight drop shadow -- so all five chips read as one
+     cohesive strip of raised tiles rather than five flat colored bars. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .dist-chip-label {
   text-transform: uppercase;
@@ -511,7 +518,11 @@
 .source-summary-tile {
   /* Two-column inner layout - primary info on left, distribution + freshness
      + per-source stats on right. Used to be flex-column which left the right
-     half of the wide tile completely empty */
+     half of the wide tile completely empty.
+     Depth treatment: rounded corners + soft outer shadow + inner highlight
+     stripe across the top so the tile reads as a raised card, not a flat
+     rectangle. The 1px inset-highlight is the top-edge specular; the outer
+     shadow is what sells the lift. */
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
@@ -519,7 +530,13 @@
   min-height: 136px;
   padding: 14px 16px;
   border: 1px solid var(--border2);
-  background: linear-gradient(180deg, rgba(39, 49, 63, 0.98), rgba(28, 35, 46, 0.98));
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(102, 192, 244, 0.05), transparent 40%),
+    linear-gradient(180deg, rgba(39, 49, 63, 0.98), rgba(28, 35, 46, 0.98));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 14px rgba(0, 0, 0, 0.28);
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -552,7 +569,12 @@
 .source-summary-tile:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+  /* Deepen the lift on hover and add a subtle accent glow so it feels
+     interactive without becoming a whole different card. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 12px 28px rgba(0, 0, 0, 0.32),
+    0 0 0 1px var(--accent-glow);
 }
 .source-summary-tile:focus-visible {
   outline: 2px solid var(--accent);
@@ -587,6 +609,13 @@
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  /* Give the tier badge a touch of depth so it reads as a chip on top
+     of the tile background, not a flat block. Inset highlight + subtle
+     drop shadow; tier-specific bg colors still come from inline style. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.15) inset,
+    0 1px 2px rgba(0, 0, 0, 0.25);
 }
 .source-summary-tier-row {
   display: flex;
@@ -596,7 +625,7 @@
   width: 100%;
 }
 .source-summary-tier-row > * {
-  border-radius: 3px;
+  border-radius: 6px;
 }
 /* Both pills size to their own content and group at the left edge. The old
    9:3 flex split stretched the row across the full column, which squeezed the
