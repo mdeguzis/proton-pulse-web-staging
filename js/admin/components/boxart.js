@@ -15,7 +15,7 @@
 
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { escapeHtml } from '../utils.js?v=bd5a67c2';
-import { probeSteamHeader, refetchSteamHeader, refetchNonSteamHeader } from '../api/boxart.js?v=a5f6e2fb';
+import { probeSteamHeader, refetchSteamHeader, refetchNonSteamHeader, refetchSgdbHeader } from '../api/boxart.js?v=c61c1add';
 
 const PAGE_SIZE = 25;
 const BATCH_SIZE = 10;              // parallel probes per batch when Probe all runs
@@ -150,8 +150,9 @@ function _renderRow(r) {
       <td>${cachedCell}</td>
       <td class="boxart-status">-</td>
       <td>
-        <button class="admin-btn" data-action="probe">Probe</button>
-        <button class="admin-btn" data-action="refetch">Refetch</button>
+        <button class="admin-btn" data-action="probe" title="HEAD the canonical URL">Probe</button>
+        <button class="admin-btn" data-action="refetch" title="Ask the store's API for the current header URL">Refetch</button>
+        <button class="admin-btn" data-action="sgdb" title="Fetch from SteamGridDB (community artwork)">SGDB</button>
       </td>
     </tr>`;
 }
@@ -208,6 +209,15 @@ async function _refetchRow(tr) {
   const result = type === 'steam'
     ? await refetchSteamHeader(appId)
     : await refetchNonSteamHeader(appId, tr.dataset.cached || null);
+  _paintStatus(statusEl, result);
+  return result;
+}
+
+async function _sgdbRow(tr) {
+  const appId = tr.dataset.appid;
+  const statusEl = tr.querySelector('.boxart-status');
+  statusEl.innerHTML = '<span class="admin-muted">fetching from SteamGridDB...</span>';
+  const result = await refetchSgdbHeader(appId);
   _paintStatus(statusEl, result);
   return result;
 }
@@ -365,6 +375,7 @@ export async function renderBoxartAdmin() {
     try {
       if (btn.dataset.action === 'probe') await _probeRow(tr, indexes.gameImages);
       else if (btn.dataset.action === 'refetch') await _refetchRow(tr);
+      else if (btn.dataset.action === 'sgdb') await _sgdbRow(tr);
     } finally {
       btn.disabled = false;
     }

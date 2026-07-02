@@ -104,27 +104,28 @@ describe('Missing Box Art component contract', () => {
 });
 
 describe('boxart API contract', () => {
-  test('exports the three probe/refetch entry points', () => {
+  test('exports the four probe/refetch entry points', () => {
     expect(API).toMatch(/export async function probeImageUrl\(/);
     expect(API).toMatch(/export async function probeSteamHeader\(/);
     expect(API).toMatch(/export async function refetchSteamHeader\(/);
     expect(API).toMatch(/export async function refetchNonSteamHeader\(/);
+    expect(API).toMatch(/export async function refetchSgdbHeader\(/);
   });
 
-  test('refetchSteamHeader hits the official appdetails endpoint', () => {
-    expect(API).toContain('store.steampowered.com/api/appdetails');
-    // filters=basic is smaller/faster payload -- keep it.
-    expect(API).toMatch(/filters=basic/);
-    expect(API).toContain('header_image');
+  test('refetch routes through the image-refetch edge function (not browser -> steam)', () => {
+    // Steam appdetails is CORS-blocked from browsers; the server-side
+    // proxy is the only working path. There must be no direct browser
+    // fetch to store.steampowered.com/api/appdetails.
+    expect(API).toContain('/functions/v1/image-refetch');
+    expect(API).not.toMatch(/fetch\([^)]*store\.steampowered\.com\/api\/appdetails/);
+    expect(API).toContain("_callImageRefetch(idStr, 'steam')");
+    expect(API).toContain("_callImageRefetch(appId, 'sgdb')");
   });
 
   test('failures return a { ok:false, error } shape with a human-readable message', () => {
-    // The internal _result(false, { error }) helper wraps every failure
-    // path; grepping for that pattern catches accidental raw throws.
     expect(API).toMatch(/_result\(false,/);
-    // Specific friendly errors we expect the UI to show.
-    expect(API).toMatch(/appdetails returned unsuccessful/);
-    expect(API).toMatch(/appdetails returned no header_image/);
+    // Proxy transport error surfaces distinctly from upstream error.
+    expect(API).toMatch(/proxy HTTP/);
   });
 
   test('probeImageUrl retries on HEAD-not-allowed (405) with an aborted GET', () => {
