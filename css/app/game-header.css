@@ -241,7 +241,7 @@
    The action row sits in row2 col2, directly under the panel. */
 .game-header-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
   grid-template-rows: auto auto;
   align-items: stretch;
   gap: 12px 22px;
@@ -252,7 +252,12 @@
   align-self: stretch;
   width: 100%;
   max-width: 100%;
+  /* Cap the height so a wide viewport can't balloon a 460x215 Steam header
+     into a giant panel. The box art (and the panel that matches its row
+     height) stays compact; object-fit keeps the key art centered. */
+  max-height: 240px;
   object-fit: cover;
+  object-position: center;
   display: block;
   border: 1px solid var(--border);
   border-radius: 6px;
