@@ -20,9 +20,9 @@ const API    = fs.readFileSync(path.join(ROOT, 'js', 'admin', 'api', 'boxart.js'
 const PERMS  = fs.readFileSync(path.join(ROOT, 'js', 'admin', 'permissions.js'), 'utf8');
 const MANIFEST = fs.readFileSync(path.join(ROOT, 'gh-pages-manifest.txt'), 'utf8').split('\n');
 
-describe('Missing Box Art admin tab wiring', () => {
+describe('Box Art Manager admin tab wiring', () => {
   test('admin.html registers the tab option + section container', () => {
-    expect(HTML).toContain('<option value="boxart">Missing Box Art</option>');
+    expect(HTML).toContain('<option value="boxart">Box Art Manager</option>');
     expect(HTML).toContain('id="tab-boxart"');
     expect(HTML).toContain('id="boxart-content"');
   });
@@ -56,11 +56,31 @@ describe('Missing Box Art component contract', () => {
     expect(COMP).toContain("dataUrl('nonsteam-images.json')");
   });
 
-  test('renders the four required filters + scan button', () => {
+  test('renders search + store + scope filters and the two batch buttons', () => {
     expect(COMP).toContain('id="boxart-search"');
     expect(COMP).toContain('id="boxart-store"');
-    expect(COMP).toContain('id="boxart-only-cached-fallback"');
-    expect(COMP).toContain('id="boxart-scan-btn"');
+    expect(COMP).toContain('id="boxart-scope"');
+    expect(COMP).toContain('id="boxart-probe-visible-btn"');
+    expect(COMP).toContain('id="boxart-probe-all-btn"');
+    expect(COMP).toContain('id="boxart-cancel-btn"');
+  });
+
+  test('game title hyperlinks to the app page so admins can jump to it', () => {
+    expect(COMP).toContain('_appHref(r.appId)');
+    expect(COMP).toMatch(/app\.html#\/app\//);
+  });
+
+  test('status column labels are user-facing ("Box art OK" / "Missing")', () => {
+    expect(COMP).toContain('Box art OK');
+    expect(COMP).toContain('Missing');
+    // No stale FAIL badge left over.
+    expect(COMP).not.toContain('">FAIL<');
+  });
+
+  test('Probe all runs in bounded batches and yields between them', () => {
+    expect(COMP).toMatch(/const BATCH_SIZE = \d+/);
+    expect(COMP).toMatch(/BATCH_YIELD_MS/);
+    expect(COMP).toContain('cancelToken');
   });
 
   test('per-row Probe + Refetch actions are wired via delegated click', () => {
