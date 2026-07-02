@@ -462,7 +462,7 @@ export async function populateSubmitForm(el) {
         <select name="systemPicker" id="sf-system-picker">
           <option value="">Manual entry</option>
         </select>
-        <span style="font-size:0.72rem;color:var(--muted)">Pick a saved system to prefill hardware fields</span>
+        <span class="sf-row-hint">Pick a saved system to prefill hardware fields</span>
       </div>
       <div class="sf-row"><label>Proton Version *</label>
         <div class="sf-autocomplete" style="position:relative;flex:1;">
