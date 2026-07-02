@@ -206,3 +206,68 @@ def test_build_writes_both_output_files(tmp_path):
 
     assert (tmp_path / "game-images.json").exists()
     assert (tmp_path / "game-images-cache.json").exists()
+
+
+def test_build_preserves_admin_override_and_skips_probe(tmp_path):
+    # Admin set a custom URL for app 42. The pipeline MUST:
+    #   1) not probe Steam CDN / appdetails / SGDB for this app
+    #   2) surface the override URL in game-images.json
+    #   3) stamp status='override' in the cache
+    _make_data_dir(tmp_path, ["42", "43"])
+    override_url = "https://cdn.admin-upload.example.com/42/header.png"
+
+    def fake_overrides():
+        return {"42": {"image_url": override_url, "source": "upload"}}
+
+    probed = []
+    def fake_url_ok(url, timeout=8):
+        # Only app 43 should ever reach the probe -- app 42 must be skipped.
+        probed.append(url.split("/apps/")[1].split("/")[0])
+        return True
+
+    with patch("scripts.pipeline.game_images._fetch_admin_overrides", side_effect=fake_overrides), \
+         patch("scripts.pipeline.game_images._url_is_ok", side_effect=fake_url_ok):
+        result = build_game_images(tmp_path)
+
+    assert result["42"] == override_url
+    assert "42" not in probed
+    assert "43" in probed
+    cache = json.loads((tmp_path / "game-images-cache.json").read_text(encoding="utf-8"))
+    assert cache["42"]["status"] == "override"
+    assert cache["42"]["url"] == override_url
+
+
+def test_build_survives_missing_supabase_env(tmp_path):
+    # No SUPABASE_URL / anon key set (default). _fetch_admin_overrides
+    # should return {} and the pipeline runs exactly as before.
+    _make_data_dir(tmp_path, ["100"])
+
+    with patch("scripts.pipeline.game_images.SUPABASE_URL", ""), \
+         patch("scripts.pipeline.game_images.SUPABASE_ANON_KEY", ""), \
+         patch("scripts.pipeline.game_images._url_is_ok", return_value=True):
+        build_game_images(tmp_path)
+
+    cache = json.loads((tmp_path / "game-images-cache.json").read_text(encoding="utf-8"))
+    assert cache["100"]["status"] == "ok"
+
+
+def test_build_override_replaces_previous_hashed_status(tmp_path):
+    # An app had a hashed fallback in a prior run. Admin later sets an
+    # override for it. On the next pipeline run the cache entry must
+    # flip from status='hashed' to status='override' with the new URL,
+    # and the frontend export must reflect the override, not the old
+    # hashed URL.
+    _make_data_dir(tmp_path, ["777"])
+    (tmp_path / "game-images-cache.json").write_text(json.dumps({
+        "777": {"status": "hashed", "url": "https://old.example.com/777.jpg", "probed_at": "2026-01-01"},
+    }), encoding="utf-8")
+    override_url = "https://new.admin.example.com/777.png"
+
+    with patch("scripts.pipeline.game_images._fetch_admin_overrides",
+               return_value={"777": {"image_url": override_url, "source": "manual"}}), \
+         patch("scripts.pipeline.game_images._url_is_ok", return_value=True):
+        result = build_game_images(tmp_path)
+
+    assert result["777"] == override_url
+    cache = json.loads((tmp_path / "game-images-cache.json").read_text(encoding="utf-8"))
+    assert cache["777"]["status"] == "override"

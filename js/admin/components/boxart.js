@@ -15,7 +15,10 @@
 
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { escapeHtml } from '../utils.js?v=bd5a67c2';
-import { probeSteamHeader, refetchSteamHeader, refetchNonSteamHeader, refetchSgdbHeader } from '../api/boxart.js?v=c61c1add';
+import {
+  probeSteamHeader, refetchSteamHeader, refetchNonSteamHeader, refetchSgdbHeader,
+  setBoxArtOverride, uploadBoxArtOverride, clearBoxArtOverride, listBoxArtOverrides,
+} from '../api/boxart.js?v=d0157b15';
 
 const PAGE_SIZE = 25;
 const BATCH_SIZE = 10;              // parallel probes per batch when Probe all runs
@@ -24,28 +27,36 @@ const BATCH_YIELD_MS = 50;          // pause between batches so the UI stays res
 let _cache = null;
 async function _loadIndexes() {
   if (_cache) return _cache;
-  const [siRes, giRes, nsRes] = await Promise.all([
+  const [siRes, giRes, nsRes, overrides] = await Promise.all([
     fetch(await dataUrl('search-index.json')).catch(() => null),
     fetch(await dataUrl('game-images.json')).catch(() => null),
     fetch(await dataUrl('nonsteam-images.json')).catch(() => null),
+    listBoxArtOverrides().catch(() => ({ ok: false, rows: [] })),
   ]);
   const searchIndex = (siRes && siRes.ok) ? await siRes.json().catch(() => []) : [];
   const gameImages  = (giRes && giRes.ok) ? await giRes.json().catch(() => ({})) : {};
   const nonSteam    = (nsRes && nsRes.ok) ? await nsRes.json().catch(() => ({})) : {};
-  _cache = { searchIndex, gameImages, nonSteam };
+  // Admin overrides beat all other sources; keyed by app_id for O(1)
+  // lookup during row build + status render.
+  const overrideMap = {};
+  for (const row of (overrides.rows || [])) {
+    if (row?.app_id) overrideMap[String(row.app_id)] = row;
+  }
+  _cache = { searchIndex, gameImages, nonSteam, overrideMap };
   return _cache;
 }
 
 // Derive the same status the Status column shows, without probing.
-// Keeping this separate from _initialStatusHtml lets the scope + status
-// filters key off a stable value.
-function _deriveStatus(type, cachedUrl) {
+// Admin override beats everything; otherwise the presence of a cached
+// URL and store type determine the label.
+function _deriveStatus(type, cachedUrl, hasOverride) {
+  if (hasOverride) return 'override';
   if (type === 'steam') return cachedUrl ? 'fallback_cached' : 'default_cdn';
   return cachedUrl ? 'cached' : 'missing';
 }
 
 // search-index shape: [appId, title, tier, pdb, pulse, appType, releaseYear, delisted, adult]
-function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, scope, status }) {
+function _buildRows({ searchIndex, gameImages, nonSteam, overrideMap }, { store, textFilter, scope, status }) {
   const q = String(textFilter || '').trim().toLowerCase();
   const rows = [];
   for (const row of searchIndex) {
@@ -55,20 +66,20 @@ function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, 
     const type  = row[5] || (appId.startsWith('gog:') ? 'gog' : appId.startsWith('epic:') ? 'epic' : 'steam');
     if (store && store !== 'all' && store !== type) continue;
     if (q && !title.toLowerCase().includes(q) && !appId.startsWith(q)) continue;
+    const override = overrideMap ? overrideMap[appId] : null;
     let cachedUrl = null;
     if (type === 'steam') cachedUrl = gameImages[appId] || null;
     else                   cachedUrl = nonSteam[appId] || null;
-    const derivedStatus = _deriveStatus(type, cachedUrl);
+    const derivedStatus = _deriveStatus(type, cachedUrl, !!override);
     // scope filter: has = row is presumed to display box art
-    // (Steam default CDN OR any cached URL). missing = only rows we
-    // know don't display box art (non-Steam with no cached URL and
-    // no store CDN fallback). Steam default-CDN rows are NOT missing
-    // -- they display the standard header URL unless probed and 404'd.
+    // (Steam default CDN OR any cached URL OR override). missing =
+    // only rows we know don't display box art (non-Steam with no
+    // cached URL, no override, and no store CDN fallback).
     if (scope === 'has'     && derivedStatus === 'missing') continue;
     if (scope === 'missing' && derivedStatus !== 'missing') continue;
     // status filter: exact match against derived status label.
     if (status && status !== 'all' && status !== derivedStatus) continue;
-    rows.push({ appId, title, type, cachedUrl, derivedStatus });
+    rows.push({ appId, title, type, cachedUrl, derivedStatus, override });
   }
   return rows;
 }
@@ -82,6 +93,10 @@ function _buildRows({ searchIndex, gameImages, nonSteam }, { store, textFilter, 
 //   - non-Steam + cached   -> we have a URL from the store's catalog
 //   - non-Steam + no cache -> genuinely missing (no store CDN fallback available)
 function _initialStatusHtml(r) {
+  if (r.override) {
+    const src = String(r.override.source || 'manual');
+    return `<span class="admin-badge admin-badge--ok" title="Admin override (${escapeHtml(src)}) -- pipeline preserves this on every run">Admin override</span>`;
+  }
   if (r.type === 'steam') {
     if (r.cachedUrl) return '<span class="admin-badge admin-badge--info" title="Pipeline stored a hashed fallback URL (standard CDN 404\'d at build time)">Fallback cached</span>';
     return '<span class="admin-badge admin-badge--muted" title="No fallback needed; standard Steam CDN presumed working. Click Probe to verify.">Default CDN</span>';
@@ -107,6 +122,7 @@ function _renderShell() {
       </select>
       <select id="boxart-status" class="admin-select" title="Fine filter: match the exact status column value">
         <option value="all">Any status</option>
+        <option value="override">Admin override</option>
         <option value="default_cdn">Default CDN (Steam, no fallback saved)</option>
         <option value="fallback_cached">Fallback cached (Steam, pipeline saved URL)</option>
         <option value="cached">Cached (GOG/Epic with catalog URL)</option>
@@ -117,10 +133,23 @@ function _renderShell() {
       <button class="admin-btn" id="boxart-cancel-btn" hidden>Cancel</button>
     </div>
     <p class="admin-hint" style="margin:8px 0 12px">
-      Loads search-index.json + game-images.json + nonsteam-images.json in this browser.
-      "Probe" HEADs the canonical URL. "Refetch" hits the store's live API (Steam appdetails
-      for Steam; URL re-probe for GOG/Epic) and reports the URL or a human-readable error.
+      Loads search-index.json + game-images.json + nonsteam-images.json + box_art_overrides in this browser.
+      Probe HEADs the canonical URL. Refetch asks the store's API (Steam appdetails / SGDB) for the current URL.
+      Set URL and Upload write to box_art_overrides -- the pipeline preserves those on every rerun. Clear removes the override.
     </p>
+    <input type="file" id="boxart-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none">
+    <div id="boxart-modal-backdrop" class="admin-modal-backdrop" hidden aria-hidden="true">
+      <div class="admin-modal" style="padding: 20px; min-width: 380px; max-width: 90vw">
+        <h3 class="admin-modal-title">Set custom box art URL</h3>
+        <p class="admin-modal-sub" style="margin:6px 0 12px">Overrides the CDN and pipeline fallbacks. Preserved across pipeline reruns until you Clear it.</p>
+        <input type="url" id="boxart-modal-input" class="admin-input" placeholder="https://example.com/header.jpg" style="width:100%">
+        <div class="admin-modal-actions" style="margin-top:14px">
+          <button class="admin-btn" data-modal-action="cancel">Cancel</button>
+          <button class="admin-btn admin-btn--primary" data-modal-action="save">Save override</button>
+        </div>
+        <p id="boxart-modal-error" class="admin-error" hidden style="margin-top:10px"></p>
+      </div>
+    </div>
     <div id="boxart-loading" class="admin-loading">Loading indexes...</div>
     <div id="boxart-batch-progress" class="admin-counts" hidden></div>
     <div id="boxart-count" class="admin-counts" hidden></div>
@@ -190,6 +219,9 @@ function _renderRow(r) {
         <button class="admin-btn" data-action="probe" title="HEAD the canonical URL">Probe</button>
         <button class="admin-btn" data-action="refetch" title="Ask the store's API for the current header URL">Refetch</button>
         <button class="admin-btn" data-action="sgdb" title="Fetch from SteamGridDB (community artwork)">SGDB</button>
+        <button class="admin-btn" data-action="set-url" title="Set a custom URL that survives pipeline reruns">Set URL</button>
+        <button class="admin-btn" data-action="upload" title="Upload an image (PNG/JPG/WebP, <= 2 MB)">Upload</button>
+        <button class="admin-btn admin-btn--danger" data-action="clear" title="Remove the admin override" ${r.override ? '' : 'hidden'}>Clear</button>
       </td>
     </tr>`;
 }
@@ -406,15 +438,106 @@ export async function renderBoxartAdmin() {
     setTimeout(() => { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; }, 1500);
   });
 
+  // Modal + upload input handles for admin override actions.
+  const modal      = document.getElementById('boxart-modal-backdrop');
+  const modalInput = document.getElementById('boxart-modal-input');
+  const modalErr   = document.getElementById('boxart-modal-error');
+  const uploadInp  = document.getElementById('boxart-upload-input');
+  let   modalContext = null;   // { tr, appId }
+
+  function _openSetUrlModal(tr) {
+    modalContext = { tr, appId: tr.dataset.appid };
+    modalInput.value = tr.dataset.cached || '';
+    modalErr.hidden = true; modalErr.textContent = '';
+    modal.hidden = false; modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => modalInput.focus(), 0);
+  }
+  function _closeModal() {
+    modal.hidden = true; modal.setAttribute('aria-hidden', 'true');
+    modalContext = null;
+  }
+  modal.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-modal-action]');
+    if (!btn) return;
+    if (btn.dataset.modalAction === 'cancel') return _closeModal();
+    if (btn.dataset.modalAction === 'save' && modalContext) {
+      const url = modalInput.value.trim();
+      btn.disabled = true;
+      modalErr.hidden = true;
+      const result = await setBoxArtOverride(modalContext.appId, url);
+      btn.disabled = false;
+      if (!result.ok) {
+        modalErr.hidden = false;
+        modalErr.textContent = result.error || 'save failed';
+        return;
+      }
+      _applyOverrideToRow(modalContext.tr, modalContext.appId, { image_url: result.url, source: 'manual' });
+      _closeModal();
+    }
+  });
+  // Upload input fires 'change' when a file is picked. modalContext is
+  // repurposed to remember which row triggered the picker.
+  uploadInp.addEventListener('change', async () => {
+    const file = uploadInp.files?.[0];
+    if (!file || !modalContext) { uploadInp.value = ''; return; }
+    const { tr, appId } = modalContext;
+    const statusEl = tr.querySelector('.boxart-status');
+    statusEl.innerHTML = '<span class="admin-muted">uploading...</span>';
+    const result = await uploadBoxArtOverride(appId, file);
+    uploadInp.value = ''; // allow re-picking the same file later
+    if (!result.ok) {
+      _paintStatus(statusEl, result);
+      return;
+    }
+    _applyOverrideToRow(tr, appId, { image_url: result.url, source: 'upload' });
+  });
+
+  // After a set/upload succeeds we mutate the row locally so the admin
+  // sees Admin override without reloading. Also updates the in-memory
+  // overrideMap so refilter() keeps this row visible if the status
+  // filter is set to "override".
+  function _applyOverrideToRow(tr, appId, override) {
+    if (!indexes.overrideMap) indexes.overrideMap = {};
+    indexes.overrideMap[appId] = { app_id: appId, ...override };
+    const r = state.rows.find(x => x.appId === appId);
+    if (r) { r.override = indexes.overrideMap[appId]; r.derivedStatus = 'override'; }
+    const statusEl = tr.querySelector('.boxart-status');
+    if (statusEl) statusEl.innerHTML = `<span class="admin-badge admin-badge--ok" title="Admin override (${escapeHtml(override.source)}) -- pipeline preserves this on every run">Admin override</span> <a href="${escapeHtml(override.image_url)}" target="_blank" rel="noopener" class="admin-link">view</a>`;
+    const clearBtn = tr.querySelector('button[data-action="clear"]');
+    if (clearBtn) clearBtn.hidden = false;
+  }
+  function _removeOverrideFromRow(tr, appId) {
+    if (indexes.overrideMap) delete indexes.overrideMap[appId];
+    const r = state.rows.find(x => x.appId === appId);
+    if (r) { r.override = null; r.derivedStatus = _deriveStatus(r.type, r.cachedUrl, false); }
+    const statusEl = tr.querySelector('.boxart-status');
+    if (statusEl && r) statusEl.innerHTML = _initialStatusHtml(r);
+    const clearBtn = tr.querySelector('button[data-action="clear"]');
+    if (clearBtn) clearBtn.hidden = true;
+  }
+
   table.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-action]');
     if (!btn) return;
     const tr = btn.closest('tr');
+    const appId = tr.dataset.appid;
     btn.disabled = true;
     try {
-      if (btn.dataset.action === 'probe') await _probeRow(tr, indexes.gameImages);
-      else if (btn.dataset.action === 'refetch') await _refetchRow(tr);
-      else if (btn.dataset.action === 'sgdb') await _sgdbRow(tr);
+      const action = btn.dataset.action;
+      if (action === 'probe') await _probeRow(tr, indexes.gameImages);
+      else if (action === 'refetch') await _refetchRow(tr);
+      else if (action === 'sgdb') await _sgdbRow(tr);
+      else if (action === 'set-url') _openSetUrlModal(tr);
+      else if (action === 'upload') {
+        modalContext = { tr, appId };
+        uploadInp.click();
+      }
+      else if (action === 'clear') {
+        if (!confirm(`Remove the admin override for ${appId}? This can't be undone.`)) return;
+        const result = await clearBoxArtOverride(appId);
+        if (result.ok) _removeOverrideFromRow(tr, appId);
+        else _paintStatus(tr.querySelector('.boxart-status'), result);
+      }
     } finally {
       btn.disabled = false;
     }

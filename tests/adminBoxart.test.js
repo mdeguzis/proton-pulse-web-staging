@@ -66,13 +66,34 @@ describe('Missing Box Art component contract', () => {
     expect(COMP).toContain('id="boxart-cancel-btn"');
   });
 
-  test('status filter offers the four derived status values', () => {
+  test('status filter offers the five derived status values (incl. override)', () => {
     // These match _deriveStatus() output. If a status key is renamed
     // both the option value AND the filter branch have to move together.
+    expect(COMP).toContain('value="override"');
     expect(COMP).toContain('value="default_cdn"');
     expect(COMP).toContain('value="fallback_cached"');
     expect(COMP).toContain('value="cached"');
     expect(COMP).toMatch(/<option value="missing">Missing/);
+  });
+
+  test('per-row actions include admin override controls', () => {
+    expect(COMP).toContain('data-action="set-url"');
+    expect(COMP).toContain('data-action="upload"');
+    expect(COMP).toContain('data-action="clear"');
+  });
+
+  test('set-url modal + hidden file input for uploads exist', () => {
+    expect(COMP).toContain('id="boxart-modal-backdrop"');
+    expect(COMP).toContain('id="boxart-modal-input"');
+    expect(COMP).toContain('id="boxart-upload-input"');
+    // File picker restricts to image mimes matching the storage bucket allowlist.
+    expect(COMP).toContain('accept="image/png,image/jpeg,image/webp"');
+  });
+
+  test('admin override status label is present and hyperlinks to the URL', () => {
+    expect(COMP).toContain('Admin override');
+    // Override rows show a "view" link so the admin can confirm the URL.
+    expect(COMP).toMatch(/admin-link[^"]*">view</);
   });
 
   test('scope="missing" no longer catches Steam default-CDN rows', () => {
@@ -82,7 +103,7 @@ describe('Missing Box Art component contract', () => {
     // rows we know have no source) not raw cachedUrl presence.
     expect(COMP).toMatch(/scope === 'has'\s+&& derivedStatus === 'missing'/);
     expect(COMP).toMatch(/scope === 'missing' && derivedStatus !== 'missing'/);
-    expect(COMP).toMatch(/function _deriveStatus\(type, cachedUrl\)/);
+    expect(COMP).toMatch(/function _deriveStatus\(type, cachedUrl, hasOverride\)/);
   });
 
   test('game title hyperlinks to the app page so admins can jump to it', () => {
@@ -124,12 +145,37 @@ describe('Missing Box Art component contract', () => {
 });
 
 describe('boxart API contract', () => {
-  test('exports the four probe/refetch entry points', () => {
+  test('exports the probe/refetch entry points', () => {
     expect(API).toMatch(/export async function probeImageUrl\(/);
     expect(API).toMatch(/export async function probeSteamHeader\(/);
     expect(API).toMatch(/export async function refetchSteamHeader\(/);
     expect(API).toMatch(/export async function refetchNonSteamHeader\(/);
     expect(API).toMatch(/export async function refetchSgdbHeader\(/);
+  });
+
+  test('exports admin override write + list entry points', () => {
+    expect(API).toMatch(/export async function setBoxArtOverride\(/);
+    expect(API).toMatch(/export async function uploadBoxArtOverride\(/);
+    expect(API).toMatch(/export async function clearBoxArtOverride\(/);
+    expect(API).toMatch(/export async function listBoxArtOverrides\(/);
+  });
+
+  test('override writes send an admin JWT (not the anon key)', () => {
+    // The edge function verifies manage_box_art permission via the JWT.
+    // Anon-key-only requests must be rejected with 401.
+    expect(API).toContain('SupaAuth.getSession');
+    expect(API).toMatch(/Authorization:\s*`Bearer \$\{session\.access_token\}`/);
+  });
+
+  test('upload uses multipart FormData with app_id + source + file', () => {
+    expect(API).toContain('new FormData()');
+    expect(API).toMatch(/form\.append\('app_id'/);
+    expect(API).toMatch(/form\.append\('source', 'upload_override'/);
+    expect(API).toMatch(/form\.append\('file'/);
+  });
+
+  test('listBoxArtOverrides reads via anon-key REST (RLS grants SELECT to anon)', () => {
+    expect(API).toContain('/rest/v1/box_art_overrides?select=');
   });
 
   test('refetch routes through the image-refetch edge function (not browser -> steam)', () => {

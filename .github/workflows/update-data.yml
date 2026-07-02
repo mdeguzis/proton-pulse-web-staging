@@ -295,6 +295,12 @@ jobs:
           # own APIs yield no header URL. Key is optional -- pipeline
           # tags the row "missing" cleanly if unset.
           SGDB_API_KEY: ${{ secrets.SGDB_API_KEY }}
+          # Anon key + URL let game_images.py fetch admin overrides
+          # (box_art_overrides table) via the anon-readable REST
+          # endpoint. Optional -- if unset the pipeline runs as before
+          # without seeding overrides.
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           uv run python scripts/split_reports.py finalize --skip-probe \
             /tmp/protondb-output

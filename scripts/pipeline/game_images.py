@@ -40,6 +40,13 @@ SGDB_API_KEY = os.environ.get("SGDB_API_KEY", "").strip()
 SGDB_STEAM_LOOKUP = "https://www.steamgriddb.com/api/v2/games/steam/{appid}"
 SGDB_GRIDS_URL    = "https://www.steamgriddb.com/api/v2/grids/game/{game_id}?dimensions=460x215&types=static"
 
+# Admin overrides: box_art_overrides table on Supabase. Reads use the
+# anon key -- the table's RLS grants SELECT to anon so the pipeline
+# doesn't need a service role key. Empty envs => skip the fetch and
+# proceed as before.
+SUPABASE_URL      = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+
 STEAM_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails?appids={appid}&filters=basic"
 STEAM_STORE_PAGE_URL = "https://store.steampowered.com/app/{appid}/"
 REQUEST_DELAY = 0.3       # seconds between Steam API calls
@@ -54,6 +61,41 @@ CANARY_APPID = "220"
 
 def _standard_header_url(app_id: str) -> str:
     return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg"
+
+
+def _fetch_admin_overrides(timeout: int = 10) -> dict[str, dict]:
+    """Fetch all rows from Supabase box_art_overrides via the anon REST API.
+
+    Returns { app_id: {image_url, source, updated_at} }. Empty dict on any
+    failure (missing env, HTTP error, bad JSON) -- the pipeline continues
+    without overrides in that case, same as before overrides existed.
+    """
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        log("[game-images] admin overrides: SUPABASE_URL/ANON_KEY unset, skipping fetch")
+        return {}
+    url = f"{SUPABASE_URL}/rest/v1/box_art_overrides?select=app_id,image_url,source,updated_at"
+    req = urllib.request.Request(url, headers={
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        "Accept": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            rows = json.loads(r.read())
+    except Exception as e:
+        log(f"[game-images] admin overrides fetch failed: {e}")
+        return {}
+    if not isinstance(rows, list):
+        log(f"[game-images] admin overrides fetch: unexpected shape {type(rows).__name__}")
+        return {}
+    out = {}
+    for row in rows:
+        aid = str(row.get("app_id") or "").strip()
+        img = row.get("image_url")
+        if aid and img:
+            out[aid] = {"image_url": img, "source": row.get("source"), "updated_at": row.get("updated_at")}
+    log(f"[game-images] admin overrides: {len(out)} row(s) loaded")
+    return out
 
 
 def _fetch_sgdb_header(app_id: str, timeout: int = 8) -> str | None:
@@ -324,15 +366,31 @@ def build_game_images(output_dir) -> dict[str, str]:
     if not cache:
         _migrate_legacy(output_dir, cache)
 
+    # Admin overrides are the top of the fallback chain and MUST survive
+    # every pipeline rerun. Seed the cache with them BEFORE any probing
+    # so the skip-check below excludes them from hot/backlog lists.
+    override_map = _fetch_admin_overrides()
+    today_iso = date.today().isoformat()
+    for aid, ov in override_map.items():
+        cache[aid] = {
+            "status": "override",
+            "url": ov["image_url"],
+            "source": ov.get("source"),
+            "probed_at": today_iso,
+        }
+
     all_ids = _collect_all_app_ids(data_dir)
     hot_ids = _hot_app_ids(output_dir)
     hot_set = set(hot_ids)
 
-    # Hot: probe if uncached or stale
-    hot_to_probe = [a for a in hot_ids if a not in cache or _is_stale(cache[a])]
+    # Hot: probe if uncached or stale (but never re-probe an override)
+    hot_to_probe = [
+        a for a in hot_ids
+        if a not in override_map and (a not in cache or _is_stale(cache[a]))
+    ]
     # Backlog: probe if uncached OR if hashed entry is stale (cover art hash may change), cap applies
     backlog_to_probe = [
-        a for a in all_ids if a not in hot_set and (
+        a for a in all_ids if a not in hot_set and a not in override_map and (
             a not in cache or
             (cache[a].get("status") == "hashed" and _is_stale(cache[a]))
         )
@@ -344,7 +402,7 @@ def build_game_images(output_dir) -> dict[str, str]:
     extended_seen = hot_set | set(all_ids)
     extended_to_probe = [
         a for a in _extended_steam_ids(output_dir)
-        if a not in extended_seen and a not in cache
+        if a not in extended_seen and a not in override_map and a not in cache
     ]
     backlog_to_probe += extended_to_probe
 
@@ -411,16 +469,20 @@ def build_game_images(output_dir) -> dict[str, str]:
     # Both categories represent "the frontend needs a non-standard URL
     # for this app" -- the fallback chain in steam-img.js reads this
     # map after the standard CDN 404s.
+    # override entries beat all other sources in the frontend map so
+    # the fallback chain in steam-img.js finds them first when the
+    # standard CDN 404s.
     frontend = {
         aid: e["url"]
         for aid, e in cache.items()
-        if e.get("status") in ("hashed", "sgdb") and e.get("url")
+        if e.get("status") in ("override", "hashed", "sgdb") and e.get("url")
     }
     frontend_path = output_dir / "game-images.json"
     frontend_path.write_text(json.dumps(frontend, indent=2) + "\n", encoding="utf-8")
-    hashed_ct = sum(1 for e in cache.values() if e.get("status") == "hashed")
-    sgdb_ct   = sum(1 for e in cache.values() if e.get("status") == "sgdb")
-    log(f"[game-images] wrote {len(frontend)} URL(s) to {frontend_path.name} ({hashed_ct} hashed, {sgdb_ct} sgdb)")
+    override_ct = sum(1 for e in cache.values() if e.get("status") == "override")
+    hashed_ct   = sum(1 for e in cache.values() if e.get("status") == "hashed")
+    sgdb_ct     = sum(1 for e in cache.values() if e.get("status") == "sgdb")
+    log(f"[game-images] wrote {len(frontend)} URL(s) to {frontend_path.name} ({override_ct} override, {hashed_ct} hashed, {sgdb_ct} sgdb)")
 
     return frontend
 
