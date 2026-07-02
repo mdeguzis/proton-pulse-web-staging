@@ -164,9 +164,11 @@ type SgdbSearchOk = {
 };
 type SgdbSearchFail = { ok: false; source: "sgdb_search"; error: string; status?: number };
 
-async function _sgdbSearch(appId: string, term: string): Promise<SgdbSearchOk | SgdbSearchFail> {
+async function _sgdbSearch(appId: string, term: string, dimensions: string): Promise<SgdbSearchOk | SgdbSearchFail> {
   const key = Deno.env.get("SGDB_API_KEY");
   if (!key) return { ok: false, source: "sgdb_search", error: "SGDB_API_KEY not configured on the server" };
+  // Only allow digits, x, and comma through to the upstream query string.
+  const dimSafe = /^[0-9x,]+$/.test(dimensions) ? dimensions : "";
 
   let gameId: number | null = null;
   let gameName = "";
@@ -197,9 +199,11 @@ async function _sgdbSearch(appId: string, term: string): Promise<SgdbSearchOk | 
 
   let gridsRes: Response;
   try {
-    // No dimensions filter -- return every static grid so the admin sees all
-    // options. types=static excludes animated grids.
-    gridsRes = await fetch(`${SGDB_BASE}/grids/game/${gameId}?types=static`, {
+    // types=static excludes animated grids. dimensions is optional -- when
+    // empty every static grid is returned; otherwise it is a comma-separated
+    // allowlist (e.g. "460x215,920x430" for widescreen box-art shapes).
+    const dimQuery = dimSafe ? `&dimensions=${dimSafe}` : "";
+    gridsRes = await fetch(`${SGDB_BASE}/grids/game/${gameId}?types=static${dimQuery}`, {
       headers: { Authorization: `Bearer ${key}` },
     });
   } catch (e) {
@@ -364,6 +368,7 @@ Deno.serve(async (req: Request) => {
   let source = "steam";
   let overrideUrl = "";
   let searchTerm = "";
+  let searchDims = "";
   if (isMultipart) {
     // Clone so downstream _uploadOverride can re-read the body.
     const clone = req.clone();
@@ -371,12 +376,13 @@ Deno.serve(async (req: Request) => {
     appId = String(form?.get("app_id") ?? "").trim();
     source = String(form?.get("source") ?? "upload_override").trim().toLowerCase();
   } else {
-    let body: { app_id?: string; source?: string; url?: string; term?: string } | null = null;
+    let body: { app_id?: string; source?: string; url?: string; term?: string; dimensions?: string } | null = null;
     try { body = await req.json(); } catch { /* fall through */ }
     appId = String(body?.app_id ?? "").trim();
     source = String(body?.source ?? "steam").trim().toLowerCase();
     overrideUrl = String(body?.url ?? "").trim();
     searchTerm = String(body?.term ?? "").trim();
+    searchDims = String(body?.dimensions ?? "").trim();
   }
 
   if (!appId) {
@@ -396,8 +402,8 @@ Deno.serve(async (req: Request) => {
     return Response.json(result, { status: 200, headers: corsHeaders });
   }
   if (source === "sgdb_search") {
-    const result = await _sgdbSearch(appId, searchTerm);
-    console.log(`[image-refetch] source=sgdb_search app=${appId} term="${searchTerm}" ok=${result.ok} ${result.ok ? `${result.results.length} results via ${result.resolved_via}` : result.error}`);
+    const result = await _sgdbSearch(appId, searchTerm, searchDims);
+    console.log(`[image-refetch] source=sgdb_search app=${appId} term="${searchTerm}" dims="${searchDims}" ok=${result.ok} ${result.ok ? `${result.results.length} results via ${result.resolved_via}` : result.error}`);
     return Response.json(result, { status: 200, headers: corsHeaders });
   }
   if (source === "set_override") {

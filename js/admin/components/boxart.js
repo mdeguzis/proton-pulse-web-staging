@@ -18,7 +18,7 @@ import { escapeHtml } from '../utils.js?v=bd5a67c2';
 import {
   probeSteamHeader, refetchSteamHeader, refetchNonSteamHeader, refetchSgdbHeader, searchSgdb,
   setBoxArtOverride, uploadBoxArtOverride, clearBoxArtOverride, listBoxArtOverrides,
-} from '../api/boxart.js?v=f70d5e9a';
+} from '../api/boxart.js?v=c99238ee';
 
 // Strip trademark / registered / service-mark symbols (and collapse the
 // whitespace they leave behind) from a store title so it works as a
@@ -588,14 +588,26 @@ function _sgdbPanelHtml(row) {
   const byIdBtn = row.type === 'steam'
     ? `<button class="admin-btn" data-sgdb="search-id" title="Search by Steam app id instead of the title">By Steam id</button>`
     : '';
+  // External link to the SteamGridDB website for manual inspection (opens the
+  // same search in the browser). Uses the raw title -- the site handles the
+  // trademark symbol in its own search.
+  const webHref = `https://www.steamgriddb.com/search/grids?term=${encodeURIComponent(row.title || row.appId)}`;
   return `
     <div class="admin-card" style="padding:14px 16px; margin-top:16px">
       <div class="admin-subhead">SteamGridDB artwork</div>
       <p class="admin-hint" style="margin:6px 0 10px">Search community artwork and set one as the box art override. The term defaults to the title with trademark symbols stripped; edit it to broaden or fix the search.</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
-        <input id="sgdb-term" class="admin-input" type="text" value="${escapeHtml(term)}" placeholder="Search SteamGridDB by title" style="flex:1 1 260px; min-width:0">
+        <input id="sgdb-term" class="admin-input" type="text" value="${escapeHtml(term)}" placeholder="Search SteamGridDB by title" style="flex:0 1 300px; min-width:0">
+        <select id="sgdb-dims" class="admin-select" title="Filter results by grid dimensions. Box art is a 460x215 header, so Widescreen is the right shape.">
+          <option value="460x215,920x430" selected>Widescreen (460x215, 920x430)</option>
+          <option value="600x900">Vertical (600x900)</option>
+          <option value="342x482,660x930">Galaxy (342x482, 660x930)</option>
+          <option value="512x512,1024x1024">Square (512x512, 1024x1024)</option>
+          <option value="">Any dimensions</option>
+        </select>
         <button class="admin-btn admin-btn--primary" data-sgdb="search">Search</button>
         ${byIdBtn}
+        <a class="admin-btn" href="${escapeHtml(webHref)}" target="_blank" rel="noopener" title="Open this search on the SteamGridDB website for manual inspection">Open on SteamGridDB</a>
       </div>
       <p id="sgdb-status" class="admin-hint" style="margin:10px 0 0" hidden></p>
       <div id="sgdb-results" class="sgdb-results"></div>
@@ -615,7 +627,9 @@ function _sgdbResultsHtml(payload) {
     const dims = `${g.width || '?'}x${g.height || '?'}${g.style ? ' · ' + escapeHtml(g.style) : ''}`;
     return `
       <div class="sgdb-card">
-        <img class="sgdb-thumb" src="${escapeHtml(g.thumb || g.url)}" alt="SteamGridDB grid ${escapeHtml(String(g.id || ''))}" loading="lazy" onerror="this.style.opacity=0.25">
+        <a class="sgdb-thumb-link" href="${escapeHtml(g.url)}" target="_blank" rel="noopener" title="Open the full-size image in a new tab">
+          <img class="sgdb-thumb" src="${escapeHtml(g.thumb || g.url)}" alt="SteamGridDB grid ${escapeHtml(String(g.id || ''))}" loading="lazy" onerror="this.style.opacity=0.25">
+        </a>
         <div class="sgdb-meta">${dims}</div>
         <button class="admin-btn admin-btn--primary sgdb-set" data-sgdb-set="${escapeHtml(g.url)}">Set as box art</button>
       </div>`;
@@ -656,11 +670,6 @@ function _detailBodyHtml(row, currentLiveUrl, currentSource) {
     ? `<a href="${escapeHtml(storeHref)}" target="_blank" rel="noopener" class="admin-link">Open on ${escapeHtml(type)} store</a>`
     : `<span class="admin-muted">no store link</span>`;
   const gamePageLink = `<a href="${_appHref(appId)}" target="_blank" rel="noopener" class="admin-link">Open game page</a>`;
-  // Direct link to a SteamGridDB grid search for manual inspection -- opens the
-  // same results the sgdb_search panel queries, in the browser. Uses the raw
-  // title (SteamGridDB handles the trademark symbol fine in its own search).
-  const sgdbSearchHref = `https://www.steamgriddb.com/search/grids?term=${encodeURIComponent(title || appId)}`;
-  const sgdbSearchLink = `<a href="${escapeHtml(sgdbSearchHref)}" target="_blank" rel="noopener" class="admin-link">Search on SteamGridDB</a>`;
 
   // Standard Steam URLs (only meaningful for type=steam).
   const akamaiUrl     = type === 'steam' ? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${encodeURIComponent(appId)}/header.jpg` : null;
@@ -685,7 +694,7 @@ function _detailBodyHtml(row, currentLiveUrl, currentSource) {
         <div class="admin-subhead">Preview</div>
         <img id="boxart-detail-preview" src="${escapeHtml(previewSrc)}" alt="header preview" style="width:100%; height:auto; display:block; border-radius:6px; background: rgba(255,255,255,0.05)"
              onerror="this.style.opacity=0.3; this.alt='(preview failed to load)'">
-        <p class="admin-hint" style="margin:8px 0 0">${gamePageLink} &middot; ${storeLink} &middot; ${sgdbSearchLink}</p>
+        <p class="admin-hint" style="margin:8px 0 0">${gamePageLink} &middot; ${storeLink}</p>
       </div>
 
       <div class="admin-card" style="padding:0; overflow:hidden">
@@ -810,9 +819,10 @@ export async function renderBoxartAdminDetail(appId) {
       if (searchBtn) {
         const byId = searchBtn.dataset.sgdb === 'search-id';
         const term = byId ? '' : (document.getElementById('sgdb-term')?.value || '').trim();
+        const dims = document.getElementById('sgdb-dims')?.value || '';
         sgdbStatus('Searching SteamGridDB...');
         searchBtn.disabled = true;
-        const payload = await searchSgdb(row.appId, term);
+        const payload = await searchSgdb(row.appId, term, dims);
         searchBtn.disabled = false;
         const resultsEl = document.getElementById('sgdb-results');
         if (resultsEl) resultsEl.innerHTML = _sgdbResultsHtml(payload);

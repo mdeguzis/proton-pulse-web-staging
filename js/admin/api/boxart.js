@@ -114,12 +114,12 @@ export async function refetchSgdbHeader(appId) {
 // pick from. `term` searches by title (empty term falls back to the Steam-id
 // lookup). Returns the raw proxy payload: { ok, game, results[] } or
 // { ok:false, error }. Each result has { id, url, thumb, width, height, style }.
-export async function searchSgdb(appId, term = '') {
+export async function searchSgdb(appId, term = '', dimensions = '') {
   try {
     const res = await fetch(IMAGE_REFETCH_ENDPOINT(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app_id: String(appId), source: 'sgdb_search', term: String(term || '') }),
+      body: JSON.stringify({ app_id: String(appId), source: 'sgdb_search', term: String(term || ''), dimensions: String(dimensions || '') }),
       cache: 'no-store',
     });
     const body = await res.json().catch(() => null);

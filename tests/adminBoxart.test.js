@@ -283,9 +283,25 @@ describe('SteamGridDB search-and-pick', () => {
     expect(COMP).toContain('searchSgdb');
   });
 
-  test('detail view links to a SteamGridDB grid search for manual inspection', () => {
+  test('panel links to the SteamGridDB website and has a dimension filter', () => {
     expect(COMP).toContain('steamgriddb.com/search/grids?term=');
-    expect(COMP).toContain('Search on SteamGridDB');
-    expect(COMP).toContain('${sgdbSearchLink}');
+    expect(COMP).toContain('Open on SteamGridDB');
+    expect(COMP).toContain('id="sgdb-dims"');
+    // widescreen (460x215 header shape) is the default box-art dimension
+    expect(COMP).toContain('value="460x215,920x430" selected');
+  });
+
+  test('grid thumbnails open the full-size image in a new tab', () => {
+    expect(COMP).toContain('class="sgdb-thumb-link"');
+    expect(COMP).toContain('href="${escapeHtml(g.url)}" target="_blank"');
+  });
+
+  test('dimension filter flows through the api and edge function (sanitized)', () => {
+    expect(API).toContain('dimensions: String(dimensions');
+    expect(COMP).toContain("document.getElementById('sgdb-dims')?.value");
+    expect(COMP).toContain('searchSgdb(row.appId, term, dims)');
+    expect(EDGE).toContain('dimensions: string');
+    expect(EDGE).toContain('/^[0-9x,]+$/.test(dimensions)');
+    expect(EDGE).toContain('&dimensions=${dimSafe}');
   });
 });
