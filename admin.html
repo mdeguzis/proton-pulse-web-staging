@@ -306,6 +306,28 @@
         <div id="boxart-content"></div>
       </section>
 
+      <!-- Box Art Detail (navigated to via ?boxart=<appId>) -->
+      <section id="tab-boxart-detail" class="admin-section" hidden>
+        <div id="boxart-detail-content"></div>
+      </section>
+
+      <!-- Shared boxart chrome (modal + file picker). Used by both the
+           list view and the detail view so a single instance handles
+           set-url and upload actions from either place. -->
+      <input type="file" id="boxart-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none">
+      <div id="boxart-modal-backdrop" class="admin-modal-backdrop" hidden aria-hidden="true">
+        <div class="admin-modal" style="padding: 20px; min-width: 380px; max-width: 90vw">
+          <h3 class="admin-modal-title">Set custom box art URL</h3>
+          <p class="admin-modal-sub" style="margin:6px 0 12px">Overrides the CDN and pipeline fallbacks. Preserved across pipeline reruns until you Clear it.</p>
+          <input type="url" id="boxart-modal-input" class="admin-input" placeholder="https://example.com/header.jpg" style="width:100%">
+          <div class="admin-modal-actions" style="margin-top:14px">
+            <button class="admin-btn" data-modal-action="cancel">Cancel</button>
+            <button class="admin-btn admin-btn--primary" data-modal-action="save">Save override</button>
+          </div>
+          <p id="boxart-modal-error" class="admin-error" hidden style="margin-top:10px"></p>
+        </div>
+      </div>
+
     </div><!-- /admin-panel -->
 
     <!-- Ban reason modal -->
@@ -332,6 +354,6 @@
 <script src="js/lib/analytics.js?v=e6dfbad8"></script>
 <script src="js/lib/topbar.js?v=48d8ca3b"></script>
 <script src="js/lib/toast.js?v=7bb23014"></script>
-<script type="module" src="js/admin/main.js?v=81f29c16"></script>
+<script type="module" src="js/admin/main.js?v=0993bcee"></script>
 </body>
 </html>

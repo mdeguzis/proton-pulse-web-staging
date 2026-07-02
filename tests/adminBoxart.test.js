@@ -27,9 +27,11 @@ describe('Box Art Manager admin tab wiring', () => {
     expect(HTML).toContain('id="boxart-content"');
   });
 
-  test('admin main.js registers the loader in TAB_LOADERS', () => {
-    expect(MAIN).toMatch(/import\s*\{\s*renderBoxartAdmin\s*\}\s*from\s*'\.\/components\/boxart\.js/);
+  test('admin main.js registers the loader + detail route in TAB_LOADERS', () => {
+    expect(MAIN).toMatch(/import\s*\{\s*renderBoxartAdmin(?:,\s*renderBoxartAdminDetail)?\s*(?:,\s*[a-zA-Z_$][a-zA-Z0-9_$]*)*\s*\}\s*from\s*'\.\/components\/boxart\.js/);
     expect(MAIN).toMatch(/boxart:\s*\(\)\s*=>\s*renderBoxartAdmin\(\)/);
+    expect(MAIN).toContain('renderBoxartAdminDetail');
+    expect(MAIN).toMatch(/params\.get\('boxart'\)/);
   });
 
   test('boxart tab is gated by the same permission as analytics', () => {
@@ -76,18 +78,46 @@ describe('Missing Box Art component contract', () => {
     expect(COMP).toMatch(/<option value="missing">Missing/);
   });
 
-  test('per-row actions include admin override controls', () => {
-    expect(COMP).toContain('data-action="set-url"');
-    expect(COMP).toContain('data-action="upload"');
-    expect(COMP).toContain('data-action="clear"');
+  test('list-view row action is a single Details link', () => {
+    // Previous versions rendered a 6-button pile per row (Probe /
+    // Refetch / SGDB / Set URL / Upload / Clear). Those moved to the
+    // detail view; the list row now only has one primary Details link.
+    expect(COMP).toContain('data-action="details"');
+    expect(COMP).toMatch(/href="\?boxart=\$\{encodeURIComponent\(r\.appId\)\}"/);
   });
 
-  test('set-url modal + hidden file input for uploads exist', () => {
-    expect(COMP).toContain('id="boxart-modal-backdrop"');
-    expect(COMP).toContain('id="boxart-modal-input"');
-    expect(COMP).toContain('id="boxart-upload-input"');
-    // File picker restricts to image mimes matching the storage bucket allowlist.
-    expect(COMP).toContain('accept="image/png,image/jpeg,image/webp"');
+  test('detail view exports render function and holds all action buttons', () => {
+    expect(COMP).toMatch(/export async function renderBoxartAdminDetail\(appId\)/);
+    // All six actions still exist -- just relocated to the detail view.
+    // They live in the _DETAIL_ACTIONS array which _detailActionsHtml
+    // renders as data-action="<action>" buttons.
+    expect(COMP).toMatch(/action:\s*'probe'/);
+    expect(COMP).toMatch(/action:\s*'refetch'/);
+    expect(COMP).toMatch(/action:\s*'sgdb'/);
+    expect(COMP).toMatch(/action:\s*'set-url'/);
+    expect(COMP).toMatch(/action:\s*'upload'/);
+    expect(COMP).toMatch(/action:\s*'clear'/);
+    expect(COMP).toMatch(/data-action="\$\{a\.action\}"/);
+  });
+
+  test('detail view shows every URL source + highlights the live one', () => {
+    expect(COMP).toMatch(/_urlRowHtml\('Admin override'/);
+    expect(COMP).toMatch(/_urlRowHtml\('Default CDN \(akamai\)'/);
+    expect(COMP).toMatch(/_urlRowHtml\('Cloudflare CDN'/);
+    expect(COMP).toMatch(/'Pipeline fallback \(game-images\.json\)'/);
+    expect(COMP).toMatch(/highlight:\s*currentSource === 'override'/);
+  });
+
+  test('set-url modal + hidden file input for uploads live in admin.html', () => {
+    // Moved out of the component so both list and detail views share
+    // one instance. The component only references these by ID.
+    expect(HTML).toContain('id="boxart-modal-backdrop"');
+    expect(HTML).toContain('id="boxart-modal-input"');
+    expect(HTML).toContain('id="boxart-upload-input"');
+    expect(HTML).toContain('accept="image/png,image/jpeg,image/webp"');
+    // Component wires the modal by looking up those ids.
+    expect(COMP).toContain("getElementById('boxart-modal-backdrop')");
+    expect(COMP).toContain("getElementById('boxart-upload-input')");
   });
 
   test('admin override status label is present and hyperlinks to the URL', () => {
@@ -132,10 +162,12 @@ describe('Missing Box Art component contract', () => {
     expect(COMP).toContain('cancelToken');
   });
 
-  test('per-row Probe + Refetch actions are wired via delegated click', () => {
-    expect(COMP).toContain('data-action="probe"');
-    expect(COMP).toContain('data-action="refetch"');
-    expect(COMP).toMatch(/table\.addEventListener\('click'/);
+  test('detail view uses delegated click for row actions', () => {
+    // Actions moved to the detail view. The list view only exposes a
+    // Details link; the detail view attaches click delegation to the
+    // section content container.
+    expect(COMP).toMatch(/content\.addEventListener\('click'/);
+    expect(COMP).toMatch(/button\[data-action\]/);
   });
 
   test('pagination pushes at PAGE_SIZE per page', () => {

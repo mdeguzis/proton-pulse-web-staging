@@ -137,19 +137,7 @@ function _renderShell() {
       Probe HEADs the canonical URL. Refetch asks the store's API (Steam appdetails / SGDB) for the current URL.
       Set URL and Upload write to box_art_overrides -- the pipeline preserves those on every rerun. Clear removes the override.
     </p>
-    <input type="file" id="boxart-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none">
-    <div id="boxart-modal-backdrop" class="admin-modal-backdrop" hidden aria-hidden="true">
-      <div class="admin-modal" style="padding: 20px; min-width: 380px; max-width: 90vw">
-        <h3 class="admin-modal-title">Set custom box art URL</h3>
-        <p class="admin-modal-sub" style="margin:6px 0 12px">Overrides the CDN and pipeline fallbacks. Preserved across pipeline reruns until you Clear it.</p>
-        <input type="url" id="boxart-modal-input" class="admin-input" placeholder="https://example.com/header.jpg" style="width:100%">
-        <div class="admin-modal-actions" style="margin-top:14px">
-          <button class="admin-btn" data-modal-action="cancel">Cancel</button>
-          <button class="admin-btn admin-btn--primary" data-modal-action="save">Save override</button>
-        </div>
-        <p id="boxart-modal-error" class="admin-error" hidden style="margin-top:10px"></p>
-      </div>
-    </div>
+    <!-- Modal + file input live in admin.html so both list + detail views share them. -->
     <div id="boxart-loading" class="admin-loading">Loading indexes...</div>
     <div id="boxart-batch-progress" class="admin-counts" hidden></div>
     <div id="boxart-count" class="admin-counts" hidden></div>
@@ -216,12 +204,7 @@ function _renderRow(r) {
       <td>${cachedCell}</td>
       <td class="boxart-status">${_initialStatusHtml(r)}</td>
       <td>
-        <button class="admin-btn" data-action="probe" title="HEAD the canonical URL">Probe</button>
-        <button class="admin-btn" data-action="refetch" title="Ask the store's API for the current header URL">Refetch</button>
-        <button class="admin-btn" data-action="sgdb" title="Fetch from SteamGridDB (community artwork)">SGDB</button>
-        <button class="admin-btn" data-action="set-url" title="Set a custom URL that survives pipeline reruns">Set URL</button>
-        <button class="admin-btn" data-action="upload" title="Upload an image (PNG/JPG/WebP, <= 2 MB)">Upload</button>
-        <button class="admin-btn admin-btn--danger" data-action="clear" title="Remove the admin override" ${r.override ? '' : 'hidden'}>Clear</button>
+        <a class="admin-btn admin-btn--primary" href="?boxart=${encodeURIComponent(r.appId)}" data-action="details" title="Open the detail view with all URL sources + action buttons">Details</a>
       </td>
     </tr>`;
 }
@@ -560,4 +543,277 @@ export async function renderBoxartAdmin() {
   });
 
   refilter();
+}
+
+
+// --- Detail view -----------------------------------------------------
+//
+// Full-page view for one app. Shows every URL source (default CDN,
+// cloudflare CDN, pipeline fallback from game-images.json, admin
+// override) with the current live URL called out, a preview image,
+// override metadata, and all action buttons at the top.
+
+const _DETAIL_ACTIONS = [
+  { action: 'probe',   label: 'Probe',   cls: '',                     title: 'HEAD the canonical URL' },
+  { action: 'refetch', label: 'Refetch', cls: '',                     title: "Ask the store's API for the current header URL" },
+  { action: 'sgdb',    label: 'SGDB',    cls: '',                     title: 'Fetch from SteamGridDB (community artwork)' },
+  { action: 'set-url', label: 'Set URL', cls: 'admin-btn--primary',   title: 'Set a custom URL that survives pipeline reruns' },
+  { action: 'upload',  label: 'Upload',  cls: 'admin-btn--primary',   title: 'Upload an image (PNG/JPG/WebP, <= 2 MB)' },
+  { action: 'clear',   label: 'Clear override', cls: 'admin-btn--danger', title: 'Remove the admin override', overrideOnly: true },
+];
+
+function _detailShell() {
+  return `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px">
+      <a class="admin-btn" href="admin.html?tab=boxart" title="Back to the Box Art Manager list">&larr; Back to list</a>
+      <h2 id="boxart-detail-title" class="admin-section-title" style="margin:0; flex:1"></h2>
+    </div>
+    <div id="boxart-detail-body"><div class="admin-loading">Loading...</div></div>
+  `;
+}
+
+function _detailActionsHtml(hasOverride) {
+  return _DETAIL_ACTIONS
+    .filter(a => !a.overrideOnly || hasOverride)
+    .map(a => `<button class="admin-btn ${a.cls}" data-action="${a.action}" title="${escapeHtml(a.title)}">${escapeHtml(a.label)}</button>`)
+    .join(' ');
+}
+
+function _urlRowHtml(label, url, opts = {}) {
+  const { note = '', highlight = false } = opts;
+  const val = url
+    ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="admin-link" title="${escapeHtml(url)}">${escapeHtml(url)}</a>`
+    : '<span class="admin-muted">(none)</span>';
+  const noteHtml = note ? `<span class="admin-muted" style="margin-left:8px">${escapeHtml(note)}</span>` : '';
+  const rowStyle = highlight ? 'background: rgba(80, 200, 120, 0.08);' : '';
+  return `
+    <tr style="${rowStyle}">
+      <th style="text-align:left; padding:8px 12px; white-space:nowrap; vertical-align:top">${escapeHtml(label)}</th>
+      <td style="padding:8px 12px; word-break:break-all">${val}${noteHtml}</td>
+    </tr>`;
+}
+
+function _detailBodyHtml(row, currentLiveUrl, currentSource) {
+  const { appId, type, title, cachedUrl, override } = row;
+  const storeHref = _storeHref(type, appId, title);
+  const storeLink = storeHref
+    ? `<a href="${escapeHtml(storeHref)}" target="_blank" rel="noopener" class="admin-link">Open on ${escapeHtml(type)} store</a>`
+    : `<span class="admin-muted">no store link</span>`;
+  const gamePageLink = `<a href="${_appHref(appId)}" target="_blank" rel="noopener" class="admin-link">Open game page</a>`;
+
+  // Standard Steam URLs (only meaningful for type=steam).
+  const akamaiUrl     = type === 'steam' ? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${encodeURIComponent(appId)}/header.jpg` : null;
+  const cloudflareUrl = type === 'steam' ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${encodeURIComponent(appId)}/header.jpg` : null;
+
+  const previewSrc = currentLiveUrl || override?.image_url || cachedUrl || akamaiUrl || '';
+
+  const overrideMeta = override
+    ? `<span class="admin-badge admin-badge--ok" title="Preserved on every pipeline run">Admin override</span>
+       <span class="admin-muted">source: ${escapeHtml(override.source || 'manual')}</span>
+       ${override.updated_at ? `<span class="admin-muted">updated: ${escapeHtml(String(override.updated_at).slice(0, 19).replace('T', ' '))}</span>` : ''}`
+    : '<span class="admin-muted">no override set</span>';
+
+  return `
+    <div class="admin-card" style="padding:14px 16px; margin-bottom:16px">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">${_detailActionsHtml(!!override)}</div>
+      <p id="boxart-detail-status" class="admin-hint" style="margin:10px 0 0" hidden></p>
+    </div>
+
+    <div style="display:grid; grid-template-columns: minmax(200px, 460px) 1fr; gap: 16px; align-items:start">
+      <div class="admin-card" style="padding:12px">
+        <div class="admin-subhead">Preview</div>
+        <img id="boxart-detail-preview" src="${escapeHtml(previewSrc)}" alt="header preview" style="width:100%; height:auto; display:block; border-radius:6px; background: rgba(255,255,255,0.05)"
+             onerror="this.style.opacity=0.3; this.alt='(preview failed to load)'">
+        <p class="admin-hint" style="margin:8px 0 0">${gamePageLink} &middot; ${storeLink}</p>
+      </div>
+
+      <div class="admin-card" style="padding:0; overflow:hidden">
+        <table class="admin-table" style="width:100%; margin:0">
+          <thead>
+            <tr><th colspan="2" style="text-align:left; padding:10px 12px">URL sources <span class="admin-muted" style="font-weight:normal">(highlighted row = live source)</span></th></tr>
+          </thead>
+          <tbody>
+            ${_urlRowHtml('App ID', appId)}
+            ${_urlRowHtml('Store', type)}
+            ${_urlRowHtml('Admin override', override?.image_url || null, { highlight: currentSource === 'override', note: currentSource === 'override' ? 'live' : '' })}
+            ${type === 'steam' ? _urlRowHtml('Default CDN (akamai)', akamaiUrl, { highlight: currentSource === 'akamai',     note: currentSource === 'akamai'     ? 'live' : '' }) : ''}
+            ${type === 'steam' ? _urlRowHtml('Cloudflare CDN',       cloudflareUrl, { highlight: currentSource === 'cloudflare', note: currentSource === 'cloudflare' ? 'live' : '' }) : ''}
+            ${_urlRowHtml(type === 'steam' ? 'Pipeline fallback (game-images.json)' : 'Pipeline URL (nonsteam-images.json)', cachedUrl, { highlight: currentSource === 'pipeline', note: currentSource === 'pipeline' ? 'live' : '' })}
+            ${_urlRowHtml('Override metadata', null)}
+            <tr><td colspan="2" style="padding:0 12px 12px">${overrideMeta}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// Given the URL sources for this row, resolve which one the frontend
+// would actually display. Overrides always win. Otherwise HEAD-probe
+// in the standard fallback order.
+async function _resolveCurrentLive(row) {
+  if (row.override?.image_url) return { url: row.override.image_url, source: 'override' };
+  if (row.type === 'steam') {
+    const akamai = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${encodeURIComponent(row.appId)}/header.jpg`;
+    const cloudflare = `https://cdn.cloudflare.steamstatic.com/steam/apps/${encodeURIComponent(row.appId)}/header.jpg`;
+    let r = await probeImageUrl(akamai);
+    if (r.ok) return { url: akamai, source: 'akamai' };
+    r = await probeImageUrl(cloudflare);
+    if (r.ok) return { url: cloudflare, source: 'cloudflare' };
+    if (row.cachedUrl) {
+      r = await probeImageUrl(row.cachedUrl);
+      if (r.ok) return { url: row.cachedUrl, source: 'pipeline' };
+    }
+    return { url: null, source: null };
+  }
+  // GOG / Epic: only the pipeline URL exists as a candidate.
+  if (row.cachedUrl) {
+    const r = await probeImageUrl(row.cachedUrl);
+    if (r.ok) return { url: row.cachedUrl, source: 'pipeline' };
+  }
+  return { url: null, source: null };
+}
+
+export async function renderBoxartAdminDetail(appId) {
+  const content = document.getElementById('boxart-detail-content');
+  if (!content) return;
+  content.innerHTML = _detailShell();
+
+  let indexes;
+  try {
+    // Force a fresh fetch so admin edits made in another tab reflect here.
+    _cache = null;
+    indexes = await _loadIndexes();
+  } catch (e) {
+    content.innerHTML = `<p class="admin-error">Failed to load indexes: ${escapeHtml(e.message || String(e))}</p>`;
+    return;
+  }
+
+  // Locate the row for this appId in the index.
+  const searchRow = (indexes.searchIndex || []).find(r => Array.isArray(r) && String(r[0]) === String(appId));
+  if (!searchRow) {
+    content.innerHTML = `<p class="admin-error">App id <code>${escapeHtml(appId)}</code> not found in the search index.</p>`;
+    return;
+  }
+  const type = searchRow[5] || (String(appId).startsWith('gog:') ? 'gog' : String(appId).startsWith('epic:') ? 'epic' : 'steam');
+  const cachedUrl = type === 'steam' ? (indexes.gameImages[appId] || null) : (indexes.nonSteam[appId] || null);
+  const override = indexes.overrideMap?.[appId] || null;
+  const row = { appId: String(appId), title: String(searchRow[1] || ''), type, cachedUrl, override, derivedStatus: _deriveStatus(type, cachedUrl, !!override) };
+
+  document.getElementById('boxart-detail-title').textContent = `Box Art: ${row.title || row.appId} (${row.type})`;
+
+  // Initial paint uses cached URL as preview; then swap once _resolveCurrentLive returns.
+  document.getElementById('boxart-detail-body').innerHTML = _detailBodyHtml(row, null, null);
+  const live = await _resolveCurrentLive(row).catch(() => ({ url: null, source: null }));
+  document.getElementById('boxart-detail-body').innerHTML = _detailBodyHtml(row, live.url, live.source);
+
+  // Wire the shared modal + upload input for this view. modalContext
+  // is set BEFORE opening the modal or triggering the file picker so
+  // the change/save handlers know which appId is in scope.
+  const modal      = document.getElementById('boxart-modal-backdrop');
+  const modalInput = document.getElementById('boxart-modal-input');
+  const modalErr   = document.getElementById('boxart-modal-error');
+  const uploadInp  = document.getElementById('boxart-upload-input');
+  let ctx = null;    // { appId }
+
+  function refreshBody() {
+    _resolveCurrentLive(row).catch(() => ({ url: null, source: null })).then(l => {
+      document.getElementById('boxart-detail-body').innerHTML = _detailBodyHtml(row, l.url, l.source);
+    });
+  }
+  function setStatus(text, isError) {
+    const el = document.getElementById('boxart-detail-status');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = text;
+    el.className = 'admin-hint';
+    if (isError) el.classList.add('admin-error');
+  }
+
+  content.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    btn.disabled = true;
+    try {
+      if (action === 'probe' || action === 'refetch' || action === 'sgdb') {
+        setStatus(`${action}ing...`);
+        let result;
+        if (action === 'probe') {
+          result = row.type === 'steam'
+            ? await probeSteamHeader(row.appId, row.cachedUrl || null)
+            : await refetchNonSteamHeader(row.appId, row.cachedUrl || null);
+        } else if (action === 'refetch') {
+          result = row.type === 'steam'
+            ? await refetchSteamHeader(row.appId)
+            : await refetchNonSteamHeader(row.appId, row.cachedUrl || null);
+        } else {
+          result = await refetchSgdbHeader(row.appId);
+        }
+        setStatus(result.ok ? `${action} ok: ${result.url}` : `${action} failed: ${result.error || 'unknown'}`, !result.ok);
+      } else if (action === 'set-url') {
+        ctx = { appId: row.appId };
+        modalInput.value = row.override?.image_url || row.cachedUrl || '';
+        modalErr.hidden = true; modalErr.textContent = '';
+        modal.hidden = false; modal.setAttribute('aria-hidden', 'false');
+        setTimeout(() => modalInput.focus(), 0);
+      } else if (action === 'upload') {
+        ctx = { appId: row.appId };
+        uploadInp.click();
+      } else if (action === 'clear') {
+        if (!confirm(`Remove the admin override for ${row.appId}? This can't be undone.`)) return;
+        setStatus('clearing override...');
+        const result = await clearBoxArtOverride(row.appId);
+        if (result.ok) {
+          row.override = null;
+          if (indexes.overrideMap) delete indexes.overrideMap[row.appId];
+          setStatus('override cleared');
+          refreshBody();
+        } else setStatus(`clear failed: ${result.error || 'unknown'}`, true);
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  modal.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-modal-action]');
+    if (!btn || !ctx) return;
+    if (btn.dataset.modalAction === 'cancel') {
+      modal.hidden = true; ctx = null; return;
+    }
+    if (btn.dataset.modalAction === 'save') {
+      const url = modalInput.value.trim();
+      btn.disabled = true;
+      modalErr.hidden = true;
+      const result = await setBoxArtOverride(ctx.appId, url);
+      btn.disabled = false;
+      if (!result.ok) {
+        modalErr.hidden = false;
+        modalErr.textContent = result.error || 'save failed';
+        return;
+      }
+      row.override = { app_id: ctx.appId, image_url: result.url, source: 'manual', updated_at: new Date().toISOString() };
+      if (!indexes.overrideMap) indexes.overrideMap = {};
+      indexes.overrideMap[ctx.appId] = row.override;
+      modal.hidden = true; ctx = null;
+      setStatus('override saved');
+      refreshBody();
+    }
+  }, { once: false });
+
+  uploadInp.addEventListener('change', async () => {
+    const file = uploadInp.files?.[0];
+    if (!file || !ctx) { uploadInp.value = ''; return; }
+    setStatus('uploading...');
+    const result = await uploadBoxArtOverride(ctx.appId, file);
+    uploadInp.value = '';
+    if (!result.ok) return setStatus(`upload failed: ${result.error || 'unknown'}`, true);
+    row.override = { app_id: ctx.appId, image_url: result.url, source: 'upload', updated_at: new Date().toISOString() };
+    if (!indexes.overrideMap) indexes.overrideMap = {};
+    indexes.overrideMap[ctx.appId] = row.override;
+    ctx = null;
+    setStatus('upload saved');
+    refreshBody();
+  }, { once: false });
 }

@@ -282,9 +282,13 @@
 .game-header-actions #stats-btn {
   flex: 0 0 auto;
 }
-/* Submit Report goes full-width on its own row below the icon buttons */
+/* Submit Report sits alongside info/Stats/Deck on wide screens and
+   wraps to its own row on narrow ones. 180px flex-basis is the wrap
+   threshold: below that width the row is too tight to fit alongside
+   the icon buttons and the browser wraps this pill down a line.
+   Keeps the CTA visible on mobile without cutting off. */
 .game-header-actions .submit-report-btn {
-  flex: 1 1 100%;
+  flex: 1 1 180px;
   padding: 8px 18px;
   text-align: center;
 }
