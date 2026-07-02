@@ -735,6 +735,45 @@
       return 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/' + appId + '/header.jpg';
     }
 
+    // Store URL parser (#116). Inline copy of js/lib/store-url-parser.js
+    // because topbar loads as a classic <script> and can't ES-import.
+    // KEEP IN SYNC with the module. Tests live at tests/storeUrlParser.test.js.
+    var _STEAM_HOSTS = { 'store.steampowered.com': 1, 'steamcommunity.com': 1, 's.team': 1 };
+    var _GOG_HOSTS   = { 'www.gog.com': 1, 'gog.com': 1 };
+    var _EPIC_HOSTS  = { 'store.epicgames.com': 1, 'www.epicgames.com': 1 };
+    var _LOCALE_RE   = /^[a-z]{2}(-[a-z]{2})?$/i;
+    function _parseStoreUrl(input) {
+      var s = String(input || '').trim();
+      if (!s) return null;
+      var withProto = /^https?:\/\//i.test(s) ? s : 'https://' + s;
+      var u;
+      try { u = new URL(withProto); } catch (e) { return null; }
+      var host = u.hostname.toLowerCase();
+      var parts = u.pathname.split('/').filter(Boolean);
+      if (_STEAM_HOSTS[host]) {
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === 'app' && /^\d+$/.test(parts[i + 1])) {
+            return { store: 'steam', appId: parts[i + 1], canonicalId: parts[i + 1], slug: null };
+          }
+        }
+        return null;
+      }
+      if (_GOG_HOSTS[host]) {
+        var gidx = 0;
+        if (parts[0] && _LOCALE_RE.test(parts[0])) gidx = 1;
+        if (parts[gidx] !== 'game' || !parts[gidx + 1]) return null;
+        return { store: 'gog', appId: null, canonicalId: null, slug: parts[gidx + 1] };
+      }
+      if (_EPIC_HOSTS[host]) {
+        var eidx = 0;
+        if (parts[0] && _LOCALE_RE.test(parts[0])) eidx = 1;
+        var kind = parts[eidx];
+        if ((kind !== 'p' && kind !== 'product') || !parts[eidx + 1]) return null;
+        return { store: 'epic', appId: null, canonicalId: null, slug: parts[eidx + 1] };
+      }
+      return null;
+    }
+
     function render(results, query) {
       focusIdx = -1;
       visible = results;
@@ -835,6 +874,21 @@
         }
         const q = input.value.trim();
         if (!q) return;
+        // Store URL paste path (#116): route directly to the game page
+        // when the input is a recognised Steam / GOG / Epic URL. Keep
+        // this inline copy in sync with js/lib/store-url-parser.js --
+        // topbar loads as a classic script and can't ES-import.
+        const parsed = _parseStoreUrl(q);
+        if (parsed && parsed.canonicalId) {
+          window.location.href = 'app.html#/app/' + parsed.canonicalId;
+          return;
+        }
+        if (parsed && parsed.slug) {
+          // GOG / Epic slug -- no canonical id lookup here; hand it to
+          // the full search page and let it match against the catalog.
+          window.location.href = 'app.html?q=' + encodeURIComponent(parsed.slug);
+          return;
+        }
         if (/^\d+$/.test(q)) {
           window.location.href = 'app.html#/app/' + q;
         } else {
