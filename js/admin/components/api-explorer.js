@@ -54,8 +54,17 @@ export function renderApiExplorer() {
         <button id="apix-fetch" class="admin-btn admin-btn--primary">Fetch</button>
       </div>
       <p id="apix-status" class="admin-hint" style="margin:10px 0 0" hidden></p>
+      <div id="apix-toolbar" class="apix-toolbar" hidden>
+        <label class="apix-wrap-toggle"><input type="checkbox" id="apix-wrap"> Word wrap</label>
+        <button id="apix-copy" class="admin-btn" type="button">Copy JSON</button>
+        <button id="apix-download" class="admin-btn" type="button">Download JSON</button>
+      </div>
       <pre id="apix-output" class="apix-output" hidden></pre>
     </div>`;
+
+  // Last rendered JSON string + a filename stem, for copy / download.
+  let lastJson = '';
+  let lastName = 'steam';
 
   const setStatus = (text, isError) => {
     const s = document.getElementById('apix-status');
@@ -76,12 +85,12 @@ export function renderApiExplorer() {
     if (btn) btn.disabled = true;
     const payload = await exploreSteam(endpoint, resolved.id);
     if (btn) btn.disabled = false;
+    // Show the upstream JSON if we got one, else the whole proxy payload.
+    lastJson = JSON.stringify(payload && 'data' in payload ? payload.data : payload, null, 2);
+    lastName = `steam-${endpoint}-${resolved.id}`;
     const out = document.getElementById('apix-output');
-    if (out) {
-      out.hidden = false;
-      // Show the upstream JSON if we got one, else the whole proxy payload.
-      out.textContent = JSON.stringify(payload && 'data' in payload ? payload.data : payload, null, 2);
-    }
+    if (out) { out.hidden = false; out.textContent = lastJson; }
+    document.getElementById('apix-toolbar').hidden = false;
     setStatus(
       payload.ok ? `HTTP ${payload.status || 200} — ${payload.url || ''}` : `Failed: ${payload.error || 'unknown'}`,
       !payload.ok,
@@ -91,5 +100,33 @@ export function renderApiExplorer() {
   el.querySelector('#apix-fetch')?.addEventListener('click', doFetch);
   el.querySelector('#apix-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); doFetch(); }
+  });
+
+  // Word wrap: toggle a class on the <pre> (default off -> horizontal scroll).
+  el.querySelector('#apix-wrap')?.addEventListener('change', (e) => {
+    document.getElementById('apix-output')?.classList.toggle('apix-wrap', e.target.checked);
+  });
+
+  el.querySelector('#apix-copy')?.addEventListener('click', async () => {
+    if (!lastJson) return;
+    try {
+      await navigator.clipboard.writeText(lastJson);
+      setStatus('Copied JSON to clipboard.');
+    } catch {
+      setStatus('Copy failed -- select the text and copy manually.', true);
+    }
+  });
+
+  el.querySelector('#apix-download')?.addEventListener('click', () => {
+    if (!lastJson) return;
+    const blob = new Blob([lastJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${lastName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   });
 }

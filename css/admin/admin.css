@@ -1117,3 +1117,24 @@ pre.flag-raw-json {
   white-space: pre;
   tab-size: 2;
 }
+
+/* API Explorer output toolbar: wrap toggle + copy / download. */
+.apix-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.apix-wrap-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted, #8899aa);
+  cursor: pointer;
+  user-select: none;
+}
+.apix-toolbar + .apix-output { margin-top: 8px; }
+/* Word-wrap variant: wrap long lines instead of scrolling horizontally. */
+.apix-output.apix-wrap { white-space: pre-wrap; word-break: break-word; }
