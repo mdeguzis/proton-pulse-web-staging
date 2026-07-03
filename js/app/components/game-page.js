@@ -485,20 +485,21 @@ export async function renderGamePage(appId) {
       ? (pulseHasReports ? pulseTier.tier : protonDbTier)
       : 'pending';
     const overallTileColor = hasAnyReports ? (RATING_COLORS[overallTier] || '#3a4a5a') : '#2a5a8c';
-    // Single summary line - confidence label comes from TOTAL report count,
-    // not just Pulse. The old code used pulseTier.confidence which returns
-    // 'none' when there are 0 Pulse reports (even if there are 163 ProtonDB
-    // reports), producing the nonsensical "none confidence across 163 reports"
-    const confBucket = totalReports >= 20 ? 'high' : totalReports >= 5 ? 'medium' : totalReports >= 1 ? 'low' : '';
-    const overallTileSummary = hasAnyReports
-      ? `${confBucket} confidence across ${totalReports} report${totalReports !== 1 ? 's' : ''}${pulseHasConfigs ? ` / ${configs.length} config${configs.length !== 1 ? 's' : ''}` : ''}`
-      : (pulseHasConfigs ? 'Community-submitted configs available' : 'No community data yet');
-    // Confidence: prefer Pulse's computed confidencePct (weights both sources)
-    // when there are Pulse reports; otherwise fall back to a sample-size only
-    // approximation against the ProtonDB report count alone
+    // Confidence percent is the single source of truth -- the same value the
+    // dial shows and confidence.html buckets. Prefer Pulse's computed
+    // confidencePct (weights both sources) when there are Pulse reports;
+    // otherwise a sample-size approximation against the ProtonDB count alone.
     const overallConfidencePct = pulseHasReports && pulseTier.confidencePct
       ? pulseTier.confidencePct
       : (protonDbCount > 0 ? Math.min(95, Math.round(30 + Math.log2(Math.max(1, protonDbCount)) * 18)) : 0);
+    // Bucket the summary label off the SAME percent thresholds confidence.html
+    // uses (>=80 high, >=50 moderate, else low) so the dial %, this line, and
+    // the "why?" page never disagree (#187). The old code bucketed by report
+    // COUNT, which said "medium" for a 14-report game the dial showed at 95%.
+    const confBucket = !hasAnyReports ? '' : overallConfidencePct >= 80 ? 'high' : overallConfidencePct >= 50 ? 'moderate' : 'low';
+    const overallTileSummary = hasAnyReports
+      ? `${confBucket} confidence across ${totalReports} report${totalReports !== 1 ? 's' : ''}${pulseHasConfigs ? ` / ${configs.length} config${configs.length !== 1 ? 's' : ''}` : ''}`
+      : (pulseHasConfigs ? 'Community-submitted configs available' : 'No community data yet');
     // Rating distribution: one horizontal bar per tier, filled with the tier
     // color and scaled to the busiest tier so the shape reads at a glance.
     // Live-only games (ProtonDB summary) have no per-tier breakdown.

@@ -82,4 +82,12 @@ describe('game page: rating panel (dial + per-tier bars + flag)', () => {
     expect(src).toContain('class="game-header-art"');
     expect(src).toContain('src="${STEAM_IMG(appId)}"');
   });
+
+  test('confidence summary buckets off the percent, not the report count (#187)', () => {
+    // Single source of truth: the dial %, the summary label, and confidence.html
+    // must agree. Bucket thresholds match confidence.html (>=80 high, >=50 moderate).
+    expect(src).toContain("overallConfidencePct >= 80 ? 'high' : overallConfidencePct >= 50 ? 'moderate' : 'low'");
+    // The old report-count bucket is gone.
+    expect(src).not.toContain("totalReports >= 20 ? 'high' : totalReports >= 5 ? 'medium'");
+  });
 });
