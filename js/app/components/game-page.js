@@ -535,8 +535,8 @@ export async function renderGamePage(appId) {
           <circle cx="66" cy="66" r="${_DIAL_R}" fill="none" stroke="var(--accent, #66c0f4)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${_DIAL_C.toFixed(1)}" stroke-dashoffset="${_dialOffset.toFixed(1)}" transform="rotate(-90 66 66)"></circle>
         </svg>
         <div class="grp-dial-ctr">
-          <span class="grp-dial-pct">${hasAnyReports ? _dialPct + '%' : '--'}</span>
           <span class="grp-dial-tier" style="color:${overallTileColor}">${overallTier}</span>
+          <span class="grp-dial-pct">${hasAnyReports ? _dialPct + '%' : '--'}</span>
           <span class="grp-dial-cap">confidence</span>
         </div>
       </div>`;
