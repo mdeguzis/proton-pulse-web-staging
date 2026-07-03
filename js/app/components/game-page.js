@@ -542,11 +542,12 @@ export async function renderGamePage(appId) {
       </div>`;
 
     // Panel footer: confidence summary (+ link to the scoring breakdown), then
-    // App id / newest report / per-source split on one meta line.
+    // App id / newest report on one meta line. The per-source split
+    // (N Pulse / M ProtonDB) lives on the stats page now -- keeping it
+    // out of the hero cuts the noise on small screens.
     const newestTs = allReports.length ? Math.max(...allReports.map((r) => r.timestamp || 0)) : 0;
     const _freshBit = newestTs ? `newest report: <strong>${daysAgo(newestTs)}</strong>` : '';
-    const _srcBit = `<strong>${nativeReports.length}</strong> Pulse / <strong>${protonDbCount}</strong> ProtonDB`;
-    const _metaBits = [`App ${esc(String(appId))}`, _freshBit, _srcBit].filter(Boolean).join(' &middot; ');
+    const _metaBits = [`App ${esc(String(appId))}`, _freshBit].filter(Boolean).join(' &middot; ');
     const _confWhy = hasAnyReports
       ? ` <a class="grp-why conf-link" href="confidence.html?app=${appId}" title="See the factor-by-factor breakdown of this aggregate confidence">why?</a>`
       : '';
