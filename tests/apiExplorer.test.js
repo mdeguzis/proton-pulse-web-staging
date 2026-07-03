@@ -55,6 +55,17 @@ describe('API Explorer client + component', () => {
     expect(COMP).toContain("new Blob([lastJson], { type: 'application/json' })");
     expect(COMP).toContain('a.download = `${lastName}.json`');
   });
+
+  test('Field descriptions button opens a popup documenting known fields', () => {
+    expect(COMP).toContain('id="apix-fields"');
+    expect(COMP).toContain('function _showFieldDocs(');
+    expect(COMP).toContain('const FIELD_DOCS = {');
+    // descriptor + deck semantics are documented
+    expect(COMP).toContain('content_descriptors.ids');
+    expect(COMP).toContain('resolved_category');
+    expect(COMP).toContain('display_type');
+    expect(COMP).toContain('required_age');
+  });
 });
 
 describe('API Explorer admin wiring', () => {
