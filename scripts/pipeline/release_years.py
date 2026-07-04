@@ -25,6 +25,14 @@ from .common import log
 
 STEAM_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails?appids={appid}"
 REQUEST_DELAY = 0.3
+# Steam soft-throttles appdetails at ~200 req / 5min. game_images.py and
+# common.py::fetch_steam_content_descriptors also hit this endpoint in the
+# same finalize job -- combined cold-start burst can push over the limit
+# for a few minutes. The cache-persistence fix (#109) makes this only bite
+# on the first run ever; subsequent runs only probe new-collision apps, so
+# the per-file caps rarely fire together. If it becomes a problem: a
+# shared token bucket in common.py, or split the fetchers across separate
+# workflow jobs (each gets its own 5-min budget).
 PROBE_CAP = 200
 CACHE_FILENAME = "release-years-cache.json"
 
