@@ -164,6 +164,22 @@
       </div>
 
       <div class="profile-section">
+        <div class="profile-section-title">Site preferences</div>
+
+        <div class="profile-field">
+          <div class="profile-field-label">Show adult games</div>
+          <div class="profile-field-value" style="gap:10px">
+            <label class="profile-toggle">
+              <input type="checkbox" id="show-adult-toggle">
+              <span class="profile-toggle-track"></span>
+            </label>
+            <span id="show-adult-status" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+          <div class="profile-field-hint">When enabled, games flagged as adult (Steam content descriptors 3 or 4) show up in search, Popular, Recent, and stub pages. Off by default. This preference syncs across devices when you're signed in (#170).</div>
+        </div>
+      </div>
+
+      <div class="profile-section">
         <div class="profile-section-title">Report filter preferences</div>
         <div class="profile-field">
           <div class="profile-field-label">GPU vendor</div>
@@ -295,6 +311,6 @@
 <script src="js/lib/analytics.js?v=e6dfbad8"></script>
 <script src="js/lib/topbar.js?v=e6956ee9"></script>
 <script src="js/lib/toast.js?v=7bb23014"></script>
-<script type="module" src="js/profile/main.js?v=7207779a"></script>
+<script type="module" src="js/profile/main.js?v=0de32796"></script>
 </body>
 </html>

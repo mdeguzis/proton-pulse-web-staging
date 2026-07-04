@@ -16,6 +16,7 @@ import {
 import {
   listLinkedPlugins, completePluginLink, removePluginLink,
 } from './api/plugin-links.js?v=05003ae3';
+import { setShowAdult, pullShowAdult, readShowAdultLocal } from '../lib/user-prefs.js?v=7b5675ef';
 import { initMyHardware } from './components/my-hardware.js?v=34fd810c';
 import { initSystems } from './components/systems.js?v=382fb770';
 import { initMyReports } from './components/my-reports.js?v=59f67107';
@@ -34,6 +35,8 @@ import { initMyReports } from './components/my-reports.js?v=59f67107';
   const copyBtn   = document.getElementById('copy-uid-btn');
   const usernameToggle = document.getElementById('show-username-toggle');
   const usernameStatus = document.getElementById('show-username-status');
+  const adultToggle    = document.getElementById('show-adult-toggle');
+  const adultStatus    = document.getElementById('show-adult-status');
   const hwGpuSelect    = document.getElementById('hw-gpu-vendor');
   const hwOsInput      = document.getElementById('hw-os');
   const configTypeSelect = document.getElementById('config-type');
@@ -147,6 +150,18 @@ import { initMyReports } from './components/my-reports.js?v=59f67107';
       usernameToggle.checked = val;
       usernameStatus.textContent = val ? 'Shown on reports' : 'Anonymous';
       if (session) syncAvatarVisibility(val, session).catch(() => {});
+    }
+    if (adultToggle) {
+      // localStorage is the zero-flash source; pull server value async in
+      // case another device changed it and update the toggle if it moved.
+      const localVal = readShowAdultLocal();
+      adultToggle.checked = localVal;
+      if (adultStatus) adultStatus.textContent = localVal ? 'Showing adult games' : 'Hidden by default';
+      pullShowAdult().then(({ changed, value }) => {
+        if (!changed) return;
+        adultToggle.checked = value;
+        if (adultStatus) adultStatus.textContent = value ? 'Showing adult games' : 'Hidden by default';
+      });
     }
     if (hwGpuSelect) hwGpuSelect.value = localStorage.getItem(HW_GPU_KEY) || '';
     if (hwOsInput)   hwOsInput.value   = localStorage.getItem(HW_OS_KEY)  || '';
@@ -391,6 +406,18 @@ import { initMyReports } from './components/my-reports.js?v=59f67107';
     });
     SupaAuth.getSession().then(s => syncAvatarVisibility(val, s)).catch((e) => {
       console.warn('[profile] syncAvatarVisibility failed:', e);
+    });
+  });
+
+  adultToggle?.addEventListener('change', () => {
+    const val = adultToggle.checked;
+    if (adultStatus) adultStatus.textContent = val ? 'Showing adult games' : 'Hidden by default';
+    // setShowAdult writes localStorage immediately + upserts to Supabase
+    // for signed-in users so the pref follows across devices (#170).
+    setShowAdult(val).then(({ synced }) => {
+      if (adultStatus && !synced) {
+        adultStatus.textContent += ' (device only)';
+      }
     });
   });
 
