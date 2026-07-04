@@ -288,6 +288,18 @@ jobs:
           restore-keys: |
             pipeline-cache-${{ runner.os }}-${{ github.workflow }}-${{ github.ref_name }}-
 
+      # Phase 2 of #171: source the probe cache from durable gh-pages state
+      # instead of the ephemeral actions cache. Overwrites .cache/protondb-
+      # summary-probe-cache.json with the last chunk's snapshot. Aborts loud
+      # if any expected chunk is missing so a runner starvation event surfaces
+      # here instead of silently finalizing on stale data. Skipped if
+      # probe-chunks didn't run this dispatch (chunk_count == 0).
+      - name: Restore chunk state from gh-pages (#171)
+        if: needs.build.outputs.chunk_count != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/restore-chunk-state.sh '${{ needs.build.outputs.chunk_matrix }}'
+
       # Seed the store catalog caches from gh-pages AFTER restoring the pipeline
       # cache, so the freshly rebuilt catalog (pushed by the dedicated GOG/Epic
       # workflows) wins over a stale copy carried in the actions cache. Doing
