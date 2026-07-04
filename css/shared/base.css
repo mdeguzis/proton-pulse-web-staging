@@ -79,24 +79,30 @@
 
   --text:      #2c3e50;
   --strong:    #0a0c10;
-  --muted:     #6b7d8f;
+  /* muted text must clear WCAG AA (>=4.5:1) on the light surfaces; the old
+     #6b7d8f only hit ~4.2 on white and worse on tinted cards (#13) */
+  --muted:     #556577;
 
-  --accent:       #1a73e8;
+  /* accent doubles as link text; #1a73e8 was 4.02 on the page bg (fails AA).
+     #1668cf clears AA on bg/s1/s2 while staying the same blue family (#13) */
+  --accent:       #1668cf;
   --accent-hi:    #0d47a1;
   --accent-soft:  rgba(26, 115, 232, 0.12);
   --accent-glow:  rgba(26, 115, 232, 0.25);
 
   --green:        #2e7d32;
-  --green-hi:     #43a047;
+  --green-hi:     #357a38;
   --green-glow:   rgba(46, 125, 50, 0.25);
 
   --magenta:      #c2185b;
   --magenta-glow: rgba(194, 24, 91, 0.25);
 
-  --gold:    #f9a825;
-  --silver:  #90a4ae;
-  --bronze:  #a1887f;
-  --red:     #e53935;
+  /* tier colors are used only as text in CSS (tier pills get their fill from
+     the JS RATING_COLORS map, not these vars), so darken them for AA (#13) */
+  --gold:    #8f6508;
+  --silver:  #586b7b;
+  --bronze:  #7d6355;
+  --red:     #c62828;
 
   color-scheme: light;
 }
