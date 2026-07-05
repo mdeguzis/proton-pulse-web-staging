@@ -198,6 +198,27 @@ export async function isAppIdInMyLibrary(appId, session) {
   }
 }
 
+/**
+ * Show a "Verified owner" indicator on the submit form when the current appId
+ * is in the signed-in user's cached Steam library. Mirrors the report-card
+ * badge so the user knows their submission will land with owner_verified=true
+ * before they press submit (#199).
+ */
+export async function renderVerifiedOwnerStatus(el, appId) {
+  const mount = el?.querySelector?.('#sf-verified-owner');
+  if (!mount || !appId) return;
+  const session = await SupaAuth.getSession();
+  if (!session?.user) { mount.hidden = true; return; }
+  const owned = await isAppIdInMyLibrary(appId, session);
+  if (!owned) { mount.hidden = true; return; }
+  mount.hidden = false;
+  mount.innerHTML = `
+    <div class="sf-verified-owner-pill" title="Your Steam library confirms you own this game. This report will be marked as Verified owner.">
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zm3.7 6.3l-4.5 4.5a.75.75 0 01-1.06 0L4.3 8.94a.75.75 0 111.06-1.06l1.31 1.31 3.97-3.97a.75.75 0 111.06 1.06z"/></svg>
+      Verified owner - this report will be flagged as owner-verified
+    </div>`;
+}
+
 export async function submitReport(appId, title, form, editReportId = null) {
   const session = await SupaAuth.getSession();
   if (!session) return { ok: false, error: 'Sign in with Steam to submit a report.' };
@@ -488,6 +509,7 @@ export async function populateSubmitForm(el) {
       </div>
     </details>
     <form id="submit-report-form" autocomplete="on">
+      <div id="sf-verified-owner" hidden></div>
       <div class="sf-section-label">Game</div>
       <div class="sf-row"><label>Game title</label><input name="gameTitle" readonly style="cursor:default;color:var(--muted);border-color:var(--border2);background:var(--s1);" placeholder="Loading..."></div>
 
@@ -510,7 +532,8 @@ export async function populateSubmitForm(el) {
       <div class="sf-row"><label>CPU *</label><input name="cpu" placeholder="e.g. AMD Ryzen 7 5800X3D"></div>
       <div class="sf-row"><label>RAM *</label><input name="ram" placeholder="e.g. 16 GB or 64"></div>
       <div class="sf-row"><label>VRAM (MB)</label><input name="vramMb" type="number" placeholder="e.g. 8192"></div>
-      <div class="sf-row"><label>OS *</label><select name="os"><option value="" disabled selected>-- choose one --</option>${opts(osList,false)}</select><input name="osVersion" placeholder="Version (e.g. 24.04)" style="max-width:120px"></div>
+      <div class="sf-row"><label>OS *</label><select name="os"><option value="" disabled selected>-- choose one --</option>${opts(osList,false)}</select></div>
+      <div class="sf-row"><label>OS Version</label><input name="osVersion" placeholder="e.g. 24.04"></div>
       <div class="sf-row"><label>Kernel</label><input name="kernel" placeholder="e.g. 6.8.0"></div>
       <div class="sf-row"><label>Steam Playtime</label><select name="duration">${durationOpts}</select></div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>

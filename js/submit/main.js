@@ -1,6 +1,6 @@
 // Entry module for submit.html. Migrated from the page's inline script.
 import { FAULT_KEYS_WEB } from '../shared/scoring.js?v=1b8ae722';
-import { populateSubmitForm, prefillSubmitFormFromMyHardware, submitReport } from '../shared/submit.js?v=5d174c35';
+import { populateSubmitForm, prefillSubmitFormFromMyHardware, renderVerifiedOwnerStatus, submitReport } from '../shared/submit.js?v=87da37ef';
 import { SupaAuth } from '../shared/config.js?v=f6f2c00a';
 import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
 
@@ -119,6 +119,9 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
       `<div style="padding:24px;color:var(--red)">Failed to load form: ${err.message || err}</div>`;
     return;
   }
+  // Show the Verified owner pill at the top of the form when the user's
+  // cached Steam library confirms ownership (#199).
+  void renderVerifiedOwnerStatus(el, appId);
 
   // #153: markdown editor is on site-wide now (no flag). Wrap the Notes
   // textarea with Write / Preview tabs and render the preview via
