@@ -96,12 +96,12 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
         ${r.vramMb ? `<div class="row"><span class="label">VRAM</span><span>${r.vramMb >= 1024 ? (r.vramMb/1024).toFixed(1)+' GB' : r.vramMb+' MB'}</span></div>` : ''}
         <div class="row"><span class="label">GPU Driver</span><span>${na(esc(r.gpuDriver))}</span></div>
         <div class="row"><span class="label">Kernel</span><span>${na(esc(r.kernel))}</span></div>
+        ${r.reportId != null ? `<div class="row"><span class="label">Report ID</span><span style="font-family:monospace;font-size:0.8em;color:var(--muted)">#${r.reportId}</span></div>` : ''}
+        <div class="row"><span class="label">Source</span><span>${isProtonDb ? 'ProtonDB' : isWeb ? 'Web submission' : 'Decky Proton Pulse'}</span></div>
+        ${!isProtonDb && r.timestamp ? `<div class="row"><span class="label">Submitted</span><span>${new Date(r.timestamp * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>` : ''}
+        ${!isProtonDb && r.updatedAt && r.updatedAt !== r.timestamp ? `<div class="row"><span class="label">Edited</span><span>${new Date(r.updatedAt * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>` : ''}
       </div>
       ${(() => { const fr = buildFormRows(r); return fr ? `<div class="all-details-panel fr-panel"><div class="fr-section">${fr}</div></div>` : ''; })()}
-      ${r.reportId != null ? `<div class="row"><span class="label">Report ID</span><span style="font-family:monospace;font-size:0.8em;color:var(--muted)">#${r.reportId}</span></div>` : ''}
-      <div class="row"><span class="label">Source</span><span>${isProtonDb ? 'ProtonDB' : isWeb ? 'Web submission' : 'Decky Proton Pulse'}</span></div>
-      ${!isProtonDb && r.timestamp ? `<div class="row"><span class="label">Submitted</span><span>${new Date(r.timestamp * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>` : ''}
-      ${!isProtonDb && r.updatedAt && r.updatedAt !== r.timestamp ? `<div class="row"><span class="label">Edited</span><span>${new Date(r.updatedAt * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>` : ''}
       <!-- All action buttons live in the footer in one uniform blue style:
            Show Report Responses (if there are any), All Hardware Details,
            Permalink, JSON. Delete only shows for the report owner. -->
