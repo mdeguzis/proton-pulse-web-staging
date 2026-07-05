@@ -324,6 +324,15 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
             <span class="gs-trend-pct" style="color:${tone(olderPct)}">${olderPct}%</span>
           </div>
         </div>
+        <p class="gs-trend-explain">
+          Each bar is the share of reports rated playable (Platinum, Gold, or Silver)
+          in that window. <strong>Improving</strong> or <strong>declining</strong> means
+          that playable share moved by at least 15 points between the two windows;
+          anything smaller reads as <strong>stable</strong>. A shift between playable
+          tiers, say Platinum down to Gold, does not count as a decline, because the
+          game still runs. A direction only shows when both windows have at least 5
+          reports, so a couple of old reports never drive the verdict.
+        </p>
       </div>
     `;
   }
@@ -415,33 +424,36 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
   // Returns { html, wire }. wire() runs after the html is injected so any
   // chart helpers (hover targets, click-to-filter) can attach to live DOM
   function renderAll(appId, title, stats, counts = {}) {
-    const sectionHead = (icon, title) => `<div class="gs-section-head">${icon}<span>${title}</span></div>`;
+    // Each section carries an id so it can be deep-linked (e.g. the game page
+    // trend line links to #trend). Anchor offset handled by scroll-margin-top
+    // in CSS so the sticky-ish header does not cover the section title.
+    const sectionHead = (icon, title, id = '') => `<div class="gs-section-head"${id ? ` id="${id}"` : ''}>${icon}<span>${title}</span></div>`;
     const chart = renderChart(stats.monthly);
 
     const html = `
       ${renderHeader(appId, title, counts)}
-      ${sectionHead(ICON.status, 'Current state')}
+      ${sectionHead(ICON.status, 'Current state', 'current-state')}
       ${renderStatusCards(stats)}
 
-      ${sectionHead(ICON.chart, 'Monthly reports (last 5 years)')}
+      ${sectionHead(ICON.chart, 'Monthly reports (last 5 years)', 'monthly')}
       ${chart.html}
 
-      ${sectionHead(ICON.dist, 'Rating distribution')}
+      ${sectionHead(ICON.dist, 'Rating distribution', 'distribution')}
       ${renderDistribution(stats)}
 
-      ${sectionHead(ICON.trend, 'Compatibility trend (recent vs older)')}
+      ${sectionHead(ICON.trend, 'Compatibility trend (recent vs older)', 'trend')}
       ${renderTrend(stats)}
 
-      ${sectionHead(ICON.factors, 'Confidence factors')}
+      ${sectionHead(ICON.factors, 'Confidence factors', 'confidence')}
       ${renderFactors(stats)}
 
       <div class="gs-two-col" style="margin-top:8px">
         <div>
-          ${sectionHead(ICON.versions, 'Per Proton version')}
+          ${sectionHead(ICON.versions, 'Per Proton version', 'proton-versions')}
           ${renderVersions(stats)}
         </div>
         <div>
-          ${sectionHead(ICON.tips, 'Launch options that work')}
+          ${sectionHead(ICON.tips, 'Launch options that work', 'launch-options')}
           ${renderTips(stats)}
         </div>
       </div>
@@ -527,6 +539,18 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
     // wire() must run AFTER innerHTML so the hover helper sees real DOM rects.
     // Also surface the filter event for future consumers (a debug log for now)
     wire();
+    // Deep links from other pages (e.g. the game page trend line -> #trend)
+    // land after this async render, so the browser has already given up on the
+    // hash. Scroll the target section into view ourselves once it exists.
+    if (location.hash.length > 1) {
+      const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (target) {
+        requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        console.debug('[game-stats] scrolled to deep-link section', { hash: location.hash, found: true });
+      } else {
+        console.debug('[game-stats] deep-link section not found', { hash: location.hash, found: false });
+      }
+    }
     onFilterChange(payload => {
       console.debug('[game-stats] chart-filter', payload);
       // Real list-filtering will land when we add the reports panel below

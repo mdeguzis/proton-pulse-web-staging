@@ -119,7 +119,7 @@ function _showFlagModal(btn) {
   });
 }
 
-export function trendSummary(reps) {
+export function trendSummary(reps, appId) {
   if (!Array.isArray(reps) || reps.length < 2) return '';
   const now = Date.now() / 1000;
   const recent = reps.filter(r => r.timestamp && now - r.timestamp < RECENT_DAYS * 86400);
@@ -132,11 +132,18 @@ export function trendSummary(reps) {
   // decline.
   if (t.dir === 'insufficient') return '';
   const counts = `${t.recentCount} recent vs ${t.priorCount} prior reports`;
-  if (t.dir === 'improving')
-    return `<div class="trend">Compatibility is <strong style="color:var(--green)">improving</strong> - ${counts}</div>`;
-  if (t.dir === 'declining')
-    return `<div class="trend">Compatibility is <strong style="color:var(--red)">declining</strong> - ${counts}</div>`;
-  return `<div class="trend">Compatibility is <strong>stable</strong> - ${counts}</div>`;
+  const word = t.dir === 'improving'
+    ? '<strong style="color:var(--green)">improving</strong>'
+    : t.dir === 'declining'
+      ? '<strong style="color:var(--red)">declining</strong>'
+      : '<strong>stable</strong>';
+  // The whole line links to the stats page trend section, which explains how
+  // the direction is computed (playable share, windows, min sample).
+  const href = appId != null ? `game-stats.html?app=${encodeURIComponent(appId)}#trend` : '';
+  const body = `Compatibility is ${word} - ${counts} <span class="trend-more">how this works &rarr;</span>`;
+  return href
+    ? `<div class="trend"><a class="trend-link" href="${href}" title="How the compatibility trend is calculated">${body}</a></div>`
+    : `<div class="trend">${body}</div>`;
 }
 
 // - Deck Verified status helpers (stub for now) -------
@@ -610,7 +617,7 @@ export async function renderGamePage(appId) {
         </div>
       </div>
 
-      ${trendSummary(reports)}
+      ${trendSummary(reports, appId)}
 
       <div class="reports-section-head" id="pulse-summary">
         <div class="reports-section-copy">

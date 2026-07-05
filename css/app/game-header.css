@@ -1108,6 +1108,17 @@
   border-left: 3px solid var(--border2);
   margin-bottom: 14px;
 }
+/* The whole trend line links to the stats page trend breakdown. */
+.trend-link { color: inherit; text-decoration: none; display: inline; }
+.trend-link:hover { text-decoration: none; }
+.trend-more {
+  color: var(--accent);
+  white-space: nowrap;
+  margin-left: 4px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.trend-link:hover .trend-more { text-decoration: underline; opacity: 1; }
 
 /* Hero dial links to the confidence breakdown. */
 .grp-dial-link { text-decoration: none; color: inherit; cursor: pointer; border-radius: 12px; padding: 4px; transition: transform 0.1s, filter 0.12s, box-shadow 0.15s, background 0.15s; }

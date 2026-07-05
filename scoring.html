@@ -797,6 +797,14 @@ h2 small {
           </ul>` : '<p>Aggregated from per-report confidence.</p>'}
         </div>
 
+        <h2 id="compat-trend">Compatibility trend</h2>
+        <p class="lede">Game pages show a short line saying whether compatibility is improving, stable, or declining, and the per-game stats page shows the same direction with a bar chart. Both read from one function so they never disagree.</p>
+        <div class="card body">
+          <p>The trend compares two windows of reports: the last 90 days against the 90 to 270 day window before it. Reports older than 270 days are left out so a years-old rating cannot skew the baseline.</p>
+          <p>It looks at the share of playable reports in each window, not an average of tier numbers. Playable means Platinum, Gold, or Silver. If that share rises by at least 15 points the trend reads improving; if it drops by at least 15 points it reads declining; anything smaller is stable.</p>
+          <p>Two rules keep it honest. A shift between two playable tiers, say Platinum down to Gold, does not count as a decline, because the game still runs. And a direction only appears when both windows have at least 5 reports, so a couple of old reports never drive the verdict. Below that the game page shows no trend line at all.</p>
+        </div>
+
         <h2>Custom Proton markers</h2>
         <p class="lede" style="margin-bottom:8px">Any report whose <code class="inline">protonVersion</code> contains one of these tokens gets the <code class="inline">CUSTOM_PROTON</code> confidence bump - credit for going off the official path:</p>
         ${renderChips(s.customProtonMarkers, 'positive')}
