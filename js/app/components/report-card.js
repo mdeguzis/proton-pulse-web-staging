@@ -89,13 +89,13 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
       ${(r.durationMinutes != null || fmtDuration(r.duration)) ? `<div class="row"><span class="label">Steam playtime</span><span>${r.durationMinutes != null ? fmtMinutes(r.durationMinutes) : fmtDuration(r.duration)}</span></div>` : ''}
       ${(() => { const pt = r.configKey && configPlaytimeTotals.find(t => t.config_key === r.configKey); return pt ? `<div class="row"><span class="label">Config playtime</span><span title="${pt.session_count} session${pt.session_count !== 1 ? 's' : ''}">${fmtMinutes(pt.total_minutes)}</span></div>` : ''; })()}
       ${r.notes ? `<div class="row"><span class="label">Notes</span><div class="notes-full">${renderNotes(r.notes)}</div></div>` : ''}
+      ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span class="launch-options-value">${esc(r.launchOptions)}</span></div>` : ''}
       <div class="all-details-panel hw-details-panel">
         ${arch ? `<div class="row"><span class="label">GPU Arch</span><span>${esc(arch)}</span></div>` : ''}
         <div class="row"><span class="label">RAM</span><span>${na(esc(r.ram))}</span></div>
         ${r.vramMb ? `<div class="row"><span class="label">VRAM</span><span>${r.vramMb >= 1024 ? (r.vramMb/1024).toFixed(1)+' GB' : r.vramMb+' MB'}</span></div>` : ''}
         <div class="row"><span class="label">GPU Driver</span><span>${na(esc(r.gpuDriver))}</span></div>
         <div class="row"><span class="label">Kernel</span><span>${na(esc(r.kernel))}</span></div>
-        ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span>${esc(r.launchOptions)}</span></div>` : ''}
       </div>
       ${(() => { const fr = buildFormRows(r); return fr ? `<div class="all-details-panel fr-panel"><div class="fr-section">${fr}</div></div>` : ''; })()}
       ${r.reportId != null ? `<div class="row"><span class="label">Report ID</span><span style="font-family:monospace;font-size:0.8em;color:var(--muted)">#${r.reportId}</span></div>` : ''}

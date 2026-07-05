@@ -6,12 +6,12 @@ import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/sc
 import { getWebClientId } from '../../shared/submit.js?v=8c22e9ad';
 import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=dfac69c8';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=083594fa';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=0594677b';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=14086cb6';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=aba6619f';
 import { enhanceAuthorBlocks } from './author.js?v=2316d334';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=a1a075ee';
-import { renderCard } from './report-card.js?v=8a17ff46';
+import { renderCard } from './report-card.js?v=a7c54753';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=f9591262';

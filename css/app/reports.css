@@ -646,6 +646,19 @@ a.card:active { transform: translateY(1px); }
    Drop pre-wrap since markdown-it handles line breaks; leave the color
    + rhythm to match the surrounding row. */
 .card-summary .notes-full { line-height: 1.5; color: #a0b4c4; }
+/* Launch options are shell-arg strings. Monospace + break-word so long entries
+   like WINEDLLOVERRIDES=... %command% wrap cleanly instead of stretching the
+   card. Subtle tinted background sets them apart from prose without a chip. */
+.card-summary .launch-options-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  color: #cfd8e0;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .card-summary .notes-full p { margin: 0.35em 0; }
 .card-summary .notes-full p:first-child { margin-top: 0; }
 .card-summary .notes-full p:last-child { margin-bottom: 0; }
