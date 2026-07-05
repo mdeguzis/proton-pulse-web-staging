@@ -1,7 +1,7 @@
 // Entry module for index.html (homepage). Migrated from index.js.
 import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=25783509';
 import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
-import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport } from '../lib/tile-pad.js?v=82e7d8c9';
+import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport, currentColCount } from '../lib/tile-pad.js?v=7c022a1e';
 import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
 import { renderGameCard } from '../app/lib/card.js?v=754da47b';
 
@@ -148,11 +148,15 @@ import { renderGameCard } from '../app/lib/card.js?v=754da47b';
     const unratedCountEl = document.getElementById('pg-unrated-count');
     const loadMoreEl = document.getElementById('pg-load-more');
 
-    // Row target is viewport-aware: 4 rows on desktop, 5 on mobile so
-    // the tighter grid gives users more to scan before Load more. See
-    // pageSizeForFullRows + targetRowsForViewport in lib/tile-pad.js.
+    // Row target is 5 complete rows on every viewport (page size = cols * rows,
+    // so the grid always ends on a whole row and stays even across S/M/L/XL).
+    // See pageSizeForFullRows + targetRowsForViewport in lib/tile-pad.js.
     const state = { rated: true, unrated: false };
     let shownCount = pageSizeForFullRows(list, targetRowsForViewport());
+    // Guards a one-shot re-render when the grid CSS hasn't applied yet on the
+    // very first paint (see renderPopular). Without it the column count reads 1
+    // and the page collapses to the 8-item floor (2 rows at 4 columns).
+    let _popularColRetry = false;
 
     // Build the game list for the selected stores + rating filter state. Store
     // is multi-select: Steam pulls from most_played.json, GOG/Epic pull from the
@@ -220,13 +224,27 @@ import { renderGameCard } from '../app/lib/card.js?v=754da47b';
         if (loadMoreEl) loadMoreEl.innerHTML = '';
         return;
       }
-      // Recompute the row-based target now that the grid layout is
-      // definitely applied (initial shownCount was set before .cards
-      // became display:grid, so cols returned 1 and the size fell to
-      // the 8-item floor -- yielding only 2-3 rows on mobile at sm).
-      const target = pageSizeForFullRows(list, targetRowsForViewport());
+      // Recompute the row-based target now that the grid layout should be
+      // applied. The shared grid CSS (css/shared/cards.css) can still be
+      // loading when the first render fires, so getComputedStyle reports the
+      // container as display:flex and the column count reads 1, collapsing the
+      // page to the 8-item floor (2 rows at 4 columns). When we intend to be in
+      // grid mode but the columns have not resolved yet, defer one frame and
+      // re-render so the initial page fills full rows. Retry once per pass so a
+      // genuinely single-column viewport does not loop.
+      const cols = currentColCount(list);
+      const targetRows = targetRowsForViewport();
+      if (currentLayout === 'grid' && cols < 2 && !_popularColRetry) {
+        _popularColRetry = true;
+        console.debug('[popular-games] grid columns not resolved yet, deferring a frame', { cols, currentLayout, reason: 'grid-css-not-applied', source: 'currentColCount' });
+        requestAnimationFrame(renderPopular);
+        return;
+      }
+      _popularColRetry = false;
+      const target = pageSizeForFullRows(list, targetRows);
       if (shownCount < target) shownCount = target;
       const shown = Math.min(shownCount, all.length);
+      console.debug('[popular-games] render rows', { cols, targetRows, target, shownCount, shown, total: all.length, layout: currentLayout });
       list.innerHTML = all.slice(0, shown).map(pgCardHtml).join('');
       const hasMore = all.length > shown;
       // In tile mode: when more items are queued, trim any orphan tiles on

@@ -40,12 +40,13 @@ export function pageSizeForFullRows(container, rows = 4, minItems = 8) {
   return Math.max(minItems, currentColCount(container) * rows);
 }
 
-// Viewport-aware row target: mobile shows 5 rows (more room to scan the
-// tighter grid), desktop shows 4 (larger tiles + Load more feels fast).
+// Row target for the initial page and each Load more click: 5 complete rows
+// on every viewport. Because the page size is cols * rows, it is always a whole
+// number of rows, so the grid stays even (5 rows) at every S/M/L/XL size.
 // Callers pass `pageSizeForFullRows(el, targetRowsForViewport())` so the
 // initial page size and each Load more click land the same target.
 export function targetRowsForViewport() {
-  return window.matchMedia('(max-width: 560px)').matches ? 5 : 4;
+  return 5;
 }
 
 export function padTileRows(container, { tileSelector = '> *', fillerClass = 'tile-filler', hasMore = false } = {}) {
