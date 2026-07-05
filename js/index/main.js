@@ -1,8 +1,9 @@
 // Entry module for index.html (homepage). Migrated from index.js.
-import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=bb320d7f';
+import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=25783509';
 import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
-import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport } from '../lib/tile-pad.js?v=82e7d8c9';
+import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport, currentColCount } from '../lib/tile-pad.js?v=7c022a1e';
 import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
+import { renderGameCard } from '../app/lib/card.js?v=754da47b';
 
 // Homepage-only logic. Universal nav chrome (banner, nav row, mobile drawer,
 // search dropdown, auth indicator) lives in topbar.js.
@@ -61,60 +62,13 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
     return String(n);
   }
 
-  const RATING_LABEL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
   const KNOWN_TIERS = new Set(['platinum', 'gold', 'silver', 'bronze', 'borked']);
   const STORE_LABEL = { gog: 'GOG', epic: 'Epic', steam: 'Steam' };
-  const STORE_PILL_CLASS = { gog: 'game-card-store-pill--gog', epic: 'game-card-store-pill--epic', steam: 'game-card-store-pill--steam' };
-  function storeColorClass(appType) {
-    const t = appType || 'steam';
-    return STORE_PILL_CLASS[t] || 'game-card-store-pill--steam';
-  }
-  // The store badge renders both a text label and an icon every time. CSS on
-  // <html data-store-display="icon"> hides .store-text and shows .store-icon
-  // so the user pref can swap between the two without re-rendering cards.
-  function storeIconHtml(t, label) {
-    if (t !== 'steam' && t !== 'gog' && t !== 'epic') return '';
-    return `<span class="store-icon store-icon--${t}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg></span>`;
-  }
-  function storePill(appType) {
-    const t = appType || 'steam';
-    const label = STORE_LABEL[t] || 'Steam';
-    const cls = storeColorClass(t);
-    return `<span class="game-card-store-pill ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
-  }
-  function storeTag(appType) {
-    const t = appType || 'steam';
-    const label = STORE_LABEL[t] || 'Steam';
-    const cls = storeColorClass(t);
-    return `<span class="game-card-store-tag ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
-  }
-  // Card-level corner piece for the 'art-corner' placement. Rendered as a
-  // direct child of <a class="pg-card"> so it anchors to the whole card's
-  // top-right edge instead of the thumbnail.
-  function cornerTag(appType) {
-    const t = appType || 'steam';
-    const label = STORE_LABEL[t] || 'Steam';
-    const cls = storeColorClass(t);
-    return `<span class="pg-card-corner-tag game-card-corner-tag ${cls}"><span class="store-text">${label}</span>${storeIconHtml(t, label)}</span>`;
-  }
-  // Store segment that sits inside the bottom-bar strip. CSS controls
-  // visibility based on data-store-pill-pos (bar-right / bar-segment).
-  function stripStoreHtml(appType) {
-    const t = appType || 'steam';
-    const label = STORE_LABEL[t] || 'Steam';
-    return `<span class="pg-card-strip-store game-card-strip-store store-icon store-icon--${t}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-store-${t}"/></svg><span class="store-text">${label}</span></span>`;
-  }
-  // Two-tone combined corner chip for the 'combo' card layout. Tier on the
-  // left, store on the right, both colored. CSS hides this unless
-  // data-card-layout="combo" is set on <html>.
-  function comboTag(rating, appType) {
-    const t = appType || 'steam';
-    const storeLabel = STORE_LABEL[t] || 'Steam';
-    const rated = KNOWN_TIERS.has(rating);
-    const tier = rated ? rating : '';
-    const tierLabel = rated ? RATING_LABEL[rating].toUpperCase() : 'NO RATING';
-    return `<span class="pg-card-combo-tag game-card-combo-tag" data-tier="${tier}" data-store="${t}"><span class="combo-tier">${tierLabel}</span><span class="combo-store">${storeLabel}</span></span>`;
-  }
+  // #125: the storePill / storeTag / cornerTag / stripStoreHtml / comboTag /
+  // storeColorClass helpers (and RATING_LABEL / STORE_PILL_CLASS) that used to
+  // live here re-implemented what the shared renderGameCard already builds.
+  // They are gone now; pgCardHtml delegates to renderGameCard so the homepage
+  // grid and the app-page grid render identical markup and CSS.
   const SECTION_LABEL = { steam: 'Popular on Steam', gog: 'Popular GOG Games', epic: 'Popular Epic Games' };
   const SECTION_SUB = {
     steam: "Steam's most-played games and how they run on Linux through Proton.",
@@ -140,42 +94,27 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
     return searchIndexCache || [];
   }
 
+  // #125: homepage cards render through the shared renderGameCard helper so the
+  // homepage POPULAR grid and the app page grid stay identical. Peak players
+  // goes into the standard sub string; renderGameCard emits the .game-card /
+  // .game-card-strip markup that css/shared/cards.css styles, and the global
+  // data-card-layout / data-store-pill-pos attributes (set by topbar.js on every
+  // page) drive the strip bar and store pill exactly as on the app page.
   function pgCardHtml(g) {
-    const img = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${encodeURIComponent(g.appId)}/header.jpg`;
-    const peak = fmtPeak(g.peak);
     const rating = String(g.rating || '').toLowerCase();
     const rated = KNOWN_TIERS.has(rating);
-    const badgeClass = rated ? `pg-${rating}` : 'pg-unrated';
-    const rLabel = rated ? RATING_LABEL[rating] : 'Unrated';
-    // Rating layout = strip: tier-colored bar across the full card bottom.
-    // The pg-card-row wraps thumb/info/right so the strip can sit as a
-    // sibling and span the full card width (including under the thumbnail).
-    const stripTier = rated ? rating : '';
-    const stripLabel = rated ? RATING_LABEL[rating].toUpperCase() : 'NO RATING';
-    return `
-      <a class="pg-card" href="app.html#/app/${encodeURIComponent(g.appId)}">
-        ${cornerTag(g.appType)}
-        ${comboTag(rating, g.appType)}
-        <div class="pg-card-row">
-          <div class="pg-thumb-wrap">
-            <img class="pg-thumb" src="${img}" data-appid="${g.appId}" alt="" loading="lazy" onerror="window.__steamImgLoad(this)">
-            ${storeTag(g.appType)}
-          </div>
-          <div class="pg-info">
-            <div class="pg-title">${esc(g.title)}</div>
-            ${peak ? `<div class="pg-sub"><span class="pg-sub-count">${peak}</span><span class="pg-sub-suffix"> peak players</span></div>` : ''}
-          </div>
-          <div class="pg-right">
-            <span class="pg-badge ${badgeClass}">${rLabel}</span>
-            ${storePill(g.appType)}
-          </div>
-        </div>
-        <div class="pg-card-strip" data-tier="${stripTier}" data-store="${g.appType || 'steam'}">
-          <span class="pg-card-strip-tier">${stripLabel}</span>
-          ${storePill(g.appType)}
-          ${stripStoreHtml(g.appType)}
-        </div>
-      </a>`;
+    const peak = fmtPeak(g.peak);
+    const sub = peak
+      ? `<span class="game-card-sub-count">${peak}</span><span class="game-card-sub-suffix"> peak players</span>`
+      : '';
+    return renderGameCard({
+      href: `app.html#/app/${encodeURIComponent(g.appId)}`,
+      appId: g.appId,
+      title: g.title,
+      sub,
+      tier: rated ? rating : undefined,
+      storePill: STORE_LABEL[g.appType] || 'Steam',
+    });
   }
 
   // The previous super-condensed pgListRowHtml is gone -- the two layouts
@@ -209,11 +148,15 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
     const unratedCountEl = document.getElementById('pg-unrated-count');
     const loadMoreEl = document.getElementById('pg-load-more');
 
-    // Row target is viewport-aware: 4 rows on desktop, 5 on mobile so
-    // the tighter grid gives users more to scan before Load more. See
-    // pageSizeForFullRows + targetRowsForViewport in lib/tile-pad.js.
+    // Row target is 5 complete rows on every viewport (page size = cols * rows,
+    // so the grid always ends on a whole row and stays even across S/M/L/XL).
+    // See pageSizeForFullRows + targetRowsForViewport in lib/tile-pad.js.
     const state = { rated: true, unrated: false };
     let shownCount = pageSizeForFullRows(list, targetRowsForViewport());
+    // Guards a one-shot re-render when the grid CSS hasn't applied yet on the
+    // very first paint (see renderPopular). Without it the column count reads 1
+    // and the page collapses to the 8-item floor (2 rows at 4 columns).
+    let _popularColRetry = false;
 
     // Build the game list for the selected stores + rating filter state. Store
     // is multi-select: Steam pulls from most_played.json, GOG/Epic pull from the
@@ -281,23 +224,37 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
         if (loadMoreEl) loadMoreEl.innerHTML = '';
         return;
       }
-      // Recompute the row-based target now that the grid layout is
-      // definitely applied (initial shownCount was set before .cards
-      // became display:grid, so cols returned 1 and the size fell to
-      // the 8-item floor -- yielding only 2-3 rows on mobile at sm).
-      const target = pageSizeForFullRows(list, targetRowsForViewport());
+      // Recompute the row-based target now that the grid layout should be
+      // applied. The shared grid CSS (css/shared/cards.css) can still be
+      // loading when the first render fires, so getComputedStyle reports the
+      // container as display:flex and the column count reads 1, collapsing the
+      // page to the 8-item floor (2 rows at 4 columns). When we intend to be in
+      // grid mode but the columns have not resolved yet, defer one frame and
+      // re-render so the initial page fills full rows. Retry once per pass so a
+      // genuinely single-column viewport does not loop.
+      const cols = currentColCount(list);
+      const targetRows = targetRowsForViewport();
+      if (currentLayout === 'grid' && cols < 2 && !_popularColRetry) {
+        _popularColRetry = true;
+        console.debug('[popular-games] grid columns not resolved yet, deferring a frame', { cols, currentLayout, reason: 'grid-css-not-applied', source: 'currentColCount' });
+        requestAnimationFrame(renderPopular);
+        return;
+      }
+      _popularColRetry = false;
+      const target = pageSizeForFullRows(list, targetRows);
       if (shownCount < target) shownCount = target;
       const shown = Math.min(shownCount, all.length);
+      console.debug('[popular-games] render rows', { cols, targetRows, target, shownCount, shown, total: all.length, layout: currentLayout });
       list.innerHTML = all.slice(0, shown).map(pgCardHtml).join('');
       const hasMore = all.length > shown;
       // In tile mode: when more items are queued, trim any orphan tiles on
       // the last row so the grid ends flush (the Load more button visually
       // fills the gap). When fully shown, pad the last row with invisible
       // fillers instead so the trailing tiles stay aligned.
-      padTileRows(list, { tileSelector: '.pg-card', hasMore });
+      padTileRows(list, { tileSelector: '.game-card', hasMore });
       if (loadMoreEl) {
         // Recompute remaining after any orphan trim so the count is accurate.
-        const rendered = list.querySelectorAll(':scope .pg-card:not(.tile-filler)').length;
+        const rendered = list.querySelectorAll(':scope .game-card:not(.tile-filler)').length;
         const remaining = all.length - rendered;
         loadMoreEl.innerHTML = remaining > 0
           ? `<button class="pg-load-more" id="pg-load-more-btn" type="button">Load more <span class="pg-load-more-count">${remaining}</span></button>`
@@ -406,9 +363,16 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
       try { const s = localStorage.getItem(SIZE_KEY); return SIZES.includes(s) ? s : DEFAULT_SIZE; } catch { return DEFAULT_SIZE; }
     }
     function applySize(size) {
-      SIZES.forEach(s => list.classList.remove(`pg-list--${s}`));
-      list.classList.add(`pg-list--${size}`);
+      SIZES.forEach(s => list.classList.remove(`cards--${s}`));
+      list.classList.add(`cards--${size}`);
       document.querySelectorAll('.pg-size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+      // The size class changes the column count, so the previously rendered
+      // item count no longer fills whole rows -- the last row goes ragged and
+      // the grid only looked even because of the initial full-rows render.
+      // Refill to whole rows for the new width and re-render so S/M/L/XL each
+      // land an even 5 rows without needing a page refresh.
+      shownCount = pageSizeForFullRows(list, targetRowsForViewport());
+      renderPopular();
     }
     function setSizeEnabled(enabled) {
       document.querySelectorAll('.pg-size-btn').forEach(b => { b.disabled = !enabled; });
@@ -430,7 +394,7 @@ import { filterAdult } from '../lib/adult-filter.js?v=e4e9d845';
     }
     function applyLayout(layout) {
       currentLayout = layout;
-      list.classList.toggle('pg-list--tile-mode', layout === 'grid');
+      list.classList.toggle('home-cards-tile-mode', layout === 'grid');
       document.querySelectorAll('.pg-layout-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
       // S/M/L/XL sizing stays available in both layouts now -- it controls
       // tile column width in grid mode.

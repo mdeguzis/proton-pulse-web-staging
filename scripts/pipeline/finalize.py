@@ -40,10 +40,11 @@ from .common import (
     flush_steam_descriptors_cache,
     flush_steam_title_cache,
     is_adult_app,
+    is_adult_app_cached,
     log,
 )
-from .gog_catalog import load_gog_catalog, load_gog_covers
-from .epic_catalog import load_epic_catalog, load_epic_covers
+from .gog_catalog import load_gog_catalog, load_gog_covers, load_gog_release_years
+from .epic_catalog import load_epic_catalog, load_epic_covers, load_epic_release_years
 from .metadata import bootstrap_all_app_metadata, read_app_metadata
 from .data_versions import write_data_versions_json
 from .game_images import build_game_images, enrich_search_index_with_delisted
@@ -809,24 +810,40 @@ def generate_search_index(
         seen_ids.add(app_id)
 
     if gog_catalog:
+        # #112: read release-year map from the same catalog cache. Old
+        # caches (pre-#112) have no `years` field so the map is empty
+        # until the 7-day TTL expires and the next fetch populates it;
+        # rows fall back to `None` in that transition period.
+        gog_years = load_gog_release_years()
         stubs = 0
+        with_year = 0
         for pid, title in sorted(gog_catalog.items(), key=lambda kv: kv[1].lower()):
             canonical_id = f"gog:{pid}"
             if canonical_id not in seen_ids:
-                entries.append([canonical_id, title, "", 0, 0, "gog"])
+                year = gog_years.get(str(pid))
+                # 9-column shape matches Steam stubs: [id, title, tier,
+                # pdb, pulse, appType, releaseYear, delisted, adult].
+                entries.append([canonical_id, title, "", 0, 0, "gog", year, None, False])
                 stubs += 1
+                if year:
+                    with_year += 1
         if stubs:
-            log(f"[search-index] Added {stubs:,} GOG catalog stubs (no reports yet)")
+            log(f"[search-index] Added {stubs:,} GOG catalog stubs ({with_year:,} with release year)")
 
     if epic_catalog:
+        epic_years = load_epic_release_years()
         stubs = 0
+        with_year = 0
         for namespace, title in sorted(epic_catalog.items(), key=lambda kv: kv[1].lower()):
             canonical_id = f"epic:{namespace}"
             if canonical_id not in seen_ids:
-                entries.append([canonical_id, title, "", 0, 0, "epic"])
+                year = epic_years.get(namespace)
+                entries.append([canonical_id, title, "", 0, 0, "epic", year, None, False])
                 stubs += 1
+                if year:
+                    with_year += 1
         if stubs:
-            log(f"[search-index] Added {stubs:,} Epic catalog stubs (no reports yet)")
+            log(f"[search-index] Added {stubs:,} Epic catalog stubs ({with_year:,} with release year)")
 
     # Adult-suggestive keywords in a stub title trigger a descriptor check even
     # though the game has no local reports (a full scan of every stub would be
@@ -897,6 +914,25 @@ def generate_search_index(
     log(f"[search-index] Written {len(entries):,} entries to {index_file}")
 
 
+_ADULT_ENRICH_BUDGET_ENV = "PIPELINE_STUB_ADULT_ENRICH_BUDGET"
+_ADULT_ENRICH_BUDGET_DEFAULT = 500
+
+
+def _adult_enrich_budget() -> int:
+    """How many uncached extended stubs may hit appdetails this run for
+    the #176 gradual-enrichment pass. Steam's throttle is ~200 req / 5min
+    so 500/run = ~12 min added; ~30 runs covers all ~15k stubs. Override
+    with PIPELINE_STUB_ADULT_ENRICH_BUDGET=N (0 = disabled, keep old
+    hint-only behaviour)."""
+    raw = os.environ.get(_ADULT_ENRICH_BUDGET_ENV, "").strip()
+    if not raw:
+        return _ADULT_ENRICH_BUDGET_DEFAULT
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return _ADULT_ENRICH_BUDGET_DEFAULT
+
+
 def generate_extended_steam_index(
     output_path: Path,
     steam_catalog: dict[str, str] | None = None,
@@ -909,8 +945,15 @@ def generate_extended_steam_index(
     but are not in the curated signal export (e.g. "Thank You For Your
     Application" app 2881370). The extended file removes that gate entirely
     and is lazy-loaded by the frontend only when the primary index has no
-    match for a query. Same row shape as the primary index so the existing
-    render helpers work unchanged.
+    match for a query. Same 9-column row shape as the primary index so the
+    existing render helpers + adult filter work unchanged.
+
+    Adult enrichment (#176): the primary index only descriptor-checks stubs
+    whose title matches ADULT_TITLE_HINT_RE (~58 of 15k). Adult games with
+    innocuous titles slip through. Gradual pass here descriptor-checks the
+    next PIPELINE_STUB_ADULT_ENRICH_BUDGET uncached extended stubs per run;
+    over ~30 runs the whole catalog covers itself using the shared 30-day
+    descriptor cache without any single run being painful.
     """
     if not steam_catalog:
         log("[search-index-ext] No steam_catalog; skipping extended index")
@@ -926,23 +969,63 @@ def generate_extended_steam_index(
         except (json.JSONDecodeError, OSError) as exc:
             log(f"[search-index-ext] WARN: cannot read primary index ({exc}); proceeding with empty seen set")
 
+    budget = _adult_enrich_budget()
     entries = []
     skipped_no_title = 0
     skipped_already_primary = 0
-    for app_id, title in sorted(steam_catalog.items(), key=lambda kv: (kv[1] or "").lower()):
+    cached_hits = 0
+    cached_adult = 0
+    hint_probed = 0
+    hint_adult = 0
+    budget_probed = 0
+    budget_adult = 0
+    budget_left = budget
+    # Stable order (numeric app_id) for the budget pass so uncached apps
+    # get covered in a deterministic sequence across runs -- means every
+    # ~30 runs the whole catalog cycles even if the catalog grows.
+    for app_id, title in sorted(steam_catalog.items(), key=lambda kv: int(kv[0]) if str(kv[0]).isdigit() else 10**12):
         if str(app_id) in seen_ids:
             skipped_already_primary += 1
             continue
         if not title:
             skipped_no_title += 1
             continue
-        entries.append([str(app_id), title, "", 0, 0, "steam"])
+        adult = False
+        cached = is_adult_app_cached(app_id)
+        if cached is not None:
+            adult = cached
+            cached_hits += 1
+            if adult:
+                cached_adult += 1
+        elif ADULT_TITLE_HINT_RE.search(title):
+            # Hint-matched stubs stay force-refresh so a poisoned empty
+            # cache heals (#185). Doesn't count against the budget.
+            adult = is_adult_app(app_id, force_refresh=True)
+            hint_probed += 1
+            if adult:
+                hint_adult += 1
+        elif budget_left > 0:
+            adult = is_adult_app(app_id)
+            budget_probed += 1
+            budget_left -= 1
+            if adult:
+                budget_adult += 1
+        # 9-column shape matches the primary index: [id, title, tier,
+        # pdb, pulse, appType, releaseYear, delisted, adult]. Nulls
+        # keep the column indices stable for the frontend renderer.
+        entries.append([str(app_id), title, "", 0, 0, "steam", None, None, adult])
 
     ext_file = output_path / "search-index-steam-extended.json"
     ext_file.write_text(json.dumps(entries, separators=(",", ":")))
     log(
         f"[search-index-ext] Written {len(entries):,} extended Steam stubs "
         f"({skipped_already_primary:,} already in primary, {skipped_no_title:,} skipped no title)"
+    )
+    log(
+        f"[search-index-ext] Adult enrichment: {cached_hits:,} cached "
+        f"({cached_adult:,} adult) | {hint_probed:,} hint-probed ({hint_adult:,} adult) | "
+        f"{budget_probed:,} budget-probed of {budget} ({budget_adult:,} adult), "
+        f"{budget_left:,} budget remaining"
     )
 
 

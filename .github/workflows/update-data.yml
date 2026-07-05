@@ -11,7 +11,7 @@ on:
         default: false
         type: boolean
       backfill_app_ids:
-        description: "Comma-separated Steam app IDs to backfill and publish (skips full pipeline)"
+        description: "Comma-separated app IDs to backfill and publish. Accepts Steam numeric ids AND GOG/Epic canonical ids (e.g. 570,gog:1207658691,epic:MyGame). Steam ids reach ProtonDB backfill; non-Steam ids are logged as accepted-but-deferred until per-product refresh lands (#112). Skips the full pipeline. See #114."
         required: false
         default: ""
       coverage_backfill_issue_type:
@@ -33,6 +33,21 @@ on:
         required: false
         default: false
         type: boolean
+      staging_with_pipeline:
+        description: "Run the FULL pipeline against the staging branch and deploy data + shell to the staging repo. Slow (30+ min). Use when a pipeline-data change needs end-to-end verification before promoting to prod (#117)."
+        required: false
+        default: false
+        type: boolean
+      resume:
+        description: "Only re-run chunks marked incomplete in gh-pages/.pipeline-state/manifest.json. Rescue path for a partial run (e.g. chunk 8 stalled while 1-7 + 9-10 completed) -- avoids re-doing the successful work. #171 Phase 3."
+        required: false
+        default: false
+        type: boolean
+      finalize_only:
+        description: "Skip probing entirely and re-run finalize against whatever chunk state is already in gh-pages/.pipeline-state/. Use when a finalize-side bug needs a fix but the probe cache is fine. #171 Phase 3."
+        required: false
+        default: false
+        type: boolean
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -45,11 +60,16 @@ jobs:
 
   # ── Stage 1: process reports, backfill, compute probe plan ─────────
   build:
-    if: inputs.pages_only != true && inputs.staging_only != true && inputs.backfill_app_ids == '' && inputs.coverage_backfill_issue_type == ''
+    # finalize_only skips build entirely -- we're re-running the finalize
+    # stage against gh-pages state as-is, no need to re-shard/re-probe.
+    if: inputs.pages_only != true && inputs.staging_only != true && inputs.backfill_app_ids == '' && inputs.coverage_backfill_issue_type == '' && inputs.finalize_only != true
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       chunk_count: ${{ steps.plan.outputs.chunk_count }}
       chunk_matrix: ${{ steps.plan.outputs.chunk_matrix }}
+      expected_matrix: ${{ steps.plan.outputs.expected_matrix }}
     steps:
       - name: Checkout Scripts
         uses: actions/checkout@v4
@@ -108,20 +128,12 @@ jobs:
 
       - name: Build probe chunk plan
         id: plan
+        env:
+          RESUME_MODE: ${{ inputs.resume }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run python scripts/split_reports.py probe-plan /tmp/protondb-output > /tmp/probe-plan.json
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          plan = json.loads(Path("/tmp/probe-plan.json").read_text())
-          github_output = Path(os.environ["GITHUB_OUTPUT"])
-          with github_output.open("a", encoding="utf-8") as fh:
-              fh.write(f"chunk_count={plan['chunk_count']}\n")
-              fh.write(f"chunk_matrix={json.dumps(plan['chunks'])}\n")
-          print(f"[protondb-probe] chunk_count={plan['chunk_count']}, uncached={plan['uncached_count']}")
-          PY
+          bash scripts/probe-plan-emit.sh /tmp/probe-plan.json
 
       - name: Save pipeline cache
         if: always()
@@ -143,6 +155,10 @@ jobs:
     needs: build
     if: needs.build.outputs.chunk_count != '0'
     runs-on: ubuntu-24.04
+    permissions:
+      # write access needed to push each chunk's snapshot + manifest entry
+      # to gh-pages/.pipeline-state/ for durable recovery (#171).
+      contents: write
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -182,9 +198,32 @@ jobs:
             printf 'STEAM_API_KEY=%s\n' "${{ secrets.STEAM_API_KEY }}" > .env
           fi
 
+      # Phase 4 of #171: idempotent skip. If the current probe cache
+      # hashes to the same input_sha this chunk stored last time, the
+      # state hasn't drifted -- probe would be a no-op. Skip it. Warm
+      # reruns of the same dispatch (accidental double-trigger, resume
+      # of an already-complete plan) become near-instant.
+      - name: Idempotent check (#171 Phase 4)
+        id: idem
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/probe-idempotent-check.sh "${{ matrix.chunk }}"
+
       - name: Probe ProtonDB summary chunk ${{ matrix.chunk }}
+        if: steps.idem.outputs.skip != 'true'
         run: |
           uv run python scripts/split_reports.py probe /tmp/protondb-output
+
+      # Phase 1 of #171: durable chunk-state persistence. Snapshot the probe
+      # cache + a manifest entry to gh-pages/.pipeline-state/ so a cancelled
+      # run (chunk timeout, runner starvation, git-pages incident) doesn't
+      # throw away the successful chunks' work. Skipped when the idempotent
+      # check fired -- nothing changed, nothing to persist.
+      - name: Persist chunk state to gh-pages (#171)
+        if: always() && steps.idem.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/persist-chunk-state.sh "${{ matrix.chunk }}" "${{ github.run_id }}" "${{ github.run_attempt }}"
 
       - name: Save pipeline cache
         if: always()
@@ -201,8 +240,9 @@ jobs:
       inputs.pages_only != true &&
       inputs.backfill_app_ids == '' &&
       inputs.coverage_backfill_issue_type == '' &&
-      needs.build.result == 'success' &&
-      (needs.probe-chunks.result == 'success' || needs.probe-chunks.result == 'skipped')
+      (inputs.finalize_only == true ||
+        (needs.build.result == 'success' &&
+         (needs.probe-chunks.result == 'success' || needs.probe-chunks.result == 'skipped')))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -254,10 +294,14 @@ jobs:
           else
             echo "No gh-pages data branch to merge (first run or branch absent)"
           fi
-          # Seed image caches so daily runs only probe new/uncached app IDs
+          # Seed image caches so daily runs only probe new/uncached app IDs.
+          # release-years-cache.json (#109) restored the same way -- release
+          # dates never change, so once the cache accumulates the 200/run
+          # probe cap stays untouched on subsequent runs.
           cp gh-pages-data/game-images.json /tmp/protondb-output/ 2>/dev/null || true
           cp gh-pages-data/game-images-skip.json /tmp/protondb-output/ 2>/dev/null || true
           cp gh-pages-data/game-images-cache.json /tmp/protondb-output/ 2>/dev/null || true
+          cp gh-pages-data/release-years-cache.json /tmp/protondb-output/ 2>/dev/null || true
 
       - name: Restore pipeline cache
         uses: actions/cache/restore@v4
@@ -266,6 +310,20 @@ jobs:
           key: pipeline-cache-${{ runner.os }}-${{ github.workflow }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-final
           restore-keys: |
             pipeline-cache-${{ runner.os }}-${{ github.workflow }}-${{ github.ref_name }}-
+
+      # Phase 2 of #171: source the probe cache from durable gh-pages state
+      # instead of the ephemeral actions cache. Overwrites .cache/protondb-
+      # summary-probe-cache.json with the last chunk's snapshot. Aborts loud
+      # if any chunk in the FULL plan (expected_matrix) is missing so a
+      # runner starvation event surfaces here instead of silently finalizing
+      # on stale data. In finalize_only mode build was skipped so the script
+      # falls back to whatever's in manifest.json (empty arg triggers that
+      # branch). Skipped if the full plan is empty (chunk_count == 0).
+      - name: Restore chunk state from gh-pages (#171)
+        if: inputs.finalize_only == true || needs.build.outputs.chunk_count != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/restore-chunk-state.sh '${{ needs.build.outputs.expected_matrix }}'
 
       # Seed the store catalog caches from gh-pages AFTER restoring the pipeline
       # cache, so the freshly rebuilt catalog (pushed by the dedicated GOG/Epic
@@ -277,6 +335,13 @@ jobs:
           mkdir -p .cache
           cp gh-pages-data/gog-catalog-cache.json .cache/ 2>/dev/null || true
           cp gh-pages-data/epic-catalog-cache.json .cache/ 2>/dev/null || true
+
+      # #89: log which caches survived the restore, their sizes + ages,
+      # so the workflow output tells us at a glance whether the two cache
+      # layers are actually doing their job. Prints one line per known
+      # cache file with entries / bytes / age-in-days.
+      - name: Cache-state stats (#89)
+        run: bash scripts/log-cache-stats.sh post-restore
 
       - name: Write local .env from secret
         run: |
@@ -327,6 +392,7 @@ jobs:
           key: pipeline-cache-${{ runner.os }}-${{ github.workflow }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-final
 
       - name: Deploy to gh-pages (orphan, no history)
+        if: inputs.staging_with_pipeline != true
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -343,6 +409,7 @@ jobs:
           cp /tmp/protondb-output/game-images.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-skip.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/release-years-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/gog-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/epic-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/most_played.json . 2>/dev/null || true
@@ -371,7 +438,7 @@ jobs:
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)
-          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
+          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json release-years-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
             [ -f "$f" ] && git add "$f"
           done
           while IFS= read -r path; do
@@ -385,6 +452,68 @@ jobs:
           git add version.json
           git commit -m "Deploy: $(date +%F)"
           git push origin gh-pages-new:gh-pages --force
+
+      # Staging-with-pipeline mode (#117): same finalize output as the prod
+      # deploy step above, but pushed to the staging repo's gh-pages instead
+      # of origin/gh-pages. Reads version/SHA from HEAD (staging branch) so
+      # the About page reflects what's actually being tested. The two deploy
+      # steps are mutually exclusive via the `if:` gates -- prod runs on
+      # !staging_with_pipeline, staging runs on staging_with_pipeline.
+      - name: Deploy pipeline output to staging repo
+        if: inputs.staging_with_pipeline == true
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout --orphan staging-pipeline-deploy
+          git rm -rf .
+          cp -r /tmp/protondb-output/data .
+          cp /tmp/protondb-output/data-index.html .
+          cp /tmp/protondb-output/coverage.html .
+          cp /tmp/protondb-output/search-index.json . 2>/dev/null || true
+          cp /tmp/protondb-output/search-index-steam-extended.json . 2>/dev/null || true
+          cp /tmp/protondb-output/coverage-summary.json . 2>/dev/null || true
+          cp /tmp/protondb-output/stats.json . 2>/dev/null || true
+          cp /tmp/protondb-output/recent-reports.json . 2>/dev/null || true
+          cp /tmp/protondb-output/game-images.json . 2>/dev/null || true
+          cp /tmp/protondb-output/game-images-skip.json . 2>/dev/null || true
+          cp /tmp/protondb-output/game-images-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/release-years-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/gog-catalog-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/epic-catalog-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/most_played.json . 2>/dev/null || true
+          cp /tmp/protondb-output/deck-status.json . 2>/dev/null || true
+          cp /tmp/protondb-output/nonsteam-images.json . 2>/dev/null || true
+          cp /tmp/protondb-output/proton-versions.json . 2>/dev/null || true
+          cp /tmp/protondb-output/data-versions.json . 2>/dev/null || true
+          cp /tmp/protondb-output/steam-catalog.json . 2>/dev/null || true
+          cp /tmp/protondb-output/hardware-suggestions.json . 2>/dev/null || true
+          # Read shell files from HEAD (staging branch) so JS/CSS/HTML
+          # match the code being tested, not whatever's on main.
+          git show HEAD:gh-pages-manifest.txt > gh-pages-manifest.txt
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            case "$path" in \#*) continue ;; esac
+            mkdir -p "$(dirname "$path")"
+            git show HEAD:"$path" > "$path" 2>/dev/null || true
+          done < gh-pages-manifest.txt
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/scoring-info.json -o scoring-info.json
+          curl -sL https://raw.githubusercontent.com/mdeguzis/decky-proton-pulse/main/src/data/form-schema.json -o form-schema.json
+          git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json
+          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json release-years-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            case "$path" in \#*) continue ;; esac
+            git add "$path"
+          done < gh-pages-manifest.txt
+          VERSION=$(git show HEAD:package.json | python3 -c "import json,sys; print(json.load(sys.stdin).get('version','0.0.0'))")
+          SHA=$(git rev-parse --short HEAD)
+          printf '{"version":"%s","sha":"%s","deployed_at":"%s","repo":"mdeguzis/proton-pulse-web"}\n' "$VERSION" "$SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > version.json
+          git add version.json
+          git commit -m "Staging pipeline: $(date +%F)"
+          git remote add staging https://x-access-token:${{ secrets.STAGING_DEPLOY_TOKEN }}@github.com/mdeguzis/proton-pulse-web-staging.git
+          git push staging staging-pipeline-deploy:gh-pages --force
 
       # NOTE: the production pipeline must NOT push to the staging site. Doing so
       # force-pushed main's (production) frontend over any in-review staging
@@ -606,6 +735,7 @@ jobs:
           cp /tmp/protondb-output/game-images.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-skip.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/release-years-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/gog-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/epic-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/most_played.json . 2>/dev/null || true
@@ -634,7 +764,7 @@ jobs:
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)
-          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
+          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json release-years-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
             [ -f "$f" ] && git add "$f"
           done
           while IFS= read -r path; do
@@ -826,6 +956,7 @@ jobs:
           cp /tmp/protondb-output/game-images.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-skip.json . 2>/dev/null || true
           cp /tmp/protondb-output/game-images-cache.json . 2>/dev/null || true
+          cp /tmp/protondb-output/release-years-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/gog-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/epic-catalog-cache.json . 2>/dev/null || true
           cp /tmp/protondb-output/most_played.json . 2>/dev/null || true
@@ -854,7 +985,7 @@ jobs:
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)
-          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
+          for f in coverage-summary.json stats.json recent-reports.json game-images.json game-images-skip.json game-images-cache.json release-years-cache.json gog-catalog-cache.json epic-catalog-cache.json most_played.json deck-status.json proton-versions.json steam-catalog.json hardware-suggestions.json nonsteam-images.json data-versions.json search-index-steam-extended.json; do
             [ -f "$f" ] && git add "$f"
           done
           while IFS= read -r path; do

@@ -9,10 +9,10 @@
 <title>How Scoring Works - Proton Pulse</title>
 <meta name="description" content="Transparent explanation of how Proton Pulse scores compatibility reports against your hardware. Identical algorithm to the Decky Loader plugin - one canonical source of truth, no hidden magic.">
 <meta name="color-scheme" content="dark">
-<link rel="stylesheet" href="css/shared/base.css?v=5f05e437">
+<link rel="stylesheet" href="css/shared/base.css?v=a93b26ad">
 <link rel="stylesheet" href="css/shared/topbar.css?v=c550d77b">
 <link rel="stylesheet" href="css/shared/site.css?v=e05a0f73">
-<link rel="stylesheet" href="css/shared/cards.css?v=16c748ed">
+<link rel="stylesheet" href="css/shared/cards.css?v=317e26bc">
 <style>
 h1 {
   font-family: var(--font-display);
@@ -548,9 +548,9 @@ h2 small {
   // Anonymous-applicable groups get a small "anon" tag so visitors know which
   // factors affect them when not signed in
   function renderConfidenceGroup(g, weights) {
-    const anonTag = g.appliesToAnonymous
-      ? '<span class="anon-tag" title="Applies to anonymous webui visitors too">anon</span>'
-      : '<span class="signedin-tag" title="Requires signed-in plugin/webui hardware info">signed-in only</span>';
+    // Audience (anonymous vs signed-in) is already conveyed by the two section
+    // headers below, so the per-card tag is redundant and just adds noise.
+    const anonTag = '';
     const rows = (g.weightKeys || []).map(k => {
       const v = weights[k];
       if (v == null) return '';
@@ -795,6 +795,14 @@ h2 small {
           <ul style="margin: 8px 0 0 16px; line-height: 1.8;">
             ${agg.confidence.factors.map(f => `<li>${esc(f)}</li>`).join('')}
           </ul>` : '<p>Aggregated from per-report confidence.</p>'}
+        </div>
+
+        <h2 id="compat-trend">Compatibility trend</h2>
+        <p class="lede">Game pages show a short line saying whether compatibility is improving, stable, or declining, and the per-game stats page shows the same direction with a bar chart. Both read from one function so they never disagree.</p>
+        <div class="card body">
+          <p>The trend compares two windows of reports: the last 90 days against the 90 to 270 day window before it. Reports older than 270 days are left out so a years-old rating cannot skew the baseline.</p>
+          <p>It looks at the share of playable reports in each window, not an average of tier numbers. Playable means Platinum, Gold, or Silver. If that share rises by at least 15 points the trend reads improving; if it drops by at least 15 points it reads declining; anything smaller is stable.</p>
+          <p>Two rules keep it honest. A shift between two playable tiers, say Platinum down to Gold, does not count as a decline, because the game still runs. And a direction only appears when both windows have at least 5 reports, so a couple of old reports never drive the verdict. Below that the game page shows no trend line at all.</p>
         </div>
 
         <h2>Custom Proton markers</h2>

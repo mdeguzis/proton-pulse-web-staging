@@ -9,13 +9,13 @@
 <title>Game Stats - Proton Pulse</title>
 <meta name="description" content="Per-game Proton compatibility analysis with confidence breakdown, monthly report trends, working status, version success rates, and proven launch options.">
 <meta name="color-scheme" content="dark">
-<link rel="stylesheet" href="css/shared/base.css?v=5f05e437">
+<link rel="stylesheet" href="css/shared/base.css?v=a93b26ad">
 <link rel="stylesheet" href="css/shared/topbar.css?v=c550d77b">
 <link rel="stylesheet" href="css/shared/site.css?v=e05a0f73">
-<link rel="stylesheet" href="css/shared/cards.css?v=16c748ed">
-<link rel="stylesheet" href="css/app/game-header.css?v=38fa39fe">
+<link rel="stylesheet" href="css/shared/cards.css?v=317e26bc">
+<link rel="stylesheet" href="css/app/game-header.css?v=1e9439a5">
 <link rel="stylesheet" href="css/app/configs.css?v=90d5bed5">
-<link rel="stylesheet" href="css/app/reports.css?v=233a0cd0">
+<link rel="stylesheet" href="css/app/reports.css?v=1f4965f0">
 <link rel="stylesheet" href="css/app/modals.css?v=5e3db937">
 <link rel="stylesheet" href="css/app/home.css?v=95acc50a">
 <style>
@@ -87,7 +87,17 @@ h1 {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--strong);
+  /* Section heads are deep-link anchors (e.g. #trend from the game page);
+     keep the title clear of the fixed topbar when scrolled into view. */
+  scroll-margin-top: calc(var(--topnav-h) + 16px);
 }
+.gs-trend-explain {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.gs-trend-explain strong { color: var(--text); font-weight: 600; }
 .gs-section-head svg {
   width: 22px; height: 22px;
   flex-shrink: 0; stroke: var(--accent); stroke-width: 1.8;
@@ -335,7 +345,7 @@ h1 {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/lib/supabase-client.js?v=79bf62c6"></script>
 <script src="js/lib/analytics.js?v=e6dfbad8"></script>
-<script type="module" src="js/game-stats/main.js?v=ab9c5267"></script>
+<script type="module" src="js/game-stats/main.js?v=d1b893a7"></script>
 
 </body>
 </html>

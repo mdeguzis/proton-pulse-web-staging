@@ -1,5 +1,5 @@
 // Entry module for confidence.html. Migrated from the page's inline script.
-import { estimateScoreBreakdown, loadScoringInfo } from '../shared/scoring.js?v=0dae1257';
+import { estimateScoreBreakdown, loadScoringInfo, ratingMix } from '../shared/scoring.js?v=1b8ae722';
 import { isPreviewHardware, loadMyHardware, renderPreviewHardwareBanner } from '../shared/hardware.js?v=6a1246aa';
 import { attachChartHover } from '../shared/chart-interactions.js?v=6b608095';
 import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
@@ -660,8 +660,14 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
     // here as they saw to get here in the first place
     const TIER_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
     const TIER_LBL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked' };
-    let overallTier = null;
-    if (n > 0) {
+    // Prefer the authoritative tier the game page passes via ?tier= (#192). The
+    // game page factors in native Pulse reports that this CDN-only page can't
+    // see, so recomputing the tier here can disagree (Gold vs Platinum). Use the
+    // passed verdict so the breakdown always matches the badge the user clicked
+    // in from; fall back to the local mode only on a direct visit with no param.
+    const _tierParam = (new URLSearchParams(location.search).get('tier') || '').toLowerCase();
+    let overallTier = TIER_ORDER.includes(_tierParam) ? _tierParam : null;
+    if (!overallTier && n > 0) {
       const tierCounts = {};
       for (const r of reports) if (counts[r.rating] != null) {
         tierCounts[r.rating] = (tierCounts[r.rating] || 0) + 1;
@@ -680,6 +686,16 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
       ? `<span class="cb-total" style="background:${tierBg};color:${tierFg};margin-left:8px">${TIER_LBL[overallTier]}</span>`
       : '';
 
+    // Plain-language "why this rating" callout, driven by the report mix so the
+    // user sees the tiers that produced the verdict (#192 follow-up).
+    const _mixParts = ratingMix(reports)
+      .map(({ tier, count }) => `<strong style="color:${RATING_COLORS[tier] || '#888'}">${count} ${TIER_LBL[tier]}</strong>`);
+    const whyRating = overallTier && n > 0 ? `
+      <div class="cb-why-rating" style="margin:14px 0 4px;padding:12px 16px;background:var(--s1);border:1px solid var(--border);border-left:3px solid ${RATING_COLORS[overallTier] || '#3a4a5a'};border-radius:6px">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:700">Why ${TIER_LBL[overallTier]}?</div>
+        <p style="margin:6px 0 0;font-size:0.9rem;line-height:1.55;color:var(--text)">Rated <strong style="color:${RATING_COLORS[overallTier] || '#888'}">${TIER_LBL[overallTier]}</strong> across ${n} report${n !== 1 ? 's' : ''}: ${_mixParts.join(', ')}. Newer reports count for more, so the rating mix above plus recency set the overall tier.</p>
+      </div>` : '';
+
     const html = `
       <div class="cb-header">
         <div class="cb-header-game">
@@ -691,6 +707,8 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
         </span>
         ${tierBadge}
       </div>
+
+      ${whyRating}
 
       <h3 class="cb-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Report history</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">Positive (silver+) vs. negative (bronze/borked) reports submitted over time.</p>

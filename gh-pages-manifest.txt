@@ -109,6 +109,7 @@ js/lib/toast.js
 js/lib/data-url.js
 js/lib/tile-pad.js
 js/lib/adult-filter.js
+js/lib/user-prefs.js
 js/lib/store-url-parser.js
 js/lib/gh-gist.js
 js/lib/gh-auth.js
@@ -127,6 +128,7 @@ gh-pages-manifest.txt
 gh-pages-exclude-manifest.txt
 js/about/version.js
 js/app/lib/card.js
+js/app/lib/filter-group.js
 js/app/lib/steam-img.js
 system-edit.html
 js/profile/system-edit.js

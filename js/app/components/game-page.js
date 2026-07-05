@@ -1,7 +1,8 @@
 // game-page (components) for the app page. Relocated from app.js.
 
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
-import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=0dae1257';
+import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=1b8ae722';
+import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/scoring/gameStats.js?v=8dc92cf7';
 import { getWebClientId } from '../../shared/submit.js?v=8c22e9ad';
 import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=dfac69c8';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=083594fa';
@@ -11,10 +12,10 @@ import { enhanceAuthorBlocks } from './author.js?v=2316d334';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=a1a075ee';
 import { renderCard } from './report-card.js?v=8a17ff46';
-import { loadSearchIndex, searchIndex } from './search.js?v=ff82d0c0';
+import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
-import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=df5b5024';
-import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=bb320d7f';
+import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=f9591262';
+import { loadSteamImg as _loadSteamImg } from '../lib/steam-img.js?v=25783509';
 import { configKey, daysAgo, downloadJson, esc, reportKey } from '../utils.js?v=c7e1268c';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 
@@ -118,20 +119,31 @@ function _showFlagModal(btn) {
   });
 }
 
-export function trendSummary(reps) {
-  if (reps.length < 2) return '';
-  const ratingVal = { platinum: 5, gold: 4, silver: 3, bronze: 2, borked: 1 };
+export function trendSummary(reps, appId) {
+  if (!Array.isArray(reps) || reps.length < 2) return '';
   const now = Date.now() / 1000;
-  const recent = reps.filter(r => now - r.timestamp < 180 * 86400);
-  const older  = reps.filter(r => now - r.timestamp >= 180 * 86400);
-  if (!recent.length || !older.length) return '';
-  const avg = arr => arr.reduce((s, r) => s + (ratingVal[r.rating] || 3), 0) / arr.length;
-  const diff = avg(recent) - avg(older);
-  if (Math.abs(diff) < 0.3)
-    return `<div class="trend">Compatibility is <strong>stable</strong> - ${recent.length} recent vs ${older.length} older reports</div>`;
-  if (diff > 0)
-    return `<div class="trend">Compatibility is <strong style="color:var(--green)">improving</strong> - ${recent.length} recent vs ${older.length} older reports</div>`;
-  return `<div class="trend">Compatibility is <strong style="color:var(--red)">declining</strong> - ${recent.length} recent vs ${older.length} older reports</div>`;
+  const recent = reps.filter(r => r.timestamp && now - r.timestamp < RECENT_DAYS * 86400);
+  const prior  = reps.filter(r => r.timestamp && now - r.timestamp >= RECENT_DAYS * 86400 && now - r.timestamp < PRIOR_WINDOW_DAYS * 86400);
+  const t = computeCompatTrend(recent, prior);
+  console.debug('[game-page] trendSummary', { dir: t.dir, delta: t.delta, recentCount: t.recentCount, priorCount: t.priorCount, source: 'computeCompatTrend' });
+  // Insufficient data (e.g. a game with only a couple of old reports) shows
+  // nothing rather than a misleading verdict off a tiny baseline. The trend is
+  // playable-share based, so a platinum->gold drift reads as stable, not a
+  // decline.
+  if (t.dir === 'insufficient') return '';
+  const counts = `${t.recentCount} recent vs ${t.priorCount} prior reports`;
+  const word = t.dir === 'improving'
+    ? '<strong style="color:var(--green)">improving</strong>'
+    : t.dir === 'declining'
+      ? '<strong style="color:var(--red)">declining</strong>'
+      : '<strong>stable</strong>';
+  // The whole line links to the stats page trend section, which explains how
+  // the direction is computed (playable share, windows, min sample).
+  const href = appId != null ? `game-stats.html?app=${encodeURIComponent(appId)}#trend` : '';
+  const body = `Compatibility is ${word} - ${counts} <span class="trend-more">how this works &rarr;</span>`;
+  return href
+    ? `<div class="trend"><a class="trend-link" href="${href}" title="How the compatibility trend is calculated">${body}</a></div>`
+    : `<div class="trend">${body}</div>`;
 }
 
 // - Deck Verified status helpers (stub for now) -------
@@ -532,7 +544,7 @@ export async function renderGamePage(appId) {
     // Short labels match the tier bars on the right (PLAT/GOLD/SILV/BRON/BORK).
     // CSS shows the abbreviated form on narrow screens so PLATINUM doesn't
     // spill past the 118px dial diameter.
-    const gaugeDial = `<div class="grp-dial-block">
+    const _dialInner = `
         <div class="grp-dial-verdict" style="color:${overallTileColor}">${overallTier}</div>
         <div class="grp-dial" title="Aggregate confidence: ${_dialPct}%">
           <svg viewBox="0 0 132 132" aria-hidden="true">
@@ -543,8 +555,12 @@ export async function renderGamePage(appId) {
             <span class="grp-dial-pct">${hasAnyReports ? _dialPct + '%' : '--'}</span>
             <span class="grp-dial-cap">confidence</span>
           </div>
-        </div>
-      </div>`;
+        </div>`;
+    // The whole dial links to the factor-by-factor breakdown (same target as the
+    // "why?" link) so clicking the hero circle explains how the rating was reached.
+    const gaugeDial = hasAnyReports
+      ? `<a class="grp-dial-block grp-dial-link" href="confidence.html?app=${appId}&tier=${overallTier}" title="See how this ${overallTier} rating and its confidence were calculated">${_dialInner}</a>`
+      : `<div class="grp-dial-block">${_dialInner}</div>`;
 
     // Panel footer: confidence summary (+ link to the scoring breakdown), then
     // App id / newest report on one meta line. The per-source split
@@ -554,7 +570,7 @@ export async function renderGamePage(appId) {
     const _freshBit = newestTs ? `newest report: <strong>${daysAgo(newestTs)}</strong>` : '';
     const _metaBits = [`App ${esc(String(appId))}`, _freshBit].filter(Boolean).join(' &middot; ');
     const _confWhy = hasAnyReports
-      ? ` <a class="grp-why conf-link" href="confidence.html?app=${appId}" title="See the factor-by-factor breakdown of this aggregate confidence">why?</a>`
+      ? ` <a class="grp-why conf-link" href="confidence.html?app=${appId}&tier=${overallTier}" title="See the factor-by-factor breakdown of this aggregate confidence">why?</a>`
       : '';
     const ratingPanel = `<div class="game-rating-panel">
         <div class="grp-row">${gaugeDial}${tierBars}</div>
@@ -601,7 +617,7 @@ export async function renderGamePage(appId) {
         </div>
       </div>
 
-      ${trendSummary(reports)}
+      ${trendSummary(reports, appId)}
 
       <div class="reports-section-head" id="pulse-summary">
         <div class="reports-section-copy">
