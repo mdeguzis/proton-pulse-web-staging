@@ -12,7 +12,7 @@ const TIER_COLORS = {
   borked:   { bg: '#c85050', color: '#fff' },
 };
 
-// opts: { href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill }
+// opts: { href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend }
 // imgUrl: pre-resolved Steam image URL (bypasses CDN guessing entirely)
 // tier: one of platinum/gold/silver/bronze/borked - auto-colours the badge
 // badge: raw label string - used when tier is not applicable
@@ -20,7 +20,12 @@ const TIER_COLORS = {
 //   of the artwork (e.g. "Steam", "GOG", "Epic"), keeping the right column free
 //   for just the rating pill so titles get more width on mobile.
 // sourceLabel: plain muted text shown below the pills (legacy; prefer storePill)
-export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill }) {
+// trend: compatibility trend direction from the pipeline (recent 90d vs 90-270d
+//   playable-share). Renders a small up/down arrow next to the tier + store
+//   pills. 'improving' -> green up, 'declining' -> red down. Any other value
+//   (stable, insufficient, undefined, "") renders nothing so unchanged games
+//   read as neutral without adding a "stable" glyph to every card.
+export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend }) {
   const primarySrc = imgUrl || (appId ? STEAM_IMG(appId) : '');
   const aid = appId != null ? String(appId) : '';
   const thumbInner = primarySrc
@@ -52,7 +57,24 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
   const storePillHtml = storePill
     ? `<span class="game-card-store-pill game-card-store-pill--${storeKey}"><span class="store-text">${esc(storePill)}</span>${storeIcon}</span>`
     : '';
-  const pillsRowHtml = `<div class="game-card-pills">${badgeHtml}${storePillHtml}</div>`;
+  // Trend arrow. Only 'improving' and 'declining' render; stable and
+  // insufficient are absent by design so a card stays quiet when nothing has
+  // changed. aria-label carries the plain-English direction for AT users.
+  const trendKey = trend === 'improving' || trend === 'declining' ? trend : '';
+  const trendGlyph = trendKey === 'improving'
+    ? '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2 L10 8 L2 8 Z" fill="currentColor"/></svg>'
+    : trendKey === 'declining'
+      ? '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10 L10 4 L2 4 Z" fill="currentColor"/></svg>'
+      : '';
+  const trendLabel = trendKey === 'improving'
+    ? 'Compatibility trending up'
+    : trendKey === 'declining'
+      ? 'Compatibility trending down'
+      : '';
+  const trendHtml = trendKey
+    ? `<span class="game-card-trend game-card-trend--${trendKey}" title="${trendLabel}" aria-label="${trendLabel}">${trendGlyph}</span>`
+    : '';
+  const pillsRowHtml = `<div class="game-card-pills">${badgeHtml}${storePillHtml}${trendHtml}</div>`;
   const sourceLabelHtml = sourceLabel
     ? `<span class="game-card-source">${esc(sourceLabel)}</span>`
     : '';

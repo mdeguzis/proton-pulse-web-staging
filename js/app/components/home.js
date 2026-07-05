@@ -4,7 +4,7 @@ import { fetchRecentPulseReports } from '../api/reports.js?v=003f23c0';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { SB_KEY, SB_URL, isNonSteamAppId, appTypeFromAppId, storeLabel } from '../config.js?v=f9591262';
 import { daysAgo, latestPerApp } from '../utils.js?v=c7e1268c';
-import { renderGameCard } from '../lib/card.js?v=754da47b';
+import { renderGameCard } from '../lib/card.js?v=a5102ff4';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport } from '../../lib/tile-pad.js?v=7c022a1e';
 import { filterAdult } from '../../lib/adult-filter.js?v=e4e9d845';
@@ -117,6 +117,25 @@ function _allShownNote(count) {
   return `<p class="home-results-note">Showing all ${count} result${count === 1 ? '' : 's'}</p>`;
 }
 
+// Trend direction lookup by appId. Populated from search-index column 9
+// after loadSearchIndex resolves. Empty for older payloads that predate the
+// trend column so cards render neutral (no arrow) until the pipeline catches up.
+let _trendByAppId = null;
+function _lookupTrend(appId) {
+  if (!_trendByAppId || appId == null) return '';
+  return _trendByAppId.get(String(appId)) || '';
+}
+function _buildTrendMap() {
+  if (_trendByAppId) return;
+  _trendByAppId = new Map();
+  if (!Array.isArray(searchIndex)) return;
+  for (const row of searchIndex) {
+    if (!Array.isArray(row) || row.length < 10) continue;
+    const t = row[9];
+    if (t === 'improving' || t === 'declining') _trendByAppId.set(String(row[0]), t);
+  }
+}
+
 function _recentCardHtml(r) {
   // recent-reports.json carries appType ('gog'|'epic'|'steam') from the pipeline.
   // Fall back to deriving it from the id so non-Steam games are labeled even on
@@ -129,6 +148,7 @@ function _recentCardHtml(r) {
     sub: _popularSub(r),
     tier: _cardTier(r.tier),
     storePill: storeLabel(appType),
+    trend: _lookupTrend(r.appId),
   });
 }
 
@@ -150,6 +170,12 @@ export async function renderHomePage() {
       fetch(mostPlayedUrl).catch(() => null),
       loadSearchIndex().catch(() => null),
     ]);
+
+    // searchIndex is available now that loadSearchIndex resolved (Promise.all
+     // above). Build the appId -> trend map once so every card renderer below
+     // gets the arrow via a single Map.get instead of re-scanning the array.
+    _trendByAppId = null;
+    _buildTrendMap();
 
     let allRecentReports = [];
     if (recentResp && recentResp.ok) {
@@ -359,6 +385,7 @@ export async function renderHomePage() {
         title: g.title,
         sub: g.tier === 'pending' ? 'No reports yet · be the first' : _popularSub(g),
         tier: _cardTier(g.tier), storePill: storeLabel(g.appType || appTypeFromAppId(g.appId)),
+        trend: _lookupTrend(g.appId),
       });
     }
 
@@ -632,10 +659,12 @@ export async function renderHomeFallback() {
   ]);
   const popularIds = ['730', '570', '440', '292030', '1245620', '1091500', '1174180', '413150'];
   const titleById = new Map((searchIndex || []).map(([id, title]) => [String(id), title]));
+  _trendByAppId = null;
+  _buildTrendMap();
   const popularCards = popularIds
     .map((appId) => ({ appId, title: titleById.get(appId) || `App ${appId}` }))
     .filter((row) => row.title)
-    .map((row) => renderGameCard({ href: `#/app/${row.appId}`, appId: row.appId, title: row.title, sub: 'ProtonDB data available' }))
+    .map((row) => renderGameCard({ href: `#/app/${row.appId}`, appId: row.appId, title: row.title, sub: 'ProtonDB data available', trend: _lookupTrend(row.appId) }))
     .join('');
 
   const pulseCards = renderPulseReportCards(pulseReports);
@@ -690,6 +719,7 @@ export function renderActivityCard(kind, row, counts = {}) {
     sub,
     tier: rating || undefined,
     storePill: storePillLabel,
+    trend: _lookupTrend(appId),
   });
 }
 
@@ -703,6 +733,7 @@ export function renderPulseReportCards(rows) {
       title: row.title || `App ${row.app_id}`,
       sub,
       tier: rating || undefined,
+      trend: _lookupTrend(row.app_id),
     });
   }).join('');
 }

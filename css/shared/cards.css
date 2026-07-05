@@ -237,6 +237,23 @@
 .game-card-store-pill--gog   { background: #7a3fcf; color: #fff; }
 .game-card-store-pill--epic  { background: #555; color: #eee; }
 .game-card-store-pill--non-steam { background: #444; color: #ddd; }
+/* Compatibility trend arrow (rendered only for improving / declining games).
+   Sits to the right of the store pill inside .game-card-pills so the tier
+   pill still reads first. Kept small so it doesn't compete with the badge. */
+.game-card-trend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.game-card-trend svg { width: 12px; height: 12px; }
+.game-card-trend--improving { color: #3aaa5b; }
+.game-card-trend--declining { color: #d9534f; }
+/* Site preference: hide the arrow entirely when the user turned it off. */
+[data-trend-arrow="off"] .game-card-trend { display: none; }
 
 /* Round store icon -- the .store-icon span wraps the SVG glyph and gets a
    tight square footprint. By default it is hidden inside the store pill;
