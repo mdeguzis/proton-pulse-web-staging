@@ -352,20 +352,18 @@ a.card:active { transform: translateY(1px); }
 }
 .author-verified {
   display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 4px;
   margin-top: 4px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(46, 160, 67, 0.14);
-  color: #2ea043;
-  font-size: 0.6rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  line-height: 1.3;
-  align-self: center;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
 }
+.author-verified svg { flex-shrink: 0; margin-top: 1px; }
 .author-verified svg { flex-shrink: 0; }
 .author-avatar-img {
   width: 100%;
