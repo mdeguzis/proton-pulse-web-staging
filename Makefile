@@ -203,7 +203,7 @@ gh-pages-only: gh-check check-staging-sync
 
 gh-staging: gh-check
 	@bash scripts/wait-for-remote.sh
-	gh workflow run $(GITHUB_WORKFLOW) --field staging_only=true
+	gh workflow run $(GITHUB_WORKFLOW) --ref staging --field staging_only=true
 	@echo "Triggered $(GITHUB_WORKFLOW) with staging_only=true -- preview at https://mdeguzis.github.io/proton-pulse-web-staging/"
 
 # Full-pipeline staging deploy (#117). Runs the whole pipeline against the
@@ -213,7 +213,7 @@ gh-staging: gh-check
 # keep using `make gh-staging`.
 gh-staging-pipeline: gh-check
 	@bash scripts/wait-for-remote.sh
-	gh workflow run $(GITHUB_WORKFLOW) --field staging_with_pipeline=true
+	gh workflow run $(GITHUB_WORKFLOW) --ref staging --field staging_with_pipeline=true
 	@echo "Triggered $(GITHUB_WORKFLOW) with staging_with_pipeline=true -- full pipeline against staging, ~30 min. Preview at https://mdeguzis.github.io/proton-pulse-web-staging/"
 
 # Fast staging deploy for finalize-only changes (#196). Skips build + probe
@@ -223,7 +223,7 @@ gh-staging-pipeline: gh-check
 # e.g. adding a column to search-index.json. Wall time: ~5 min instead of 30.
 gh-staging-finalize: gh-check
 	@bash scripts/wait-for-remote.sh
-	gh workflow run $(GITHUB_WORKFLOW) --field staging_with_finalize=true
+	gh workflow run $(GITHUB_WORKFLOW) --ref staging --field staging_with_finalize=true
 	@echo "Triggered $(GITHUB_WORKFLOW) with staging_with_finalize=true -- finalize + stats only against prod chunk state, deploy to staging (~5 min). Preview at https://mdeguzis.github.io/proton-pulse-web-staging/"
 
 # Resume a partial run (#171 Phase 3). Reads gh-pages/.pipeline-state/
