@@ -366,6 +366,13 @@ import { renderGameCard } from '../app/lib/card.js?v=754da47b';
       SIZES.forEach(s => list.classList.remove(`cards--${s}`));
       list.classList.add(`cards--${size}`);
       document.querySelectorAll('.pg-size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+      // The size class changes the column count, so the previously rendered
+      // item count no longer fills whole rows -- the last row goes ragged and
+      // the grid only looked even because of the initial full-rows render.
+      // Refill to whole rows for the new width and re-render so S/M/L/XL each
+      // land an even 5 rows without needing a page refresh.
+      shownCount = pageSizeForFullRows(list, targetRowsForViewport());
+      renderPopular();
     }
     function setSizeEnabled(enabled) {
       document.querySelectorAll('.pg-size-btn').forEach(b => { b.disabled = !enabled; });

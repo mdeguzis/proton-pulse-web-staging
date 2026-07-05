@@ -601,6 +601,11 @@ export async function renderHomePage() {
         if (el2) { SIZES.forEach(s => el2.classList.remove(`cards--${s}`)); el2.classList.add(`cards--${size}`); }
       });
       document.querySelectorAll('.home-size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+      // The size class changes the column count, so re-render both grids to
+      // refill whole rows for the new width. Without this the last row goes
+      // ragged on a size change until the next full re-render.
+      applyRecentFilters();
+      applyPopularFilters();
     }
     document.querySelectorAll('.home-size-btn').forEach(btn => {
       btn.addEventListener('click', () => {
