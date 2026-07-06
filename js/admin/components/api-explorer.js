@@ -287,12 +287,31 @@ export function renderApiExplorer() {
       <p id="apix-status" class="admin-hint" style="margin:10px 0 0" hidden></p>
       <div id="apix-toolbar" class="apix-toolbar" hidden>
         <label class="apix-wrap-toggle"><input type="checkbox" id="apix-wrap"> Word wrap</label>
-        <label class="apix-wrap-toggle" title="Show the full edge-function response (URL, status, headers) instead of just the parsed data field"><input type="checkbox" id="apix-raw"> Raw response</label>
+        <label class="apix-wrap-toggle" title="Show the full edge-function envelope (endpoint, arg, url, status, data) instead of just the parsed data field"><input type="checkbox" id="apix-raw"> Full envelope</label>
         <button id="apix-copy" class="admin-btn" type="button">Copy JSON</button>
         <button id="apix-download" class="admin-btn" type="button">Download JSON</button>
         <a id="apix-store-link" class="admin-btn" target="_blank" rel="noopener" hidden>Open store page &#8599;</a>
       </div>
+
+      <!-- REQUEST section: what we actually asked the upstream store for.
+           Always visible after a fetch so admins can see method, URL, and
+           the parameters we sent (like Postman / any real API explorer). -->
+      <div id="apix-req-section" class="apix-req-section" hidden>
+        <div class="apix-section-label">Request</div>
+        <div class="apix-req-line"><span class="apix-req-key">Endpoint:</span> <code id="apix-req-endpoint"></code></div>
+        <div class="apix-req-line"><span class="apix-req-key">Method:</span> <code id="apix-req-method"></code></div>
+        <div class="apix-req-line"><span class="apix-req-key">Upstream URL:</span> <a id="apix-req-url" target="_blank" rel="noopener"></a></div>
+        <div class="apix-req-line"><span class="apix-req-key">Params:</span> <code id="apix-req-params"></code></div>
+      </div>
+
+      <!-- RESPONSE section: status line + the actual body. Raw envelope toggle
+           swaps between the parsed data field and the full edge-function
+           envelope (endpoint, arg, url, status, data). -->
+      <div id="apix-resp-section" class="apix-req-section" hidden>
+        <div class="apix-section-label">Response <span id="apix-resp-status" class="apix-req-key"></span></div>
+      </div>
       <pre id="apix-output" class="apix-output" hidden></pre>
+
       <div id="apix-followup-header" class="admin-hint" hidden style="margin-top:14px;color:var(--accent);font-weight:600"></div>
       <pre id="apix-followup" class="apix-output" hidden style="margin-top:6px;border-left:3px solid var(--accent);padding-left:12px"></pre>
     </div>`;
@@ -340,6 +359,29 @@ export function renderApiExplorer() {
     const out = document.getElementById('apix-output');
     if (out) { out.hidden = false; out.textContent = lastJson; }
     document.getElementById('apix-toolbar').hidden = false;
+
+    // Populate the Request + Response sections so admins see the full round
+    // trip: endpoint key, HTTP method, actual upstream URL, params we sent.
+    // Postman-style layout. #199
+    const reqSection = document.getElementById('apix-req-section');
+    const respSection = document.getElementById('apix-resp-section');
+    if (reqSection && respSection) {
+      reqSection.hidden = false;
+      respSection.hidden = false;
+      const setText = (id, val) => { const n = document.getElementById(id); if (n) n.textContent = val; };
+      setText('apix-req-endpoint', endpoint);
+      setText('apix-req-method', payload?.method || 'GET');
+      const upstreamUrl = payload?.url || '(unknown)';
+      const urlEl = document.getElementById('apix-req-url');
+      if (urlEl) { urlEl.textContent = upstreamUrl; urlEl.href = upstreamUrl; }
+      const paramsStr = arg === 'none'
+        ? '(none)'
+        : resolved.id
+          ? `id=${resolved.id}`
+          : `term="${resolved.term}"`;
+      setText('apix-req-params', paramsStr);
+      setText('apix-resp-status', `HTTP ${payload?.status ?? (payload?.ok ? 200 : 'ERR')}`);
+    }
 
     // #199: auto follow-up. If appdetails came back with success:false for
     // this appid, fire a store-page redirect probe so the admin sees whether
