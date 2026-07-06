@@ -1178,3 +1178,43 @@
   cursor: pointer;
 }
 .sf-draft-restore button:hover { background: rgba(102, 192, 244, 0.1); }
+
+/* Replaced-by banner + REPLACED pill on the game header (#199 follow-up) */
+.game-replaced-banner {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(232, 172, 41, 0.35);
+  background: rgba(232, 172, 41, 0.10);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.game-replaced-banner code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+}
+.game-replaced-link { color: var(--accent); font-weight: 600; }
+.game-title-replaced-pill {
+  display: inline-block;
+  background: #e8ac29;
+  color: #0a0c10;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.55em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+.submit-report-legacy {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  margin-left: 6px;
+  align-self: center;
+}
+.submit-report-legacy:hover { color: var(--accent); }

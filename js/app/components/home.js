@@ -4,7 +4,7 @@ import { fetchRecentPulseReports } from '../api/reports.js?v=003f23c0';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { SB_KEY, SB_URL, isNonSteamAppId, appTypeFromAppId, storeLabel } from '../config.js?v=f9591262';
 import { daysAgo, latestPerApp } from '../utils.js?v=c7e1268c';
-import { renderGameCard } from '../lib/card.js?v=36b52129';
+import { renderGameCard } from '../lib/card.js?v=5642a459';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewport } from '../../lib/tile-pad.js?v=7c022a1e';
 import { filterAdult } from '../../lib/adult-filter.js?v=e4e9d845';
@@ -147,6 +147,25 @@ function _buildTrendMap() {
   }
 }
 
+// Replaced-by lookup by appId. Search-index column 10 (added by
+// enrich_search_index_with_delisted); empty for older payloads or games that
+// were never replaced. Powers the REPLACED badge on cards (#199 follow-up).
+let _replacedByAppId = null;
+function _lookupReplacedBy(appId) {
+  if (!_replacedByAppId || appId == null) return '';
+  return _replacedByAppId.get(String(appId)) || '';
+}
+function _buildReplacedByMap() {
+  if (_replacedByAppId) return;
+  _replacedByAppId = new Map();
+  if (!Array.isArray(searchIndex)) return;
+  for (const row of searchIndex) {
+    if (!Array.isArray(row) || row.length < 11) continue;
+    const rb = row[10];
+    if (rb) _replacedByAppId.set(String(row[0]), String(rb));
+  }
+}
+
 function _recentCardHtml(r) {
   // recent-reports.json carries appType ('gog'|'epic'|'steam') from the pipeline.
   // Fall back to deriving it from the id so non-Steam games are labeled even on
@@ -160,6 +179,7 @@ function _recentCardHtml(r) {
     tier: _cardTier(r.tier),
     storePill: storeLabel(appType),
     trend: _lookupTrend(r.appId),
+    replacedBy: _lookupReplacedBy(r.appId),
   });
 }
 
@@ -186,7 +206,9 @@ export async function renderHomePage() {
      // above). Build the appId -> trend map once so every card renderer below
      // gets the arrow via a single Map.get instead of re-scanning the array.
     _trendByAppId = null;
+    _replacedByAppId = null;
     _buildTrendMap();
+    _buildReplacedByMap();
 
     let allRecentReports = [];
     if (recentResp && recentResp.ok) {
@@ -706,7 +728,9 @@ export async function renderHomeFallback() {
   const popularIds = ['730', '570', '440', '292030', '1245620', '1091500', '1174180', '413150'];
   const titleById = new Map((searchIndex || []).map(([id, title]) => [String(id), title]));
   _trendByAppId = null;
+  _replacedByAppId = null;
   _buildTrendMap();
+  _buildReplacedByMap();
   const popularCards = popularIds
     .map((appId) => ({ appId, title: titleById.get(appId) || `App ${appId}` }))
     .filter((row) => row.title)

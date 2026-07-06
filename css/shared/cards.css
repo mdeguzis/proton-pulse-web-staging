@@ -656,3 +656,20 @@
   vertical-align: middle;
   margin-left: 8px;
 }
+
+/* REPLACED tag on game cards (#199 follow-up) */
+.game-card-replaced-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #e8ac29;
+  color: #0a0c10;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+}
