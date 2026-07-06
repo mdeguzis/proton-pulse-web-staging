@@ -819,7 +819,9 @@ export async function renderBoxartAdminDetail(appId) {
   const override = indexes.overrideMap?.[appId] || null;
   const row = { appId: String(appId), title: String(searchRow[1] || ''), type, cachedUrl, override, derivedStatus: _deriveStatus(type, String(appId), cachedUrl, !!override, indexes.knownMissingSteam, indexes.knownMissingNonSteam) };
 
-  document.getElementById('boxart-detail-title').textContent = `Box Art: ${row.title || row.appId} (${row.type})`;
+  // Header carries the store label + app id so admins can copy the id or eyeball
+  // which storefront they're editing without scrolling to the meta rows. (#199)
+  document.getElementById('boxart-detail-title').textContent = `Box Art: ${row.title || row.appId} - ${row.type} - App ${row.appId}`;
 
   // Initial paint uses cached URL as preview; then swap once _resolveCurrentLive returns.
   document.getElementById('boxart-detail-body').innerHTML = _detailBodyHtml(row, null, null);
