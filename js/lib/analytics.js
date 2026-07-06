@@ -13,6 +13,31 @@
     return sid;
   }
 
+  // #202: stable per-browser id for anonymous visitors. Uses the SAME
+  // localStorage key that js/shared/submit.js::getWebClientId writes, so a
+  // visitor's tracker events and their submitted reports/votes share the
+  // same client_id. Without this, the analytics DB function counted
+  // count(distinct coalesce(user_id, client_id)) but every anonymous row
+  // had null for both and Unique visitors flatlined at the authed-user
+  // count.
+  function getWebClientId() {
+    try {
+      var key = 'proton-pulse:web-client-id';
+      var id = localStorage.getItem(key);
+      if (!id) {
+        id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem(key, id);
+      }
+      return id;
+    } catch (e) {
+      // localStorage may throw in private-mode Safari; degrade to a
+      // per-session random so we still contribute one distinct visitor.
+      return getSessionId();
+    }
+  }
+
   // #143: classify the visitor's device so admin charts can break Deck vs
   // phone vs desktop without a separate column. UA sniffing is fine here --
   // we just want a rough bucket, not feature detection.
@@ -54,6 +79,7 @@
       page: location.pathname,
       session_id: getSessionId(),
       proton_pulse_user_id: protonPulseUserId,
+      client_id: getWebClientId(),
       metadata: meta,
     };
     fetch(SUPABASE_URL + '/rest/v1/site_events', {
