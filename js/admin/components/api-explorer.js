@@ -293,7 +293,8 @@ export function renderApiExplorer() {
         <a id="apix-store-link" class="admin-btn" target="_blank" rel="noopener" hidden>Open store page &#8599;</a>
       </div>
       <pre id="apix-output" class="apix-output" hidden></pre>
-      <pre id="apix-followup" class="apix-output" hidden style="margin-top:12px;border-left:3px solid var(--accent);padding-left:12px"></pre>
+      <div id="apix-followup-header" class="admin-hint" hidden style="margin-top:14px;color:var(--accent);font-weight:600"></div>
+      <pre id="apix-followup" class="apix-output" hidden style="margin-top:6px;border-left:3px solid var(--accent);padding-left:12px"></pre>
     </div>`;
 
   const endpointSel = el.querySelector('#apix-endpoint');
@@ -345,12 +346,19 @@ export function renderApiExplorer() {
     // Steam replaced this appid with a newer one without having to switch
     // endpoints and re-fetch.
     const followupEl = document.getElementById('apix-followup');
+    const followupHeader = document.getElementById('apix-followup-header');
     if (followupEl) { followupEl.hidden = true; followupEl.textContent = ''; }
-    if (endpoint === 'steam_appdetails' && resolved.id && payload?.data && payload.data[String(resolved.id)]?.success === false && followupEl) {
+    if (followupHeader) { followupHeader.hidden = true; followupHeader.textContent = ''; }
+    if (endpoint === 'steam_appdetails' && resolved.id && payload?.data && payload.data[String(resolved.id)]?.success === false && followupEl && followupHeader) {
+      followupHeader.hidden = false;
+      followupHeader.textContent = 'Auto follow-up: steam_store_redirect (Steam said success:false, checking if the appid was replaced)';
       followupEl.hidden = false;
-      followupEl.textContent = 'Auto-checking Steam store redirect for a replaced_by target...';
+      followupEl.textContent = 'Probing store page...';
       const redirect = await exploreStore('steam_store_redirect', { id: resolved.id });
       followupEl.textContent = JSON.stringify(rawMode ? redirect : redirect.data || redirect, null, 2);
+      if (redirect?.data?.replaced_by) {
+        followupHeader.textContent = `Auto follow-up: Steam replaced appid ${resolved.id} -> ${redirect.data.replaced_by}`;
+      }
     }
     const storeLink = document.getElementById('apix-store-link');
     if (storeLink) {
