@@ -23,7 +23,7 @@ const EPIC_SEARCH_QUERY = `query searchStoreQuery($keywords: String!, $country: 
 
 type EndpointDef = {
   // Whether the endpoint takes a numeric id or a free-text term.
-  arg: "id" | "term";
+  arg: "id" | "term" | "none";
   method: "GET" | "POST";
   url: (arg: string) => string;
   headers?: Record<string, string>;
@@ -41,6 +41,56 @@ const ENDPOINTS: Record<string, EndpointDef> = {
     arg: "id",
     method: "GET",
     url: (id) => `https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport?nAppID=${id}`,
+  },
+  steam_store_redirect: {
+    // Fetches the storefront page with redirects followed. Useful when
+    // appdetails returns success:false: if the app was replaced by a
+    // newer appid (e.g. 5488 -> 45700 for Devil May Cry 4), the final URL
+    // encodes the new appid in its /app/<newId>/ path. Response.data is
+    // { original_url, final_url, replaced_by }. #199
+    arg: "id",
+    method: "GET",
+    url: (id) => `https://store.steampowered.com/app/${id}/`,
+  },
+  // Common public Steam endpoints -- no API key required. Rate-limited by
+  // Steam but shared across the whole edge function. Documented at
+  // https://steamapi.xpaw.me and https://partner.steamgames.com/doc/webapi
+  steam_current_players: {
+    arg: "id",
+    method: "GET",
+    url: (id) => `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${id}`,
+  },
+  steam_global_achievements: {
+    arg: "id",
+    method: "GET",
+    url: (id) => `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${id}`,
+  },
+  steam_news: {
+    arg: "id",
+    method: "GET",
+    url: (id) => `https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?appid=${id}&count=5&maxlength=300&format=json`,
+  },
+  steam_reviews: {
+    arg: "id",
+    method: "GET",
+    url: (id) => `https://store.steampowered.com/appreviews/${id}?json=1&language=all&purchase_type=all&filter=summary`,
+  },
+  steam_community_search: {
+    arg: "term",
+    method: "GET",
+    url: (t) => `https://steamcommunity.com/actions/SearchApps/${encodeURIComponent(t)}`,
+  },
+  steam_featured: {
+    // No arg: dumps the currently-featured storefront blocks. Useful for
+    // sanity-checking storefront availability and for spotting deals.
+    arg: "none",
+    method: "GET",
+    url: () => `https://store.steampowered.com/api/featured?cc=us&l=en`,
+  },
+  steam_featured_categories: {
+    arg: "none",
+    method: "GET",
+    url: () => `https://store.steampowered.com/api/featuredcategories?cc=us&l=en`,
   },
   gog_product: {
     arg: "id",
@@ -92,7 +142,11 @@ Deno.serve(async (req: Request) => {
   }
 
   let arg: string;
-  if (def.arg === "id") {
+  if (def.arg === "none") {
+    // Argless endpoints (featured / featuredcategories). We still pass an
+    // empty string to url() so the signature stays uniform.
+    arg = "";
+  } else if (def.arg === "id") {
     if (!/^\d+$/.test(id)) {
       return Response.json({ ok: false, error: "id must be numeric for this endpoint" }, { status: 400, headers: corsHeaders });
     }
@@ -109,6 +163,38 @@ Deno.serve(async (req: Request) => {
     const init: RequestInit = { method: def.method, headers: def.headers ?? { Accept: "application/json" } };
     if (def.method === "POST" && def.body) init.body = def.body(arg);
     const upstream = await fetch(url, init);
+    // steam_store_redirect: we don't care about the body, only the final URL
+    // path. Parse out the new appid if Steam redirected to /app/<newId>/,
+    // else return the same appid so admins see it's a live URL. #199
+    if (endpoint === "steam_store_redirect") {
+      const finalUrl = upstream.url || url;
+      const match = /\/app\/(\d+)(?:\/|$)/.exec(finalUrl);
+      const finalAppId = match ? match[1] : null;
+      const replacedBy = finalAppId && finalAppId !== arg ? finalAppId : null;
+      console.log(`[steam-explore] endpoint=${endpoint} arg=${arg} final=${finalUrl} replaced_by=${replacedBy}`);
+      return Response.json(
+        {
+          ok: upstream.ok,
+          endpoint,
+          arg,
+          url,
+          status: upstream.status,
+          data: {
+            original_appid: arg,
+            original_url: url,
+            final_url: finalUrl,
+            final_appid: finalAppId,
+            replaced_by: replacedBy,
+            note: replacedBy
+              ? `Steam redirected appid ${arg} to appid ${replacedBy}. This app has been superseded by a newer entry.`
+              : finalAppId === arg
+                ? "Store page resolved back to the same appid: this app is live."
+                : "Store page redirected to a non-app URL (delisted, homepage, or region-blocked).",
+          },
+        },
+        { status: 200, headers: corsHeaders },
+      );
+    }
     const text = await upstream.text();
     let data: unknown;
     try { data = JSON.parse(text); } catch { data = text; }
