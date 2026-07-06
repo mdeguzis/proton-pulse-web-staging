@@ -658,6 +658,52 @@ h2 {
   border: 1px solid rgba(200,80,80,0.3);
   background: rgba(200,80,80,0.08);
 }
+
+/* Phase B (#206): stats page tabs. Kept small so the existing chart-card
+   look dominates; the tab bar is chrome, not a headline. */
+.stats-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 14px 0 18px;
+  flex-wrap: wrap;
+}
+.stats-tab-btn {
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+.stats-tab-btn:hover { color: var(--text); }
+.stats-tab-btn--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.pattern-group { margin-top: 14px; }
+.pattern-group-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.pattern-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pattern-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.78rem;
+}
 </style>
 </head>
 <body>
@@ -678,6 +724,6 @@ h2 {
 
 </div></div>
 
-<script type="module" src="js/stats/main.js?v=9cd30c97"></script>
+<script type="module" src="js/stats/main.js?v=6d79f9ab"></script>
 </body>
 </html>

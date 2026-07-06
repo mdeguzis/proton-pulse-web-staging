@@ -12,6 +12,75 @@ import {
   renderBars, renderFreshness, renderFramegen, renderDonut,
   renderSparkline, renderTopGames, renderRatingsTrend,
 } from './charts.js?v=870157ea';
+import {
+  OPTIMIZATION_PATTERNS, FAULT_PATTERNS, TINKERING_PATTERNS,
+  CONTROLLER_PATTERNS, ONLINE_NET_PATTERNS,
+} from '../shared/analytics-patterns.js?v=c119f011';
+
+// Phase B (#206): stats page is now tabbed. Overall keeps roughly what the
+// page had before; Per-Store and Correlations are stubs that later phases
+// fill in with real data. Tab state lives in the URL hash alongside filters
+// so links and back-nav survive.
+// Escape user-visible strings inserted into innerHTML. Small helper so we
+// don't import from utils just for this one call.
+function _escHtml(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+// Render the pattern catalogue as a set of labelled pill groups so admins /
+// visitors see the vocabulary the Correlations tab will drill into once
+// report-level data lands. Purely presentational; the real matching happens
+// server-side in phases C/D.
+function _renderPatternCatalogHtml() {
+  const groups = [
+    ['Optimization tools', OPTIMIZATION_PATTERNS],
+    ['Fault signals', FAULT_PATTERNS],
+    ['Tinkering methods', TINKERING_PATTERNS],
+    ['Controller mentions', CONTROLLER_PATTERNS],
+    ['Online / DRM', ONLINE_NET_PATTERNS],
+  ];
+  return groups.map(([label, group]) => `
+    <div class="pattern-group">
+      <div class="pattern-group-label">${_escHtml(label)}</div>
+      <div class="pattern-pills">
+        ${group.map(g => `<span class="pattern-pill" title="key: ${_escHtml(g.key)}">${_escHtml(g.label)}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+const TABS = ['overall', 'per-store', 'correlations'];
+function getActiveTab() {
+  const hash = window.location.hash || '';
+  const m = /tab=([\w-]+)/.exec(hash);
+  const t = m && TABS.includes(m[1]) ? m[1] : 'overall';
+  return t;
+}
+function setActiveTab(tab) {
+  const url = new URL(window.location.href);
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+  const params = new URLSearchParams(hash);
+  params.set('tab', tab);
+  const next = params.toString().replace(/%2C/g, ',');
+  window.location.hash = next;
+  _applyTabVisibility();
+}
+function _applyTabVisibility() {
+  const active = getActiveTab();
+  for (const t of TABS) {
+    const el = document.getElementById(`tab-${t}`);
+    if (el) el.hidden = (t !== active);
+    const btn = document.querySelector(`[data-tab-btn="${t}"]`);
+    if (btn) btn.classList.toggle('stats-tab-btn--active', t === active);
+  }
+}
+// Tab clicks are delegated so the render pass doesn't have to re-bind them.
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest && e.target.closest('[data-tab-btn]');
+  if (!btn) return;
+  e.preventDefault();
+  setActiveTab(btn.dataset.tabBtn);
+});
+window.addEventListener('hashchange', _applyTabVisibility);
 
 const root = document.getElementById('stats-root');
 const metaEl = document.getElementById('stats-meta');
@@ -83,6 +152,13 @@ function renderAll() {
       <span class="filter-status" id="filter-status"></span>
     </div>
 
+    <nav class="stats-tabs" aria-label="Stats sections">
+      <button type="button" class="stats-tab-btn" data-tab-btn="overall">Overall</button>
+      <button type="button" class="stats-tab-btn" data-tab-btn="per-store">Per-store</button>
+      <button type="button" class="stats-tab-btn" data-tab-btn="correlations">Correlations</button>
+    </nav>
+
+    <section id="tab-overall" data-tab="overall">
     <div class="chart-grid">
       <div class="chart-card">
         <h3>Ratings ${filter.dim ? '(filtered)' : ''}</h3>
@@ -171,7 +247,34 @@ function renderAll() {
 
     <h2>Top games by report volume</h2>
     <div class="topgames" id="topgames"></div>
+    </section>
+
+    <section id="tab-per-store" data-tab="per-store" hidden>
+      <div class="chart-card">
+        <h3>Per-storefront breakdown</h3>
+        <p class="fg-card-hint">
+          Coming soon (#204 Phase C+). Will show side-by-side tier distribution and
+          report volume for Steam, GOG, and Epic on a single page. For now, use the
+          Store filter above to slice the Overall tab.
+        </p>
+      </div>
+    </section>
+
+    <section id="tab-correlations" data-tab="correlations" hidden>
+      <div class="chart-card">
+        <h3>What we look for</h3>
+        <p class="fg-card-hint">
+          Reports get scanned for optimization tools, fault descriptions, tinkering
+          methods, controller mentions, and online / DRM signals. Once report-level
+          data lands on this page (Phase C, #207), each category becomes a real
+          filter and drilldown chart. For now: here is the catalogue.
+        </p>
+        ${_renderPatternCatalogHtml()}
+      </div>
+    </section>
   `;
+
+  _applyTabVisibility();
 
   // Bind chart contents to data
   renderBars(document.getElementById('chart-rating'),
