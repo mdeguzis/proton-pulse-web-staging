@@ -159,42 +159,97 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = def.url(arg);
+
+  // steam_store_redirect: walk the redirect chain by hand (redirect:"manual")
+  // so we can return every hop -- status, url, Location, response headers.
+  // Reads like `curl -L -v` for admins, not just the final URL.
+  if (endpoint === "steam_store_redirect") {
+    const MAX_HOPS = 8;
+    type Hop = {
+      step: number;
+      method: string;
+      url: string;
+      status: number;
+      status_text: string;
+      location: string | null;
+      content_type: string | null;
+    };
+    const hops: Hop[] = [];
+    let currentUrl = url;
+    let lastStatus = 0;
+    let lastCT: string | null = null;
+    for (let step = 1; step <= MAX_HOPS; step++) {
+      let hopRes: Response;
+      try {
+        hopRes = await fetch(currentUrl, {
+          method: "GET",
+          redirect: "manual",
+          headers: { "User-Agent": "Mozilla/5.0 (proton-pulse admin-explorer)" },
+        });
+      } catch (e) {
+        return Response.json(
+          { ok: false, endpoint, arg, url, error: `hop ${step} network: ${(e as Error).message}`, data: { hops } },
+          { status: 200, headers: corsHeaders },
+        );
+      }
+      const loc = hopRes.headers.get("Location");
+      const ct = hopRes.headers.get("Content-Type");
+      hops.push({
+        step,
+        method: "GET",
+        url: currentUrl,
+        status: hopRes.status,
+        status_text: hopRes.statusText,
+        location: loc,
+        content_type: ct,
+      });
+      lastStatus = hopRes.status;
+      lastCT = ct;
+      // Drain the body so the underlying connection can be reused / closed.
+      try { await hopRes.arrayBuffer(); } catch { /* ignore */ }
+      if (hopRes.status >= 300 && hopRes.status < 400 && loc) {
+        // Resolve Location against currentUrl for relative redirects.
+        currentUrl = new URL(loc, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+    const finalUrl = hops.length ? hops[hops.length - 1].url : url;
+    const match = /\/app\/(\d+)(?:\/|$)/.exec(finalUrl);
+    const finalAppId = match ? match[1] : null;
+    const replacedBy = finalAppId && finalAppId !== arg ? finalAppId : null;
+    console.log(`[steam-explore] endpoint=${endpoint} arg=${arg} hops=${hops.length} final=${finalUrl} replaced_by=${replacedBy}`);
+    return Response.json(
+      {
+        ok: lastStatus > 0 && lastStatus < 400,
+        endpoint,
+        arg,
+        url,
+        status: lastStatus,
+        data: {
+          original_appid: arg,
+          original_url: url,
+          hops,
+          final_url: finalUrl,
+          final_status: lastStatus,
+          final_content_type: lastCT,
+          final_appid: finalAppId,
+          replaced_by: replacedBy,
+          note: replacedBy
+            ? `Steam redirected appid ${arg} to appid ${replacedBy} through ${hops.length} hop${hops.length === 1 ? "" : "s"}. This app has been superseded by a newer entry.`
+            : finalAppId === arg
+              ? `Store page resolved to /app/${arg}/ in ${hops.length} hop${hops.length === 1 ? "" : "s"}: this app is live.`
+              : `Store page redirected to a non-app URL after ${hops.length} hop${hops.length === 1 ? "" : "s"} (delisted, homepage, or region-blocked).`,
+        },
+      },
+      { status: 200, headers: corsHeaders },
+    );
+  }
+
   try {
     const init: RequestInit = { method: def.method, headers: def.headers ?? { Accept: "application/json" } };
     if (def.method === "POST" && def.body) init.body = def.body(arg);
     const upstream = await fetch(url, init);
-    // steam_store_redirect: we don't care about the body, only the final URL
-    // path. Parse out the new appid if Steam redirected to /app/<newId>/,
-    // else return the same appid so admins see it's a live URL. #199
-    if (endpoint === "steam_store_redirect") {
-      const finalUrl = upstream.url || url;
-      const match = /\/app\/(\d+)(?:\/|$)/.exec(finalUrl);
-      const finalAppId = match ? match[1] : null;
-      const replacedBy = finalAppId && finalAppId !== arg ? finalAppId : null;
-      console.log(`[steam-explore] endpoint=${endpoint} arg=${arg} final=${finalUrl} replaced_by=${replacedBy}`);
-      return Response.json(
-        {
-          ok: upstream.ok,
-          endpoint,
-          arg,
-          url,
-          status: upstream.status,
-          data: {
-            original_appid: arg,
-            original_url: url,
-            final_url: finalUrl,
-            final_appid: finalAppId,
-            replaced_by: replacedBy,
-            note: replacedBy
-              ? `Steam redirected appid ${arg} to appid ${replacedBy}. This app has been superseded by a newer entry.`
-              : finalAppId === arg
-                ? "Store page resolved back to the same appid: this app is live."
-                : "Store page redirected to a non-app URL (delisted, homepage, or region-blocked).",
-          },
-        },
-        { status: 200, headers: corsHeaders },
-      );
-    }
     const text = await upstream.text();
     let data: unknown;
     try { data = JSON.parse(text); } catch { data = text; }

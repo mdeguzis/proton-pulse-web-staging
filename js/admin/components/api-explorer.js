@@ -76,7 +76,9 @@ const FIELD_DOCS = {
     rows: [
       ['original_appid', 'The appid we asked about.'],
       ['original_url', 'store.steampowered.com/app/<originalAppid>/'],
-      ['final_url', 'Whatever URL Steam ended on after redirects.'],
+      ['hops[]', 'Every request-response pair the edge function made, curl -L -v style: { step, method, url, status, status_text, location, content_type }. The green-bordered block above the JSON renders this as a trace.'],
+      ['final_url', 'The URL of the last hop.'],
+      ['final_status / final_content_type', 'HTTP status + Content-Type of the last hop.'],
       ['final_appid', 'Appid parsed from the final URL, or null if it did not land on /app/<n>/.'],
       ['replaced_by', 'The new appid if it differs from the original -- Steam has superseded the entry. null when the store page resolved back to the same appid (live game) or to a non-app URL.'],
       ['note', 'Human-readable summary of what happened.'],
@@ -219,6 +221,23 @@ function _storeUrl(endpoint, id, term, payload) {
   return null;
 }
 
+// Format the steam_store_redirect hops as a `curl -L -v`-style trace. Each
+// hop becomes 3-4 lines: request line, status line, optional Location line,
+// and (on the final hop) the Content-Type. Reads left-to-right so admins can
+// see the redirect chain without decoding raw JSON. #199
+function _formatHopTrace(hops) {
+  if (!Array.isArray(hops) || hops.length === 0) return '';
+  const lines = ['# Redirect trace (curl -L -v style)'];
+  for (const h of hops) {
+    lines.push(`> ${h.method || 'GET'} ${h.url}`);
+    lines.push(`< HTTP ${h.status} ${h.status_text || ''}`.trimEnd());
+    if (h.location) lines.push(`< Location: ${h.location}`);
+    if (h.content_type && !h.location) lines.push(`< Content-Type: ${h.content_type}`);
+    lines.push('');
+  }
+  return lines.join('\n').trimEnd();
+}
+
 let _index = null;
 async function _loadIndex() {
   if (_index) return _index;
@@ -313,6 +332,7 @@ export function renderApiExplorer() {
       <pre id="apix-output" class="apix-output" hidden></pre>
 
       <div id="apix-followup-header" class="admin-hint" hidden style="margin-top:14px;color:var(--accent);font-weight:600"></div>
+      <pre id="apix-hop-trace" class="apix-output apix-hop-trace" hidden style="margin-top:6px"></pre>
       <pre id="apix-followup" class="apix-output" hidden style="margin-top:6px;border-left:3px solid var(--accent);padding-left:12px"></pre>
     </div>`;
 
@@ -383,6 +403,16 @@ export function renderApiExplorer() {
       setText('apix-resp-status', `HTTP ${payload?.status ?? (payload?.ok ? 200 : 'ERR')}`);
     }
 
+    // Hop-by-hop redirect trace (curl -L -v style). Rendered when the caller
+    // chose steam_store_redirect directly, or when the auto follow-up fires
+    // one below.
+    const hopEl = document.getElementById('apix-hop-trace');
+    if (hopEl) { hopEl.hidden = true; hopEl.textContent = ''; }
+    if (endpoint === 'steam_store_redirect' && Array.isArray(payload?.data?.hops) && hopEl) {
+      hopEl.hidden = false;
+      hopEl.textContent = _formatHopTrace(payload.data.hops);
+    }
+
     // #199: auto follow-up. If appdetails came back with success:false for
     // this appid, fire a store-page redirect probe so the admin sees whether
     // Steam replaced this appid with a newer one without having to switch
@@ -397,6 +427,12 @@ export function renderApiExplorer() {
       followupEl.hidden = false;
       followupEl.textContent = 'Probing store page...';
       const redirect = await exploreStore('steam_store_redirect', { id: resolved.id });
+      // Show the same hop trace above the JSON so admins see the curl-style
+      // redirect chain immediately after the appdetails call.
+      if (hopEl && Array.isArray(redirect?.data?.hops)) {
+        hopEl.hidden = false;
+        hopEl.textContent = _formatHopTrace(redirect.data.hops);
+      }
       followupEl.textContent = JSON.stringify(rawMode ? redirect : redirect.data || redirect, null, 2);
       if (redirect?.data?.replaced_by) {
         followupHeader.textContent = `Auto follow-up: Steam replaced appid ${resolved.id} -> ${redirect.data.replaced_by}`;
@@ -429,6 +465,7 @@ export function renderApiExplorer() {
   el.querySelector('#apix-wrap')?.addEventListener('change', (e) => {
     document.getElementById('apix-output')?.classList.toggle('apix-wrap', e.target.checked);
     document.getElementById('apix-followup')?.classList.toggle('apix-wrap', e.target.checked);
+    document.getElementById('apix-hop-trace')?.classList.toggle('apix-wrap', e.target.checked);
   });
   // #199: Raw mode swaps between the parsed data field (default) and the
   // full edge-function envelope (endpoint, arg, url, status, data). Re-serializes

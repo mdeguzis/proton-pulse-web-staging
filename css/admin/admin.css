@@ -1328,3 +1328,13 @@ pre.flag-raw-json {
   color: var(--accent);
   word-break: break-all;
 }
+
+/* Curl -L -v-style redirect trace in the API Explorer (#199 follow-up).
+   Same look as apix-output but with a green tint so admins recognise the
+   trace block at a glance. */
+.apix-hop-trace {
+  border-left: 3px solid #2ea043;
+  padding-left: 12px;
+  color: var(--text);
+  background: rgba(46, 160, 67, 0.05);
+}
