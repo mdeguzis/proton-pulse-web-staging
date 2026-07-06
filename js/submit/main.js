@@ -91,6 +91,17 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
   document.querySelector('.eyebrow').textContent = isEdit
     ? 'Edit a Report'
     : fromCloud ? 'Publish a Report' : 'Submit a Report';
+  // Subtitle under the game name: storefront + app id so a reporter always
+  // knows exactly which entry they're writing against, especially when a
+  // title exists on multiple stores or after a replaced-by redirect (#199).
+  const storeGuess = String(appId).startsWith('gog:')  ? 'GOG'
+                     : String(appId).startsWith('epic:') ? 'Epic'
+                     : 'Steam';
+  const subtitleEl = document.getElementById('game-subtitle');
+  if (subtitleEl) {
+    subtitleEl.hidden = false;
+    subtitleEl.textContent = `${storeGuess} \u00b7 App ${appId}`;
+  }
 
   // auth check. On localhost the Steam OAuth redirect is configured for the
   // production domain, so signing in locally just bounces back to prod -- you
