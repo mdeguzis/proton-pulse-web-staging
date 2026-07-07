@@ -19,43 +19,85 @@
  * iterates this map. Native first (it is the reference baseline for
  * comparisons); Proton next; wrappers after.
  */
+// Each canonical entry pairs the display metadata with a `versionPattern`
+// used by the submit form to validate the free-text version string the
+// user (or plugin) enters. Patterns are deliberately loose because
+// runtimes ship variants ("Proton 9.0-4", "Proton 8.0-5c", "GE-Proton9-27",
+// "Proton-TKG 9.0"), but strict enough that a Proton version pasted into
+// the Native slot or vice-versa is caught before the row is written.
 export const RUN_TYPES = Object.freeze({
   native: {
     key:      'native',
     label:    'Native Linux',
     subtitle: 'Linux build (no Proton)',
+    versionPattern: null,        // native has no runtime version to record
+    versionExample: 'not applicable',
   },
   proton: {
     key:      'proton',
     label:    'Proton',
     subtitle: 'Valve\'s official Proton (stable / hotfix)',
+    versionPattern: /^proton[\s-]?(\d+(?:\.\d+)*(?:[-_]\w+)?|hotfix)$/i,
+    versionExample: 'e.g. Proton 9.0-4 or Proton Hotfix',
   },
   'proton-experimental': {
     key:      'proton-experimental',
     label:    'Proton Experimental',
     subtitle: 'Valve\'s bleeding-edge Proton branch',
+    versionPattern: /(proton[\s-]?experimental|bleeding[-\s]?edge)/i,
+    versionExample: 'e.g. Proton Experimental',
   },
   'proton-ge': {
     key:      'proton-ge',
     label:    'Proton GE',
     subtitle: 'GloriousEggroll community fork',
+    versionPattern: /^(ge[-_ ]?proton|proton[-_ ]?ge)[-_ ]?\d+([-_.]\d+)*$/i,
+    versionExample: 'e.g. GE-Proton9-27',
   },
   'proton-cachyos': {
     key:      'proton-cachyos',
     label:    'CachyOS Proton',
     subtitle: 'CachyOS-tuned Proton',
+    versionPattern: /cachy(os)?[-\s]?proton/i,
+    versionExample: 'e.g. CachyOS Proton 9.0-4',
   },
   'proton-tkg': {
     key:      'proton-tkg',
     label:    'Proton-TKG',
     subtitle: 'TKG custom Proton build',
+    versionPattern: /(proton[-_ ]?tkg|tkg[-_ ]?proton)/i,
+    versionExample: 'e.g. Proton-TKG 9.0-4',
   },
   'proton-lsfg': {
     key:      'proton-lsfg',
     label:    'Proton + LSFG',
     subtitle: 'Any Proton flavor with Lossless Scaling FrameGen wrapper',
+    // LSFG wraps another Proton -- accept anything that mentions LSFG OR
+    // the underlying Proton build so the user can enter either surface.
+    versionPattern: /(lsfg|lossless[-\s]?scaling|proton)/i,
+    versionExample: 'e.g. GE-Proton9-27 + LSFG',
   },
 });
+
+/**
+ * Check whether a free-text version string plausibly matches the runtime
+ * the user picked. Returns:
+ *   { ok: true }                       if the pattern matches
+ *   { ok: false, hint: '...' }         if it does not (soft warn UX)
+ *   { ok: null }                       if we don't know how to validate
+ *                                      (unknown runtime, or native)
+ * Empty version strings always return { ok: null } so callers can decide
+ * whether "required" is a separate concern.
+ */
+export function validateRuntimeVersion(runType, versionStr) {
+  const key = runType || 'proton';
+  const meta = RUN_TYPES[key];
+  const trimmed = String(versionStr || '').trim();
+  if (!trimmed) return { ok: null };
+  if (!meta || !meta.versionPattern) return { ok: null };
+  const ok = meta.versionPattern.test(trimmed);
+  return ok ? { ok: true } : { ok: false, hint: meta.versionExample };
+}
 
 /** Ordered list of canonical keys for iteration. */
 export const RUN_TYPE_KEYS = Object.freeze(Object.keys(RUN_TYPES));

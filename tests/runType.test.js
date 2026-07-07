@@ -7,7 +7,7 @@
  * 'lossless-scaling' land as three distinct run_type rows in stats.
  */
 
-const { RUN_TYPES, RUN_TYPE_KEYS, normalizeRunType, uniqueRunTypes, runTypeLabel } =
+const { RUN_TYPES, RUN_TYPE_KEYS, normalizeRunType, uniqueRunTypes, runTypeLabel, validateRuntimeVersion } =
   require('../js/shared/run-type.js');
 
 describe('RUN_TYPES canonical taxonomy', () => {
@@ -116,6 +116,68 @@ describe('uniqueRunTypes', () => {
 
   test('drops nulls (unclassified signals) instead of surfacing them', () => {
     expect(uniqueRunTypes(['native', '', null, 'proton', undefined])).toEqual(['native', 'proton']);
+  });
+});
+
+describe('validateRuntimeVersion', () => {
+  test('empty version always returns ok=null so callers handle "required" separately', () => {
+    expect(validateRuntimeVersion('proton', '').ok).toBeNull();
+    expect(validateRuntimeVersion('proton', '   ').ok).toBeNull();
+    expect(validateRuntimeVersion('proton', null).ok).toBeNull();
+  });
+
+  test('native has no pattern -> ok=null (no runtime version applies)', () => {
+    expect(validateRuntimeVersion('native', 'anything').ok).toBeNull();
+  });
+
+  test('proton accepts stable + hotfix syntax', () => {
+    expect(validateRuntimeVersion('proton', 'Proton 9.0-4').ok).toBe(true);
+    expect(validateRuntimeVersion('proton', 'Proton 8.0-5c').ok).toBe(true);
+    expect(validateRuntimeVersion('proton', 'Proton Hotfix').ok).toBe(true);
+    // Rejects unrelated strings
+    expect(validateRuntimeVersion('proton', 'GE-Proton9-27').ok).toBe(false);
+    expect(validateRuntimeVersion('proton', 'wine 9.0').ok).toBe(false);
+  });
+
+  test('proton-ge accepts GE variants only', () => {
+    expect(validateRuntimeVersion('proton-ge', 'GE-Proton9-27').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-ge', 'ge-proton 10-4').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-ge', 'Proton 9.0-4').ok).toBe(false);
+  });
+
+  test('proton-experimental matches experimental / bleeding-edge phrasing', () => {
+    expect(validateRuntimeVersion('proton-experimental', 'Proton Experimental').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-experimental', 'bleeding-edge').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-experimental', 'Proton 9.0-4').ok).toBe(false);
+  });
+
+  test('proton-cachyos matches CachyOS mentions', () => {
+    expect(validateRuntimeVersion('proton-cachyos', 'CachyOS Proton 9.0-4').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-cachyos', 'cachy-proton').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-cachyos', 'Proton 9.0-4').ok).toBe(false);
+  });
+
+  test('proton-tkg matches TKG mentions', () => {
+    expect(validateRuntimeVersion('proton-tkg', 'Proton-TKG 9.0-4').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-tkg', 'tkg proton').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-tkg', 'Proton 9.0-4').ok).toBe(false);
+  });
+
+  test('proton-lsfg accepts LSFG marker OR the wrapped Proton version', () => {
+    expect(validateRuntimeVersion('proton-lsfg', 'LSFG-VK').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-lsfg', 'Proton 9.0-4 + LSFG').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-lsfg', 'Proton 9.0-4').ok).toBe(true);
+    expect(validateRuntimeVersion('proton-lsfg', 'notepad').ok).toBe(false);
+  });
+
+  test('mismatch returns a helpful hint pointing at the runtime example', () => {
+    const v = validateRuntimeVersion('proton-ge', 'Proton 9.0-4');
+    expect(v.ok).toBe(false);
+    expect(v.hint).toMatch(/GE-Proton/);
+  });
+
+  test('unknown runtime returns ok=null (never surface a false failure)', () => {
+    expect(validateRuntimeVersion('mystery-runtime', 'anything').ok).toBeNull();
   });
 });
 

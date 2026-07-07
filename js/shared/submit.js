@@ -2,7 +2,7 @@
 
 import { SupaAuth } from './config.js?v=f6f2c00a';
 import { FAULT_KEYS_WEB, deriveRatingFromState, inferProtonType } from './scoring.js?v=1b8ae722';
-import { normalizeRunType } from './run-type.js?v=42155622';
+import { RUN_TYPES, normalizeRunType, validateRuntimeVersion } from './run-type.js?v=01ec5b4d';
 import { detectGpuArch } from '../lib/gpu-arch-detector.js?v=b4fbb7ef';
 
 // Form submission + populate-submit-form -- factored out of app.js.
@@ -609,12 +609,13 @@ export async function populateSubmitForm(el) {
         </select>
         <span class="sf-row-hint">Pick a saved system to prefill hardware fields</span>
       </div>
-      <div class="sf-row"><label>Proton Version *</label>
+      <div class="sf-row" id="sf-runtime-version-row"><label id="sf-runtime-version-label">Runtime Version *</label>
         <div class="sf-autocomplete" style="position:relative;flex:1;">
           <input name="protonVersion" placeholder="e.g. Proton 9.0-4 or GE-Proton9-27" autocomplete="off" style="width:100%">
           <ul class="sf-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--s2);border:1px solid var(--border);border-top:none;max-height:200px;overflow-y:auto;list-style:none;margin:0;padding:0;"></ul>
         </div>
       </div>
+      <div class="sf-row-hint sf-runtime-version-warn" id="sf-runtime-version-warn" hidden></div>
       <div class="sf-row"><label>GPU *</label><input name="gpu" placeholder="e.g. NVIDIA GeForce RTX 4070"></div>
       <div class="sf-row"><label>GPU Vendor *</label><select name="gpuVendor"><option value="" disabled selected>-- choose one --</option>${opts(gpuVendors,true)}</select></div>
       <div class="sf-row"><label>GPU Driver</label><input name="gpuDriver" placeholder="e.g. Mesa 24.1.0 or 555.42.02"></div>
@@ -1058,23 +1059,50 @@ function wireRunTypeToggle(container) {
     .find(row => row.querySelector('input[name="protonVersion"]'));
   if (!sel) return;
 
+  const versionInput = container.querySelector('input[name="protonVersion"]');
+  const versionLabel = container.querySelector('#sf-runtime-version-label');
+  const versionWarn  = container.querySelector('#sf-runtime-version-warn');
+
+  const runVersionValidate = () => {
+    if (!versionInput || !versionWarn) return;
+    const key = sel.value || 'proton';
+    if (key === 'native' || versionInput.disabled) {
+      versionWarn.hidden = true;
+      versionWarn.textContent = '';
+      return;
+    }
+    const v = validateRuntimeVersion(key, versionInput.value);
+    if (v.ok === false) {
+      versionWarn.textContent = `Does not look like a ${RUN_TYPES[key]?.label || key} version. ${v.hint}. Submission still allowed.`;
+      versionWarn.hidden = false;
+    } else {
+      versionWarn.hidden = true;
+      versionWarn.textContent = '';
+    }
+  };
+
   const applyRunType = () => {
     const key = sel.value || 'proton';
     const isNative = key === 'native';
+    const meta = RUN_TYPES[key];
     if (protonRow) {
-      const label = protonRow.querySelector('label');
-      const input = protonRow.querySelector('input[name="protonVersion"]');
+      const input = versionInput;
       if (input) {
         input.disabled = isNative;
         input.required = !isNative;
         input.placeholder = isNative
           ? 'Not applicable for native builds'
-          : 'e.g. Proton 9.0-4 or GE-Proton9-27';
+          : (meta?.versionExample || 'e.g. Proton 9.0-4');
         if (isNative) input.value = '';
       }
-      if (label) label.textContent = isNative ? 'Proton Version' : 'Proton Version *';
+      if (versionLabel) {
+        versionLabel.textContent = isNative
+          ? 'Runtime Version'
+          : `Runtime Version * (${meta?.label || 'Proton'})`;
+      }
       protonRow.classList.toggle('sf-row--disabled', isNative);
     }
+    runVersionValidate();
     if (hintEl) {
       if (isNative) {
         hintEl.textContent = 'Proton fields are disabled. FPS + compatibility answers still apply to the native build.';
@@ -1093,6 +1121,10 @@ function wireRunTypeToggle(container) {
   };
 
   sel.addEventListener('change', applyRunType);
+  if (versionInput) {
+    versionInput.addEventListener('blur', runVersionValidate);
+    versionInput.addEventListener('input', runVersionValidate);
+  }
   applyRunType();
 
   // "Also tested Linux?" Yes/No toggle: Yes reveals the notes textarea.
