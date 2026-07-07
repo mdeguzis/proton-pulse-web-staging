@@ -2,6 +2,7 @@
 
 import { SupaAuth } from './config.js?v=f6f2c00a';
 import { FAULT_KEYS_WEB, deriveRatingFromState, inferProtonType } from './scoring.js?v=1b8ae722';
+import { RUN_TYPES, normalizeRunType, validateRuntimeVersion } from './run-type.js?v=01ec5b4d';
 import { detectGpuArch } from '../lib/gpu-arch-detector.js?v=b4fbb7ef';
 
 // Form submission + populate-submit-form -- factored out of app.js.
@@ -294,11 +295,16 @@ export async function submitReport(appId, title, form, editReportId = null) {
   if (!derivedRating) {
     return { ok: false, error: 'Cannot derive a rating from the answers. Please review the compatibility questions.' };
   }
+  const runTypeVal = normalizeRunType(form.runType?.value) || 'proton';
+  const isNative = runTypeVal === 'native';
   const formResponses = {
     canInstall: state.canInstall || null,
     canStart:   state.canStart   || null,
     canPlay:    state.canPlay    || null,
-    protonType: inferProtonType(form.protonVersion.value),
+    // Proton type is only meaningful for Proton-family runs. Native reports
+    // carry a null so scoring can distinguish "no Proton fields required"
+    // from "Proton was blank due to user error".
+    protonType: isNative ? null : inferProtonType(form.protonVersion.value),
     tinkeringMethods: state.tinkeringMethods ? [...state.tinkeringMethods] : [],
     isTinker: !!(state.tinkeringMethods && state.tinkeringMethods.size > 0),
     ...Object.fromEntries(FAULT_KEYS_WEB.map(k => [k, state.faults?.[k] || null])),
@@ -323,6 +329,12 @@ export async function submitReport(appId, title, form, editReportId = null) {
     verdictOob: installFailed ? null : (state.verdict === 'yes'
       ? (state.tinkeringMethods && state.tinkeringMethods.size > 0 ? 'no' : 'yes')
       : null),
+    // "Also tested the native Linux build?" follow-up (only when reporting
+    // a non-native run against a game that has a native build available).
+    alsoTestedLinux: isNative ? null : (form.alsoTestedLinux?.value || null),
+    alsoTestedLinuxNotes: (!isNative && form.alsoTestedLinux?.value === 'yes')
+      ? (form.alsoTestedLinuxNotes?.value || '').trim() || null
+      : null,
     // framegen is informational only, never read by scoring (app-scoring.js).
     // When the user answered Yes we also capture which framegen tech they
     // used + free-form notes; stats can break down by type (task #31).
@@ -351,7 +363,9 @@ export async function submitReport(appId, title, form, editReportId = null) {
     ram: normalizeRam(form.ram.value),
     os: (form.os.value + (form.osVersion.value ? ' ' + form.osVersion.value.trim() : '')),
     kernel: form.kernel.value,
-    proton_version: form.protonVersion.value,
+    // Native runs do not use Proton, so store null rather than an empty
+    // string that would break "distinct Proton versions" queries later.
+    proton_version: isNative ? null : form.protonVersion.value,
     duration: form.duration.value || 'unreported',
     rating: derivedRating,
     notes: form.notes.value,
@@ -360,6 +374,14 @@ export async function submitReport(appId, title, form, editReportId = null) {
     confidence_score: null,
     source: form.reportSource?.value || getWebSource(),
     vram_mb: form.vramMb.value ? Number(form.vramMb.value) : null,
+    // Optional FPS metrics. Plugin will populate these automatically from
+    // MangoHud samples in a follow-up; web submissions capture manual entry.
+    fps_min: form.fpsMin?.value ? Number(form.fpsMin.value) : null,
+    fps_avg: form.fpsAvg?.value ? Number(form.fpsAvg.value) : null,
+    fps_max: form.fpsMax?.value ? Number(form.fpsMax.value) : null,
+    // Normalize whatever the toggle carries into the canonical taxonomy so
+    // a rogue pipeline value or a stale draft cannot land unclassified.
+    run_type: normalizeRunType(form.runType?.value) || null,
     game_owned: true,  // authenticated web users own the game by definition
     owner_verified: await isAppIdInMyLibrary(appId, session),
     form_responses: formResponses,
@@ -550,6 +572,35 @@ export async function populateSubmitForm(el) {
       <div id="sf-draft-restore" class="sf-draft-restore" hidden></div>
       <div class="sf-section-label">Game</div>
       <div class="sf-row"><label>Game title</label><input name="gameTitle" readonly style="cursor:default;color:var(--muted);border-color:var(--border2);background:var(--s1);" placeholder="Loading..."></div>
+      <div class="sf-row sf-row--run-type">
+        <label>Run type *</label>
+        <select name="runType" id="sf-run-type-select">
+          <option value="native">Native Linux -- Linux build, no Proton</option>
+          <option value="proton" selected>Proton -- Valve's official (stable/hotfix)</option>
+          <option value="proton-experimental">Proton Experimental -- Valve's bleeding-edge branch</option>
+          <option value="proton-ge">Proton GE -- GloriousEggroll community fork</option>
+          <option value="proton-cachyos">CachyOS Proton -- CachyOS-tuned</option>
+          <option value="proton-tkg">Proton-TKG -- TKG custom build</option>
+          <option value="proton-lsfg">Proton + LSFG -- with Lossless Scaling FrameGen wrapper</option>
+        </select>
+      </div>
+      <div class="sf-row-hint sf-run-type-hint" id="sf-run-type-hint" hidden></div>
+      <div class="sf-row sf-row--also-linux" id="sf-also-linux-row" hidden>
+        <label>Also tested Linux?</label>
+        <div class="sf-also-linux-body">
+          <div class="sf-inline-yn" id="sf-also-linux-yn">
+            <button type="button" data-value="yes" aria-pressed="false">Yes</button>
+            <button type="button" data-value="no" aria-pressed="false">No</button>
+          </div>
+          <input type="hidden" name="alsoTestedLinux" value="">
+          <textarea name="alsoTestedLinuxNotes" placeholder="Optional: how did the native Linux build compare (perf, stability)?" rows="2" style="display:none"></textarea>
+          <div class="sf-also-linux-hint">
+            Steam offers a native Linux build for this game. You can also
+            <a href="#" id="sf-submit-native-shortcut">file a separate Native report</a>
+            for a side-by-side comparison.
+          </div>
+        </div>
+      </div>
 
       <div class="sf-section-label">Hardware &amp; Setup</div>
       <div class="sf-row"><label>System</label>
@@ -558,12 +609,13 @@ export async function populateSubmitForm(el) {
         </select>
         <span class="sf-row-hint">Pick a saved system to prefill hardware fields</span>
       </div>
-      <div class="sf-row"><label>Proton Version *</label>
+      <div class="sf-row" id="sf-runtime-version-row"><label id="sf-runtime-version-label">Runtime Version *</label>
         <div class="sf-autocomplete" style="position:relative;flex:1;">
           <input name="protonVersion" placeholder="e.g. Proton 9.0-4 or GE-Proton9-27" autocomplete="off" style="width:100%">
           <ul class="sf-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--s2);border:1px solid var(--border);border-top:none;max-height:200px;overflow-y:auto;list-style:none;margin:0;padding:0;"></ul>
         </div>
       </div>
+      <div class="sf-row-hint sf-runtime-version-warn" id="sf-runtime-version-warn" hidden></div>
       <div class="sf-row"><label>GPU *</label><input name="gpu" placeholder="e.g. NVIDIA GeForce RTX 4070"></div>
       <div class="sf-row"><label>GPU Vendor *</label><select name="gpuVendor"><option value="" disabled selected>-- choose one --</option>${opts(gpuVendors,true)}</select></div>
       <div class="sf-row"><label>GPU Driver</label><input name="gpuDriver" placeholder="e.g. Mesa 24.1.0 or 555.42.02"></div>
@@ -574,6 +626,34 @@ export async function populateSubmitForm(el) {
       <div class="sf-row"><label>OS Version</label><input name="osVersion" placeholder="e.g. 24.04"></div>
       <div class="sf-row"><label>Kernel</label><input name="kernel" placeholder="e.g. 6.8.0"></div>
       <div class="sf-row"><label>Steam Playtime</label><select name="duration">${durationOpts}</select></div>
+      <div class="sf-row sf-row--fps">
+        <label>FPS (optional)</label>
+        <div class="sf-fps-group">
+          <div class="sf-fps-cell">
+            <input name="fpsMin" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="min">
+            <button type="button" class="sf-fps-info" data-fps-info="min" aria-label="How to measure minimum FPS">i</button>
+          </div>
+          <div class="sf-fps-cell">
+            <input name="fpsAvg" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="avg">
+            <button type="button" class="sf-fps-info" data-fps-info="avg" aria-label="How to measure average FPS">i</button>
+          </div>
+          <div class="sf-fps-cell">
+            <input name="fpsMax" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="max">
+            <button type="button" class="sf-fps-info" data-fps-info="max" aria-label="How to measure maximum FPS">i</button>
+          </div>
+        </div>
+      </div>
+      <div class="sf-row sf-row--fps-upload">
+        <label></label>
+        <div class="sf-fps-upload">
+          <label class="sf-fps-upload-btn" for="fpsCsvInput">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-14 9v2h14v-2H5z" style="transform:rotate(180deg);transform-origin:center"/></svg>
+            Upload MangoHud CSV
+          </label>
+          <input id="fpsCsvInput" name="fpsCsv" type="file" accept=".csv,text/csv" hidden>
+          <span class="sf-fps-upload-status" id="fpsCsvStatus"></span>
+        </div>
+      </div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
 
       <div class="sf-section-label" style="margin-top:16px">Compatibility Questions</div>
@@ -913,5 +993,253 @@ export async function populateSubmitForm(el) {
       }
       if (parsed.kernel && f.kernel) f.kernel.value = parsed.kernel;
     });
+  }
+
+  // Wire the "how to measure FPS" info buttons on the FPS row. All three
+  // buttons open the same popover with quick instructions for MangoHud and
+  // the SteamOS QAM performance overlay so users know how to fill the
+  // fields correctly. Once the plugin auto-populates these, the buttons
+  // remain useful for anyone submitting from a browser.
+  wireFpsInfoButtons(container);
+  wireFpsCsvUpload(container);
+  wireRunTypeToggle(container);
+}
+
+// Native vs Proton toggle at the top of the report. When "Native" is
+// selected we disable the Proton-only fields so the form communicates
+// clearly that they do not apply, and the submitted row carries a
+// definitive run_type instead of a stale Proton version guess.
+// Tracks the last Steam answer for the current form so wireRunTypeToggle
+// can show / hide the "Also tested Linux?" follow-up row when the user
+// swaps run types after Steam has replied.
+const _nativeAvailableByContainer = new WeakMap();
+
+/**
+ * Adjust the Run Type dropdown based on whether the game ships a native
+ * Linux binary per Steam appdetails. Called by the submit page after
+ * Steam returns.
+ *
+ * When Steam says no: disable the Native option so users cannot submit
+ * an impossible run_type. Restored drafts / edits with a stale
+ * 'native' selection bounce back to Proton.
+ *
+ * When Steam says yes: enable the Native option, and if the current
+ * pick is a non-native Proton flavor, reveal the "Also tested Linux?"
+ * follow-up row so we can capture a paired comparison in one report.
+ */
+export function setRunTypeNativeAvailable(container, isAvailable) {
+  _nativeAvailableByContainer.set(container, !!isAvailable);
+  const sel = container.querySelector('#sf-run-type-select');
+  if (!sel) return;
+  const nativeOpt = sel.querySelector('option[value="native"]');
+  if (nativeOpt) {
+    nativeOpt.disabled = !isAvailable;
+    nativeOpt.textContent = isAvailable
+      ? 'Native Linux -- Linux build, no Proton'
+      : 'Native Linux -- not offered by Steam for this game';
+  }
+  if (!isAvailable && sel.value === 'native') {
+    sel.value = 'proton';
+    sel.dispatchEvent(new Event('change'));
+  } else {
+    // Re-run applyRunType so the follow-up row appears / hides now that
+    // we know the answer.
+    sel.dispatchEvent(new Event('change'));
+  }
+}
+
+function wireRunTypeToggle(container) {
+  const sel = container.querySelector('#sf-run-type-select');
+  const hintEl = container.querySelector('#sf-run-type-hint');
+  const alsoRow = container.querySelector('#sf-also-linux-row');
+  const alsoHidden = container.querySelector('input[name="alsoTestedLinux"]');
+  const alsoNotes = container.querySelector('textarea[name="alsoTestedLinuxNotes"]');
+  const alsoBtns = container.querySelectorAll('#sf-also-linux-yn button');
+  const protonRow = [...container.querySelectorAll('.sf-row')]
+    .find(row => row.querySelector('input[name="protonVersion"]'));
+  if (!sel) return;
+
+  const versionInput = container.querySelector('input[name="protonVersion"]');
+  const versionLabel = container.querySelector('#sf-runtime-version-label');
+  const versionWarn  = container.querySelector('#sf-runtime-version-warn');
+
+  const runVersionValidate = () => {
+    if (!versionInput || !versionWarn) return;
+    const key = sel.value || 'proton';
+    if (key === 'native' || versionInput.disabled) {
+      versionWarn.hidden = true;
+      versionWarn.textContent = '';
+      return;
+    }
+    const v = validateRuntimeVersion(key, versionInput.value);
+    if (v.ok === false) {
+      versionWarn.textContent = `Does not look like a ${RUN_TYPES[key]?.label || key} version. ${v.hint}. Submission still allowed.`;
+      versionWarn.hidden = false;
+    } else {
+      versionWarn.hidden = true;
+      versionWarn.textContent = '';
+    }
+  };
+
+  const applyRunType = () => {
+    const key = sel.value || 'proton';
+    const isNative = key === 'native';
+    const meta = RUN_TYPES[key];
+    if (protonRow) {
+      const input = versionInput;
+      if (input) {
+        input.disabled = isNative;
+        input.required = !isNative;
+        input.placeholder = isNative
+          ? 'Not applicable for native builds'
+          : (meta?.versionExample || 'e.g. Proton 9.0-4');
+        if (isNative) input.value = '';
+      }
+      if (versionLabel) {
+        versionLabel.textContent = isNative
+          ? 'Runtime Version'
+          : `Runtime Version * (${meta?.label || 'Proton'})`;
+      }
+      protonRow.classList.toggle('sf-row--disabled', isNative);
+    }
+    runVersionValidate();
+    if (hintEl) {
+      if (isNative) {
+        hintEl.textContent = 'Proton fields are disabled. FPS + compatibility answers still apply to the native build.';
+        hintEl.hidden = false;
+      } else {
+        hintEl.hidden = true;
+        hintEl.textContent = '';
+      }
+    }
+    // Follow-up "Also tested Linux?" row appears only when the user is
+    // reporting a non-native run AND Steam has confirmed native support.
+    if (alsoRow) {
+      const nativeAvailable = _nativeAvailableByContainer.get(container) === true;
+      alsoRow.hidden = isNative || !nativeAvailable;
+    }
+  };
+
+  sel.addEventListener('change', applyRunType);
+  if (versionInput) {
+    versionInput.addEventListener('blur', runVersionValidate);
+    versionInput.addEventListener('input', runVersionValidate);
+  }
+  applyRunType();
+
+  // "Also tested Linux?" Yes/No toggle: Yes reveals the notes textarea.
+  for (const btn of alsoBtns) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const val = btn.dataset.value;
+      if (alsoHidden) alsoHidden.value = val;
+      for (const b of alsoBtns) b.setAttribute('aria-pressed', String(b === btn));
+      if (alsoNotes) alsoNotes.style.display = (val === 'yes') ? '' : 'none';
+    });
+  }
+
+  // Shortcut link: file a separate Native Linux report against this app.
+  const shortcut = container.querySelector('#sf-submit-native-shortcut');
+  if (shortcut) {
+    shortcut.addEventListener('click', (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams(window.location.search);
+      params.set('runType', 'native');
+      window.location.href = `submit.html?${params.toString()}`;
+    });
+  }
+}
+
+function wireFpsCsvUpload(container) {
+  const input = container.querySelector('#fpsCsvInput');
+  const status = container.querySelector('#fpsCsvStatus');
+  if (!input || !status) return;
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    status.textContent = 'Parsing...';
+    status.classList.remove('sf-fps-upload-status--err');
+    try {
+      const text = await file.text();
+      // Lazy-load the parser -- it is small but only relevant when someone
+      // actually uploads a file, and the module is separately testable.
+      const { parseMangohudCsv } = await import('../shared/mangohud-csv.js');
+      const result = parseMangohudCsv(text);
+      if (result.error) {
+        status.textContent = result.error;
+        status.classList.add('sf-fps-upload-status--err');
+        return;
+      }
+      const form = container.querySelector('#submit-report-form') || container.querySelector('form');
+      if (form) {
+        if (form.fpsMin && result.fpsMin != null) form.fpsMin.value = String(result.fpsMin);
+        if (form.fpsAvg && result.fpsAvg != null) form.fpsAvg.value = String(result.fpsAvg);
+        if (form.fpsMax && result.fpsMax != null) form.fpsMax.value = String(result.fpsMax);
+      }
+      status.textContent = `Filled from ${result.sampleCount.toLocaleString()} MangoHud samples`;
+    } catch (e) {
+      status.textContent = `Could not read file: ${(e && e.message) || e}`;
+      status.classList.add('sf-fps-upload-status--err');
+    } finally {
+      // Reset input so uploading the same file again re-triggers change.
+      input.value = '';
+    }
+  });
+}
+
+function wireFpsInfoButtons(container) {
+  const buttons = container.querySelectorAll('.sf-fps-info');
+  if (!buttons.length) return;
+  const showPopover = (btn) => {
+    document.querySelectorAll('.sf-fps-popover').forEach(n => n.remove());
+    const pop = document.createElement('div');
+    pop.className = 'sf-fps-popover';
+    pop.innerHTML = `
+      <div class="sf-fps-popover-title">How to measure FPS</div>
+      <ul>
+        <li><strong>SteamOS (Steam Deck):</strong>
+          Press the <em>...</em> button to open Quick Access,
+          go to Performance, turn on
+          <em>Show Performance Overlay</em> at level 3 or higher.
+          Min / avg / max show while you play.
+          <a href="https://www.steamdeck.com/en/support" target="_blank" rel="noopener">Steam Deck docs -&gt;</a></li>
+        <li><strong>MangoHud (desktop Linux):</strong>
+          install <code>mangohud</code>, then launch Steam games with
+          <code>mangohud %command%</code> in the launch options,
+          or <code>MANGOHUD=1 %command%</code>.
+          Enable <code>fps_min</code> and <code>fps_max</code> in
+          <code>~/.config/MangoHud/MangoHud.conf</code>.
+          <a href="https://github.com/flightlessmango/MangoHud#configuration" target="_blank" rel="noopener">MangoHud config -&gt;</a></li>
+        <li><strong>Have a MangoHud log?</strong> Use the
+          <em>Upload MangoHud CSV</em> button below the FPS row to
+          auto-fill min / avg / max from your file.</li>
+        <li><strong>Coming soon:</strong> the Decky plugin will
+          auto-sample MangoHud during play and pre-fill these fields.</li>
+      </ul>
+      <div class="sf-fps-popover-close-row">
+        <button type="button" class="sf-fps-popover-close">Close</button>
+      </div>`;
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    // Anchor to the button; nudge into viewport if we overflow the right edge.
+    pop.style.top = `${window.scrollY + r.bottom + 6}px`;
+    const preferredLeft = r.left + window.scrollX;
+    const rightEdge = preferredLeft + pop.offsetWidth;
+    const overflow = rightEdge - (window.scrollX + window.innerWidth) + 12;
+    pop.style.left = `${Math.max(8, preferredLeft - Math.max(0, overflow))}px`;
+    const close = () => pop.remove();
+    pop.querySelector('.sf-fps-popover-close')?.addEventListener('click', close);
+    // Dismiss on outside click / Escape.
+    setTimeout(() => {
+      document.addEventListener('click', function onDoc(e) {
+        if (!pop.contains(e.target) && e.target !== btn) { close(); document.removeEventListener('click', onDoc); }
+      });
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+      });
+    }, 0);
+  };
+  for (const btn of buttons) {
+    btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showPopover(btn); });
   }
 }

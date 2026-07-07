@@ -1,7 +1,7 @@
 // Entry module for stats.html. Orchestrates data fetch, filter state, and
 // chart rendering by delegating to utils, filters, and charts modules.
 
-import { FILTER_DIMS, dimDef, label, fmt } from './utils.js?v=9bcdac4f';
+import { FILTER_DIMS, dimDef, label, fmt } from './utils.js?v=c63d96b0';
 import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
 import {
   applyFilter, getFilter, getOpenDropdown, setOpenDropdown,
@@ -12,6 +12,145 @@ import {
   renderBars, renderFreshness, renderFramegen, renderDonut,
   renderSparkline, renderTopGames, renderRatingsTrend,
 } from './charts.js?v=870157ea';
+import {
+  OPTIMIZATION_PATTERNS, FAULT_PATTERNS, TINKERING_PATTERNS,
+  CONTROLLER_PATTERNS, ONLINE_NET_PATTERNS,
+} from '../shared/analytics-patterns.js?v=c119f011';
+import { renderPurposeChart, crossTabToCorrelation } from '../shared/purpose-charts.js?v=d383b3bd';
+import { renderLibraryTab } from './library-view.js?v=5881023e';
+
+// #207: purpose-chart instances so we destroy() before re-rendering on
+// filter change. Keyed by canvas id.
+const _purposeCharts = new Map();
+function _drawPurposeCharts() {
+  if (!stats) return;
+  const RATING_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
+  const drilldown = ({ category, key }) => {
+    // Click a stacked bar segment: append the corresponding filter to the
+    // URL hash so the whole page follows. Falls back to a noop if the
+    // dimension isn't a known filter.
+    if (!category) return;
+    const url = new URL(window.location.href);
+    const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+    const params = new URLSearchParams(hash);
+    // Two dims we can drill into with the existing filters.js state.
+    // Rating is the datasets key; category is the x-axis (gpu / os / etc).
+    params.set('dim', category);
+    params.set('vals', key || '');
+    window.location.hash = params.toString().replace(/%2C/g, ',');
+  };
+
+  const chartTargets = [
+    { id: 'purpose-chart-rating-x-gpu', purpose: 'correlation', crossTab: stats.by_rating_x_gpu_vendor, series: RATING_ORDER },
+    { id: 'purpose-chart-rating-x-os',  purpose: 'correlation', crossTab: stats.by_rating_x_os_family, series: RATING_ORDER },
+    { id: 'purpose-chart-year-rating',  purpose: 'time-series', yearRating: stats.by_year_rating, series: RATING_ORDER },
+  ];
+  for (const spec of chartTargets) {
+    const canvas = document.getElementById(spec.id);
+    if (!canvas) continue;
+    if (_purposeCharts.has(spec.id)) {
+      _purposeCharts.get(spec.id).destroy();
+      _purposeCharts.delete(spec.id);
+    }
+    let data;
+    if (spec.crossTab) {
+      data = crossTabToCorrelation(spec.crossTab, spec.series);
+    } else if (spec.yearRating) {
+      // by_year_rating: { "2020": { platinum: N, gold: N, ... }, ... }
+      // Reshape into time-series: labels = years sorted, series = one per rating.
+      const labels = Object.keys(spec.yearRating).sort();
+      data = {
+        labels,
+        series: spec.series.map(k => ({
+          key: k,
+          values: labels.map(y => Number((spec.yearRating[y] || {})[k] || 0)),
+        })),
+      };
+    } else {
+      continue;
+    }
+    const inst = renderPurposeChart(canvas, {
+      purpose: spec.purpose,
+      data,
+      options: { onSlice: drilldown },
+    });
+    if (inst) _purposeCharts.set(spec.id, inst);
+  }
+}
+
+// Phase B (#206): stats page is now tabbed. Overall keeps roughly what the
+// page had before; Per-Store and Correlations are stubs that later phases
+// fill in with real data. Tab state lives in the URL hash alongside filters
+// so links and back-nav survive.
+// Escape user-visible strings inserted into innerHTML. Small helper so we
+// don't import from utils just for this one call.
+function _escHtml(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+// Render the pattern catalogue as a set of labelled pill groups so admins /
+// visitors see the vocabulary the Correlations tab will drill into once
+// report-level data lands. Purely presentational; the real matching happens
+// server-side in phases C/D.
+function _renderPatternCatalogHtml() {
+  const groups = [
+    ['Optimization tools', OPTIMIZATION_PATTERNS],
+    ['Fault signals', FAULT_PATTERNS],
+    ['Tinkering methods', TINKERING_PATTERNS],
+    ['Controller mentions', CONTROLLER_PATTERNS],
+    ['Online / DRM', ONLINE_NET_PATTERNS],
+  ];
+  return groups.map(([label, group]) => `
+    <div class="pattern-group">
+      <div class="pattern-group-label">${_escHtml(label)}</div>
+      <div class="pattern-pills">
+        ${group.map(g => `<span class="pattern-pill" title="key: ${_escHtml(g.key)}">${_escHtml(g.label)}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+const TABS = ['overall', 'per-store', 'correlations', 'my-library'];
+function getActiveTab() {
+  const hash = window.location.hash || '';
+  const m = /tab=([\w-]+)/.exec(hash);
+  const t = m && TABS.includes(m[1]) ? m[1] : 'overall';
+  return t;
+}
+function setActiveTab(tab) {
+  const url = new URL(window.location.href);
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+  const params = new URLSearchParams(hash);
+  params.set('tab', tab);
+  const next = params.toString().replace(/%2C/g, ',');
+  window.location.hash = next;
+  _applyTabVisibility();
+}
+let _libraryTabRendered = false;
+function _applyTabVisibility() {
+  const active = getActiveTab();
+  for (const t of TABS) {
+    const el = document.getElementById(`tab-${t}`);
+    if (el) el.hidden = (t !== active);
+    const btn = document.querySelector(`[data-tab-btn="${t}"]`);
+    if (btn) btn.classList.toggle('stats-tab-btn--active', t === active);
+  }
+  // Lazy-load the My Library tab the first time it's activated. Every fetch
+  // requires auth + a REST hit; skip it on other tab views to keep the
+  // default overall render fast.
+  if (active === 'my-library' && !_libraryTabRendered) {
+    _libraryTabRendered = true;
+    const host = document.getElementById('library-tab-host');
+    if (host) renderLibraryTab(host);
+  }
+}
+// Tab clicks are delegated so the render pass doesn't have to re-bind them.
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest && e.target.closest('[data-tab-btn]');
+  if (!btn) return;
+  e.preventDefault();
+  setActiveTab(btn.dataset.tabBtn);
+});
+window.addEventListener('hashchange', _applyTabVisibility);
 
 const root = document.getElementById('stats-root');
 const metaEl = document.getElementById('stats-meta');
@@ -83,6 +222,14 @@ function renderAll() {
       <span class="filter-status" id="filter-status"></span>
     </div>
 
+    <nav class="stats-tabs" aria-label="Stats sections">
+      <button type="button" class="stats-tab-btn" data-tab-btn="overall">Overall</button>
+      <button type="button" class="stats-tab-btn" data-tab-btn="per-store">Per-store</button>
+      <button type="button" class="stats-tab-btn" data-tab-btn="correlations">Correlations</button>
+      <button type="button" class="stats-tab-btn" data-tab-btn="my-library">My Library</button>
+    </nav>
+
+    <section id="tab-overall" data-tab="overall">
     <div class="chart-grid">
       <div class="chart-card">
         <h3>Ratings ${filter.dim ? '(filtered)' : ''}</h3>
@@ -171,7 +318,62 @@ function renderAll() {
 
     <h2>Top games by report volume</h2>
     <div class="topgames" id="topgames"></div>
+    </section>
+
+    <section id="tab-per-store" data-tab="per-store" hidden>
+      <div class="chart-card">
+        <h3>Per-storefront breakdown</h3>
+        <p class="fg-card-hint">
+          Coming soon (#204 Phase C+). Will show side-by-side tier distribution and
+          report volume for Steam, GOG, and Epic on a single page. For now, use the
+          Store filter above to slice the Overall tab.
+        </p>
+      </div>
+    </section>
+
+    <section id="tab-correlations" data-tab="correlations" hidden>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Rating x GPU vendor</h3>
+          <p class="fg-card-hint">Stacked share of reports by GPU vendor. Click a segment to filter the whole page.</p>
+          <div class="purpose-chart-wrap"><canvas id="purpose-chart-rating-x-gpu"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Rating x OS family</h3>
+          <p class="fg-card-hint">Which OS families see which tiers.</p>
+          <div class="purpose-chart-wrap"><canvas id="purpose-chart-rating-x-os"></canvas></div>
+        </div>
+        <div class="chart-card" style="grid-column: 1 / -1">
+          <h3>Ratings by year</h3>
+          <p class="fg-card-hint">How the tier mix has moved over time. One line per rating.</p>
+          <div class="purpose-chart-wrap purpose-chart-wrap--tall"><canvas id="purpose-chart-year-rating"></canvas></div>
+        </div>
+      </div>
+
+      <div class="chart-card" style="margin-top: 18px">
+        <h3>What we look for</h3>
+        <p class="fg-card-hint">
+          Report notes get scanned for these signals. Each category will grow its own
+          drilldown once report-level text data lands here (#208, #209).
+        </p>
+        ${_renderPatternCatalogHtml()}
+      </div>
+    </section>
+
+    <section id="tab-my-library" data-tab="my-library" hidden>
+      <div id="library-tab-host">
+        <div class="chart-card">
+          <h3>For your library</h3>
+          <p class="fg-card-hint">Loading...</p>
+        </div>
+      </div>
+    </section>
   `;
+
+  // Fresh DOM: the library-tab-host we rendered before is gone, so allow the
+  // lazy loader to fire again if the user is on the My Library tab.
+  _libraryTabRendered = false;
+  _applyTabVisibility();
 
   // Bind chart contents to data
   renderBars(document.getElementById('chart-rating'),
@@ -221,6 +423,9 @@ function renderAll() {
     renderTopGames(stats.worth_retesting || [], document.getElementById('retesting'));
   }
   renderRatingsTrend(stats.by_year_rating || {});
+
+  // Correlations tab charts (#207).
+  _drawPurposeCharts();
 
   // Update filter status line
   const status = document.getElementById('filter-status');

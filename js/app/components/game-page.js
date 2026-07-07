@@ -3,15 +3,15 @@
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
 import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=1b8ae722';
 import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/scoring/gameStats.js?v=8dc92cf7';
-import { getWebClientId } from '../../shared/submit.js?v=64f1a52e';
-import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=dfac69c8';
+import { getWebClientId } from '../../shared/submit.js?v=339c68ea';
+import { fetchAppDepotInfo, fetchAppMetadata, fetchDeckStatusForApp, fetchMinRequirements, fetchLinuxNativeSupport } from '../api/deck-status.js?v=c5df5310';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=083594fa';
-import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=d76564a6';
+import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=01961c8d';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=aba6619f';
 import { enhanceAuthorBlocks } from './author.js?v=3a8cb3c7';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=a1a075ee';
-import { renderCard } from './report-card.js?v=a3e68133';
+import { renderCard } from './report-card.js?v=faa750d4';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=f9591262';
@@ -116,6 +116,277 @@ function _showFlagModal(btn) {
       submitEl.disabled = false;
       window.ppToast?.error('Could not flag the report. Please try again.');
     }
+  });
+}
+
+// Per-runtime "when was it last tested" table opened by clicking the
+// Native Linux hint on the game header. Renders a small modal listing
+// every run_type observed for this game (native, proton, proton-lsfg,
+// plus any pipeline-discovered variants), with the number of reports
+// and the first-seen / last-seen dates. Reports without a run_type
+// (legacy rows) get grouped under 'unknown' so viewers can spot the
+// coverage gap.
+function _openRuntimeHistoryModal(appId, combined) {
+  const existing = document.getElementById('runtime-history-modal');
+  if (existing) existing.remove();
+
+  const rows = (combined || []).filter(r => r._kind === 'report' || r._kind === 'config');
+  const byRuntime = new Map();
+  for (const r of rows) {
+    const key = r.runType || 'unknown';
+    const ts = (r.timestamp || 0) * 1000;
+    const upd = (r.updatedAt || r.timestamp || 0) * 1000;
+    let entry = byRuntime.get(key);
+    if (!entry) { entry = { count: 0, first: Infinity, last: 0 }; byRuntime.set(key, entry); }
+    entry.count++;
+    if (ts && ts < entry.first) entry.first = ts;
+    if (upd && upd > entry.last) entry.last = upd;
+  }
+
+  const LABEL = {
+    native:                'Native Linux',
+    proton:                'Proton',
+    'proton-experimental': 'Proton Experimental',
+    'proton-ge':           'Proton GE',
+    'proton-cachyos':      'CachyOS Proton',
+    'proton-tkg':          'Proton-TKG',
+    'proton-lsfg':         'Proton + LSFG',
+    unknown:               'Unclassified',
+  };
+  const CANONICAL_ORDER = ['native', 'proton', 'proton-experimental', 'proton-ge', 'proton-cachyos', 'proton-tkg', 'proton-lsfg'];
+  const ordered = [...byRuntime.entries()].sort(([a], [b]) => {
+    const ai = CANONICAL_ORDER.indexOf(a);
+    const bi = CANONICAL_ORDER.indexOf(b);
+    if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    if (a === 'unknown') return 1;
+    if (b === 'unknown') return -1;
+    return a.localeCompare(b);
+  });
+
+  const fmtDate = (ms) => Number.isFinite(ms) && ms > 0
+    ? new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : '-';
+
+  const bodyRows = ordered.length === 0
+    ? `<tr><td colspan="4" class="rh-empty">No reports on this game carry a runtime yet. New submissions will populate this table.</td></tr>`
+    : ordered.map(([key, e]) => `
+        <tr>
+          <td><span class="run-type-pill run-type-pill--${key === 'native' ? 'native' : (key === 'proton-lsfg' ? 'lsfg' : 'plain')}" title="${esc(key)}">${esc(LABEL[key] || key)}</span></td>
+          <td class="rh-num">${e.count}</td>
+          <td class="rh-date">${fmtDate(e.first)}</td>
+          <td class="rh-date">${fmtDate(e.last)}</td>
+        </tr>`).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'runtime-history-modal';
+  modal.className = 'flag-modal-overlay';
+  modal.innerHTML = `
+    <div class="flag-modal runtime-history-modal">
+      <h3 class="flag-modal-title">Runtimes tested for this game</h3>
+      <p class="rh-hint">One row per runtime observed across all reports on this app. Dates come from report timestamps.</p>
+      <table class="runtime-history-table">
+        <thead>
+          <tr>
+            <th>Runtime</th>
+            <th class="rh-num">Reports</th>
+            <th class="rh-date">First seen</th>
+            <th class="rh-date">Last updated</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      <div class="flag-modal-actions">
+        <button class="action-btn" id="runtime-history-close">Close</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('#runtime-history-close')?.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+}
+
+// Metadata modal opened by the "Metadata" pill in the hub-links row.
+// Formats the Steam appdetails payload the same way SteamDB does: one
+// section per fact block (developer / publisher / systems / release
+// date / genres / metacritic). Fields that Steam did not return simply
+// omit their block so a partial response never looks like a bug.
+async function _openMetadataModal(appId) {
+  const existing = document.getElementById('game-metadata-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'game-metadata-modal';
+  modal.className = 'flag-modal-overlay';
+  modal.innerHTML = `
+    <div class="flag-modal game-metadata-modal">
+      <h3 class="flag-modal-title">Metadata</h3>
+      <div id="game-metadata-body" class="game-metadata-body">
+        <p class="rh-hint">Loading Steam metadata...</p>
+      </div>
+      <div class="flag-modal-actions">
+        <button class="action-btn" id="game-metadata-close">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('#game-metadata-close')?.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+
+  const [meta, depotInfo] = await Promise.all([
+    fetchAppMetadata(appId).catch(() => null),
+    // Fire in parallel; #215 pipeline may not have populated this app yet
+    // and that is expected -- the fallback SteamDB link stays in place.
+    fetchAppDepotInfo(appId).catch(() => null),
+  ]);
+  const body = modal.querySelector('#game-metadata-body');
+  if (!body) return;
+  if (!meta) {
+    body.innerHTML = '<p class="rh-hint">Steam did not return metadata for this app (it may be delisted or region-locked).</p>';
+    return;
+  }
+  const section = (title, html) => html
+    ? `<div class="gm-section"><div class="gm-section-title">${esc(title)}</div><div class="gm-section-body">${html}</div></div>`
+    : '';
+  const list = (items) => (items || []).length
+    ? `<div class="gm-chips">${items.map(i => `<span class="gm-chip">${esc(i)}</span>`).join('')}</div>`
+    : '';
+  // Per-OS depot row: Steam does not publish per-depot last-updated dates
+  // via appdetails (that lives in PICS / SteamDB). Show the app-wide
+  // release date next to each supported OS + a SteamDB depot link so
+  // viewers can drill in. Tracked in #214.
+  const platformsRows = (p, releaseDate) => {
+    if (!p) return '';
+    // depotInfo shape: { found: bool, os: { windows|mac|linux: {
+    //   first_seen, last_updated, depots } } }
+    // Populated by the #215 pipeline (steamcmd nightly). When we have a
+    // real last-updated date for an OS we render it; otherwise we fall
+    // through to the SteamDB deep link.
+    const dOs = depotInfo?.found && depotInfo.os ? depotInfo.os : {};
+    const fmtDate = (iso) => {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+    // First seen + Last update ONLY come from the steamcmd depot cache
+    // (steam_depot_updates via #215). We deliberately do NOT fall through
+    // to the app-wide release date -- that used to be shown here and
+    // confused viewers into thinking it was per-OS depot data, which it
+    // is not. Release date has its own row above the table.
+    const row = (key, label) => {
+      const on = !!p[key];
+      const cached = dOs[key];
+      const firstFmt = fmtDate(cached?.first_seen);
+      const lastFmt  = fmtDate(cached?.last_updated);
+      let firstCell;
+      if (!on) firstCell = '<span class="gm-mute">not offered</span>';
+      else if (firstFmt) firstCell = `<span class="gm-depot-date" title="Earliest depot manifest seen in Steam PICS">${esc(firstFmt)}</span>`;
+      else firstCell = '<span class="gm-mute" title="Not cached yet -- pipeline #215 populates this nightly">pending</span>';
+      let lastCell;
+      if (!on) lastCell = '-';
+      else if (lastFmt) lastCell = `<span class="gm-depot-date" title="From Steam PICS (${cached.depots} depot${cached.depots === 1 ? '' : 's'} tracked)">${esc(lastFmt)}</span>`;
+      else lastCell = `<a class="gm-depot-link" href="https://steamdb.info/app/${esc(meta.appId)}/depots/" target="_blank" rel="noopener">SteamDB -&gt;</a>`;
+      return `
+        <tr>
+          <td><span class="gm-plat${on ? ' gm-plat--on' : ''}">${esc(label)}</span></td>
+          <td>${firstCell}</td>
+          <td>${lastCell}</td>
+        </tr>`;
+    };
+    return `<table class="gm-plat-table">
+      <thead><tr><th>OS</th><th>First seen</th><th>Last update</th></tr></thead>
+      <tbody>${row('windows','Windows')}${row('mac','macOS')}${row('linux','Linux')}</tbody>
+      <tfoot><tr><td colspan="3" class="gm-plat-foot">Dates from Steam depot manifests (PICS). Community report dates live in the game's report cards, not here.</td></tr></tfoot>
+    </table>`;
+  };
+  // System requirements: fold into one collapsible block per OS. Text is
+  // pre-stripped of Steam's inline HTML so we can safely render it.
+  const reqsBlock = () => {
+    const rows = [];
+    for (const [os, pair] of [['Windows', meta.pcRequirements], ['macOS', meta.macRequirements], ['Linux', meta.linuxRequirements]]) {
+      if (!pair) continue;
+      if (!pair.minimum && !pair.recommended) continue;
+      rows.push(`
+        <div class="gm-reqs">
+          <div class="gm-reqs-os">${esc(os)}</div>
+          ${pair.minimum     ? `<div><strong>Min:</strong> ${esc(pair.minimum)}</div>`     : ''}
+          ${pair.recommended ? `<div><strong>Rec:</strong> ${esc(pair.recommended)}</div>` : ''}
+        </div>`);
+    }
+    return rows.join('');
+  };
+  const packages = () => {
+    const bits = [];
+    if (meta.packageIds.length) {
+      bits.push(`<span>${meta.packageIds.length} package${meta.packageIds.length === 1 ? '' : 's'}: ${meta.packageIds.slice(0, 8).join(', ')}${meta.packageIds.length > 8 ? '...' : ''}</span>`);
+    }
+    if (meta.packageGroups.length) {
+      const g = meta.packageGroups.map(x => `${esc(x.title || x.name || 'group')} (${x.subCount})`).join(', ');
+      bits.push(`<div class="gm-mute" style="margin-top:2px">Groups: ${g}</div>`);
+    }
+    return bits.join('');
+  };
+  const fullgameLink = () => {
+    if (!meta.fullgame?.appid) return '';
+    const t = meta.fullgame.name || `App ${meta.fullgame.appid}`;
+    return `<a href="#/app/${esc(String(meta.fullgame.appid))}">${esc(t)}</a>`;
+  };
+  body.innerHTML = [
+    section('Name',          meta.name ? `<strong>${esc(meta.name)}</strong>` : ''),
+    section('App ID',        `<code>${esc(meta.appId)}</code>`),
+    section('Type',          meta.type ? `<code>${esc(meta.type)}</code>` : ''),
+    section('Parent game',   fullgameLink()),
+    section('Free to play',  meta.isFree ? '<span class="gm-plat gm-plat--on">Free</span>' : ''),
+    section('Age gate',      meta.requiredAge && Number(meta.requiredAge) > 0 ? `<code>${esc(String(meta.requiredAge))}+</code>` : ''),
+    section('Developer',     list(meta.developers)),
+    section('Publisher',     list(meta.publishers)),
+    section('Release date',  meta.releaseDate
+      ? `<span>${esc(meta.releaseDate)}${meta.comingSoon ? ' <em>(coming soon)</em>' : ''}</span>` : ''),
+    section('Supported systems', platformsRows(meta.platforms, meta.releaseDate)),
+    section('System requirements', reqsBlock()),
+    section('Genres',        list(meta.genres)),
+    section('Categories',    list(meta.categories)),
+    section('Achievements',  meta.hasAchievements
+      ? `<span>${meta.achievementCount.toLocaleString()} total</span>` : ''),
+    section('DLC',           meta.dlcCount ? `<span>${meta.dlcCount.toLocaleString()} entries</span>` : ''),
+    section('Metacritic',    meta.metacriticScore != null
+      ? `<a href="${esc(meta.metacriticUrl || '#')}" target="_blank" rel="noopener">${meta.metacriticScore} / 100 -&gt;</a>`
+      : ''),
+    section('Review summary', meta.reviewsSummary ? `<span>${esc(meta.reviewsSummary)}</span>` : ''),
+    section('Languages',     meta.supportedLanguages ? `<span>${esc(meta.supportedLanguages)}</span>` : ''),
+    section('Controller support', meta.controllerSupport ? `<code>${esc(meta.controllerSupport)}</code>` : ''),
+    section('Packages',      packages()),
+    section('Website',       meta.website
+      ? `<a href="${esc(meta.website)}" target="_blank" rel="noopener">${esc(meta.website)} -&gt;</a>` : ''),
+    section('Content notes', meta.contentDescriptors.length
+      ? list(meta.contentDescriptors) : ''),
+  ].join('') + `
+    <div class="gm-raw-wrap">
+      <button type="button" class="gm-raw-toggle" id="gm-raw-toggle" aria-expanded="false">Show raw appdetails JSON</button>
+      <pre class="gm-raw" id="gm-raw" hidden></pre>
+    </div>`;
+
+  // Wire raw-JSON toggle. Deferred so mobile does not chew memory pretty
+  // printing 40KB of JSON until the user asks for it.
+  const toggle = body.querySelector('#gm-raw-toggle');
+  const raw    = body.querySelector('#gm-raw');
+  toggle?.addEventListener('click', () => {
+    const opening = raw.hidden;
+    if (opening && !raw.dataset.filled) {
+      try { raw.textContent = JSON.stringify(meta.raw, null, 2); }
+      catch { raw.textContent = String(meta.raw); }
+      raw.dataset.filled = '1';
+    }
+    raw.hidden = !opening;
+    toggle.textContent = opening ? 'Hide raw appdetails JSON' : 'Show raw appdetails JSON';
+    toggle.setAttribute('aria-expanded', String(opening));
   });
 }
 
@@ -371,6 +642,10 @@ export async function renderGamePage(appId) {
   let filterArch   = persistedFilters.arch   || '';
   let filterOs     = persistedFilters.os     || '';
   let filterRating = persistedFilters.rating || '';
+  // Native vs Proton (or a specific proton wrapper). '' == any. Reports
+  // without a run_type value are treated as unknown so they never
+  // accidentally match a specific selection.
+  let filterRunType = persistedFilters.runType || '';
   // 'deck-lcd' / 'deck-oled' / 'deck-any' / 'desktop' / ''
   let filterDevice = persistedFilters.device || '';
   // Minimum reporter playtime in minutes (0 = any). Useful to skip "launched
@@ -382,7 +657,7 @@ export async function renderGamePage(appId) {
   function saveFiltersIfEnabled() {
     if (!persistFilters) return;
     try {
-      const snapshot = { gpu: filterGpu, arch: filterArch, os: filterOs, rating: filterRating, device: filterDevice, minPlaytime: filterMinPlaytime, source: filterSource };
+      const snapshot = { gpu: filterGpu, arch: filterArch, os: filterOs, rating: filterRating, runType: filterRunType, device: filterDevice, minPlaytime: filterMinPlaytime, source: filterSource };
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(snapshot));
     } catch { /* quota / disabled - ignore */ }
   }
@@ -434,6 +709,7 @@ export async function renderGamePage(appId) {
     if (filterGpu)    arr = arr.filter(r => gpuVendor(r.gpu) === filterGpu);
     if (filterArch)   arr = arr.filter(r => gpuArch(r) === filterArch);
     if (filterOs)     arr = arr.filter(r => osBase(r.os) === filterOs);
+    if (filterRunType) arr = arr.filter(r => (r.runType || '') === filterRunType);
     if (filterDevice) {
       arr = arr.filter(r => {
         const haystack = `${r.cpu || ''} ${r.gpu || ''}`;
@@ -619,8 +895,25 @@ export async function renderGamePage(appId) {
       <div class="game-header">
         ${replacedBanner}
         <div class="game-title">${esc(title)} <span class="game-title-store" title="Storefront this entry maps to">(${esc(storeLabelFromAppId(appId) || 'Steam')})</span>${isDelisted ? ' <span class="game-detail-delisted" title="Removed from the Steam store. Reports still apply -- people still own this via family share, backups, or regional accounts.">DELISTED</span>' : ''}${replacedBy ? ` <span class="game-title-replaced-pill" title="Replaced by app ${esc(replacedBy)}: ${esc(replacedByTitle)}">REPLACED</span>` : ''}${/\bdemo\b/i.test(title) ? ' <span class="game-title-demo-pill" title="This entry looks like a demo based on the title. Reports may not reflect the full game.">DEMO</span>' : ''}</div>
+        <div class="game-os-strip" id="game-os-strip" hidden aria-label="Supported operating systems">
+          <span class="game-os-chip" data-os="windows" title="Windows">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 5.5L10 4.5V11H3V5.5zm8-1.2L21 3v8H11V4.3zM3 12h7v6.5L3 17.5V12zm8 0h10v9L11 19.5V12z"/></svg>
+            <span>Win</span>
+          </span>
+          <span class="game-os-chip" data-os="mac" title="macOS">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17.5 12.5c0-2.6 2.1-3.9 2.2-4-1.2-1.8-3.1-2-3.8-2.1-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 2 2.7 3.4 2.6 1.4 0 1.9-.9 3.6-.9 1.7 0 2.1.9 3.5.9 1.5 0 2.4-1.3 3.3-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.7-1-2.7-4zM14.5 4.7c.7-.9 1.2-2.1 1-3.3-1.1.1-2.4.8-3.1 1.6-.7.8-1.3 2-1.1 3.2 1.2.1 2.4-.6 3.2-1.5z"/></svg>
+            <span>macOS</span>
+          </span>
+          <span class="game-os-chip" data-os="linux" title="Linux">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2c-1.66 0-3 1.34-3 3v3.5c-1.5 1-3 2.5-3 5.5 0 2.5 1 4.5 2 5.5.5.5 1 1 1 2v.5h6V21c0-1 .5-1.5 1-2 1-1 2-3 2-5.5 0-3-1.5-4.5-3-5.5V5c0-1.66-1.34-3-3-3zm-1.5 5c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zm3 0c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 11l-1.5 2h3L12 11z"/></svg>
+            <span>Linux</span>
+          </span>
+        </div>
         <div class="game-header-grid">
-          <img class="game-header-art" src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
+          <div class="game-header-art-col">
+            <img class="game-header-art" src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
+            <div class="game-native-linux" id="game-native-linux" hidden></div>
+          </div>
           ${ratingPanel}
           <div class="game-header-actions">
             <a class="info-btn" href="scoring.html" id="rating-info-btn" title="How scoring works (opens the canonical scoring page)"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="11" fill="#3b82f6"/><text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" fill="#fff" font-family="serif">i</text></svg></a>
@@ -644,6 +937,7 @@ export async function renderGamePage(appId) {
           <a class="hub-link" href="https://steamcharts.com/app/${appId}" target="_blank" rel="noopener">Steam Charts</a>
           <a class="hub-link" href="https://github.com/ValveSoftware/Proton/issues?q=${encodeURIComponent(title)}" target="_blank" rel="noopener">Proton Issues</a>
           <a class="hub-link" href="${dataFilesHref(appId)}" target="_blank" rel="noopener">Data Files</a>
+          <button type="button" class="hub-link" id="hub-metadata-btn" title="Formatted Steam appdetails: developer, publisher, systems, release date, genres">Metadata</button>
         </div>
       </div>
 
@@ -699,6 +993,27 @@ export async function renderGamePage(appId) {
                 ${availRatings.map(v => `<option value="${v}" ${filterRating===v?'selected':''}>${RATING_LABEL[v]||v}</option>`).join('')}
               </select>
             </div>` : '';
+          // Run-type filter: only show when this game has at least one report
+          // carrying a run_type (legacy reports have null and would otherwise
+          // clutter the modal with an "Any / Proton" toggle that does nothing).
+          const RUN_TYPE_LABEL = {
+            native:                'Native Linux',
+            proton:                'Proton',
+            'proton-experimental': 'Proton Experimental',
+            'proton-ge':           'Proton GE',
+            'proton-cachyos':      'CachyOS Proton',
+            'proton-tkg':          'Proton-TKG',
+            'proton-lsfg':         'Proton + LSFG',
+          };
+          const availRunTypes = [...new Set(combined.map(r => r.runType).filter(Boolean))].sort();
+          const runTypeSel = availRunTypes.length > 0 ? `
+            <div class="filter-item">
+              <label for="fRunType">Run type</label>
+              <select id="fRunType">
+                <option value="">Any</option>
+                ${availRunTypes.map(v => `<option value="${esc(v)}" ${filterRunType===v?'selected':''}>${RUN_TYPE_LABEL[v]||v}</option>`).join('')}
+              </select>
+            </div>` : '';
           const srcSel = `
             <div class="filter-item">
               <label for="fSource">Source</label>
@@ -735,7 +1050,7 @@ export async function renderGamePage(appId) {
               </select>
             </div>`;
 
-          const activeCount = [filterGpu, filterArch, filterOs, filterRating, filterSource, filterDevice, filterMinPlaytime > 0 ? '1' : ''].filter(Boolean).length;
+          const activeCount = [filterGpu, filterArch, filterOs, filterRating, filterRunType, filterSource, filterDevice, filterMinPlaytime > 0 ? '1' : ''].filter(Boolean).length;
           const anyActive = activeCount > 0;
 
           return `
@@ -746,7 +1061,7 @@ export async function renderGamePage(appId) {
             ${anyActive ? `<span class="filter-count">${reps.length} of ${combined.length} shown</span>` : ''}
             <div class="filter-panel" id="filterPanel">
               <div class="filter-panel-grid">
-                ${gpuSel}${archSel}${osSel}${srcSel}${ratingSel}${deviceSel}${playtimeSel}
+                ${gpuSel}${archSel}${osSel}${srcSel}${ratingSel}${runTypeSel}${deviceSel}${playtimeSel}
               </div>
               <div class="filter-panel-footer">
                 <label class="filter-persist" title="Save these filters so they apply next time you visit a game page">
@@ -798,6 +1113,11 @@ export async function renderGamePage(appId) {
       // status badge + summary sentence + per-criterion checklist
       el.querySelector('#deck-status-tip')?.classList.toggle('open');
     });
+    // Metadata hub link opens the SteamDB-style metadata modal.
+    el.querySelector('#hub-metadata-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      void _openMetadataModal(appId);
+    });
     el.querySelectorAll('.source-summary-tile').forEach((tile) => {
       tile.addEventListener('click', () => {
         const targetId = tile.getAttribute('data-target');
@@ -814,13 +1134,14 @@ export async function renderGamePage(appId) {
     el.querySelector('#fArch')?.addEventListener('change', e => { filterArch   = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
     el.querySelector('#fOs')?.addEventListener('change',  e => { filterOs     = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
     el.querySelector('#fRating')?.addEventListener('change', e => { filterRating = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
+    el.querySelector('#fRunType')?.addEventListener('change', e => { filterRunType = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
     el.querySelector('#fSource')?.addEventListener('change', e => { filterSource = e.target.value; saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open'); });
     el.querySelector('#filterToggle')?.addEventListener('click', (e) => {
       e.stopPropagation();
       el.querySelector('#filterPanel')?.classList.toggle('open');
     });
     el.querySelector('#filterClear')?.addEventListener('click', () => {
-      filterGpu = ''; filterArch = ''; filterOs = ''; filterRating = '';
+      filterGpu = ''; filterArch = ''; filterOs = ''; filterRating = ''; filterRunType = '';
       filterSource = ''; filterDevice = ''; filterMinPlaytime = 0;
       saveFiltersIfEnabled(); render(); el.querySelector('#filterPanel')?.classList.add('open');
     });
@@ -907,12 +1228,63 @@ export async function renderGamePage(appId) {
     // async-enhance author blocks with stats + avatars after the DOM is ready
     void enhanceAuthorBlocks(reps.filter(r => r._kind !== 'config'));
 
-    // fetch real Steam Deck compat + min requirements and patch the UI
+    // fetch real Steam Deck compat + min requirements and patch the UI.
+    // Also probe platforms.linux via the same shared appdetails cache so
+    // native-Linux titles get a small badge under the game title.
     void (async () => {
-      const [deckData, reqsData] = await Promise.all([
+      const [deckData, reqsData, appMeta] = await Promise.all([
         fetchDeckStatusForApp(appId),
         fetchMinRequirements(appId),
+        // Use the full metadata fetch instead of a dedicated linux probe so
+        // the OS availability strip + Native hint + Metadata modal all
+        // share one edge-function round trip.
+        fetchAppMetadata(appId),
       ]);
+      const platforms = appMeta?.platforms || null;
+      const hasLinuxNative = platforms?.linux === true;
+      // OS availability strip in the header: light up the OS icons Steam
+      // says the game supports, dim the others. Only render at all when we
+      // got a platforms dict back (Steam blip -> stay hidden rather than
+      // showing "all off").
+      if (platforms) {
+        const strip = el.querySelector('#game-os-strip');
+        if (strip) {
+          strip.hidden = false;
+          for (const chip of strip.querySelectorAll('.game-os-chip')) {
+            const key = chip.dataset.os; // 'windows' | 'mac' | 'linux'
+            const on = !!platforms[key];
+            chip.classList.toggle('game-os-chip--on', on);
+            const label = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }[key] || key;
+            chip.title = on ? `${label}: available` : `${label}: not offered by Steam`;
+          }
+        }
+      }
+      // Reveal the "Native Linux runtime" hint under the box art only when
+      // Steam says yes. Absence is treated as "we don't know" so a Steam
+      // API blip doesn't look like a downgrade. Clicking opens the
+      // per-runtime version-history table.
+      const nativeEl = el.querySelector('#game-native-linux');
+      if (nativeEl && hasLinuxNative) {
+        nativeEl.innerHTML = `
+          <svg class="tux-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+            <path d="M12 2c-1.66 0-3 1.34-3 3v3.5c-1.5 1-3 2.5-3 5.5 0 2.5 1 4.5 2 5.5.5.5 1 1 1 2v.5h6V21c0-1 .5-1.5 1-2 1-1 2-3 2-5.5 0-3-1.5-4.5-3-5.5V5c0-1.66-1.34-3-3-3zm-1.5 5c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zm3 0c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 11l-1.5 2h3L12 11z"/>
+          </svg>
+          Native Linux runtime available
+          <span class="game-native-linux-more">(metadata)</span>`;
+        // Clicking the hint opens the Metadata modal (where per-OS depot
+        // dates live once the #215 pipeline caches them) instead of the
+        // community-report runtime-history table. The two data sources
+        // measure different things (Steam depots vs Pulse/ProtonDB
+        // reports) and the earlier wiring was mixing them up.
+        nativeEl.title = 'Steam advertises a native Linux binary. Click to see the full metadata (developer, publisher, per-OS depot dates).';
+        nativeEl.hidden = false;
+        nativeEl.setAttribute('role', 'button');
+        nativeEl.tabIndex = 0;
+        nativeEl.addEventListener('click', () => _openMetadataModal(appId));
+        nativeEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openMetadataModal(appId); }
+        });
+      }
       // update deck status button icon + modal
       const deckBtn = el.querySelector('#deck-status-btn');
       if (deckBtn && deckData.status !== 'unknown') {

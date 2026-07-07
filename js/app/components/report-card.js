@@ -1,7 +1,7 @@
 // report-card (components) for the app page. Relocated from app.js.
 
 import { estimateScore } from '../../shared/scoring.js?v=1b8ae722';
-import { getWebClientId } from '../../shared/submit.js?v=64f1a52e';
+import { getWebClientId } from '../../shared/submit.js?v=339c68ea';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
 import { renderAuthorBlock } from './author.js?v=3a8cb3c7';
 import { buildFormRows } from './config-cards.js?v=c67740f8';
@@ -62,7 +62,22 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
     <div class="card">
       ${renderAuthorBlock(r)}
       <div class="card-body">
-        <div class="proton">${esc(r.protonVersion || 'Unknown')}</div>
+        <div class="proton">${(() => {
+          if (r.runType === 'native') {
+            return '<span class="run-type-pill run-type-pill--native" title="Native Linux build (no Proton)">Native Linux</span>';
+          }
+          const RT_PILL = {
+            'proton-lsfg':         { cls: 'lsfg',  label: 'Proton + LSFG', title: 'Proton with Lossless Scaling FrameGen wrapper' },
+            'proton-ge':           { cls: 'plain', label: 'Proton GE',     title: 'GloriousEggroll community fork' },
+            'proton-experimental': { cls: 'plain', label: 'Proton Experimental', title: 'Valve bleeding-edge Proton branch' },
+            'proton-cachyos':      { cls: 'plain', label: 'CachyOS Proton', title: 'CachyOS-tuned Proton' },
+            'proton-tkg':          { cls: 'plain', label: 'Proton-TKG',    title: 'TKG custom Proton build' },
+          };
+          const pill = RT_PILL[r.runType];
+          return pill
+            ? `<span class="run-type-pill run-type-pill--${pill.cls}" title="${pill.title}">${pill.label}</span> ${esc(r.protonVersion || 'Unknown')}`
+            : esc(r.protonVersion || 'Unknown');
+        })()}</div>
         <div class="hw">${esc([r.gpu, r.os].filter(Boolean).join(' / ') || 'Hardware unavailable')}</div>
         <div class="age">
           ${daysAgo(r.timestamp)}
@@ -87,6 +102,7 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
       <div class="row"><span class="label">OS</span><span>${na(esc(r.os))}</span></div>
       <div class="row"><span class="label">Proton</span><span>${na(esc(r.protonVersion))}</span></div>
       ${(r.durationMinutes != null || fmtDuration(r.duration)) ? `<div class="row"><span class="label">Steam playtime</span><span>${r.durationMinutes != null ? fmtMinutes(r.durationMinutes) : fmtDuration(r.duration)}</span></div>` : ''}
+      ${(r.fpsMin != null || r.fpsAvg != null || r.fpsMax != null) ? `<div class="row"><span class="label">FPS (min / avg / max)</span><span class="fps-values" title="Reported frames-per-second measurements">${r.fpsMin != null ? Number(r.fpsMin).toFixed(1) : '-'} / ${r.fpsAvg != null ? Number(r.fpsAvg).toFixed(1) : '-'} / ${r.fpsMax != null ? Number(r.fpsMax).toFixed(1) : '-'}</span></div>` : ''}
       ${(() => { const pt = r.configKey && configPlaytimeTotals.find(t => t.config_key === r.configKey); return pt ? `<div class="row"><span class="label">Config playtime</span><span title="${pt.session_count} session${pt.session_count !== 1 ? 's' : ''}">${fmtMinutes(pt.total_minutes)}</span></div>` : ''; })()}
       ${r.notes ? `<div class="row"><span class="label">Notes</span><div class="notes-full">${renderNotes(r.notes)}</div></div>` : ''}
       ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span class="launch-options-value">${esc(r.launchOptions)}</span></div>` : ''}

@@ -18,6 +18,7 @@ const ANALYTICS_SRC = fs.readFileSync(path.join(ROOT, 'js', 'lib', 'analytics.js
 
 function loadAnalytics({ session, fetchImpl, userAgent } = {}) {
   const sessionStorageMap = {};
+  const localStorageMap = {};
   const docListeners = [];
   const winListeners = [];
   const ctx = {
@@ -26,6 +27,13 @@ function loadAnalytics({ session, fetchImpl, userAgent } = {}) {
     sessionStorage: {
       getItem: (k) => Object.prototype.hasOwnProperty.call(sessionStorageMap, k) ? sessionStorageMap[k] : null,
       setItem: (k, v) => { sessionStorageMap[k] = String(v); },
+    },
+    // #202: analytics tracker now reads/writes proton-pulse:web-client-id
+    // from localStorage so anonymous visitors count in the Unique visitors
+    // chart. Mirror sessionStorage's shape.
+    localStorage: {
+      getItem: (k) => Object.prototype.hasOwnProperty.call(localStorageMap, k) ? localStorageMap[k] : null,
+      setItem: (k, v) => { localStorageMap[k] = String(v); },
     },
     navigator: { userAgent: userAgent || 'Mozilla/5.0 (X11; Linux x86_64)' },
     document: {
@@ -138,6 +146,43 @@ describe('analytics.js track()', () => {
     await ctx.window.ppTrack('report_submit', { app_id: '730', is_edit: true });
     const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
     expect(body.metadata).toEqual({ device: 'desktop', app_id: '730', is_edit: true });
+  });
+
+  test('attaches client_id from proton-pulse:web-client-id (#202)', async () => {
+    // Without a stable client_id, admin_analytics counts distinct
+    // coalesce(user_id, client_id) but every anonymous row was null/null and
+    // Unique visitors flatlined at the authed-user count.
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true });
+    const { ctx } = loadAnalytics({ session: null, fetchImpl });
+    await ctx.window.ppTrack('page_view', {});
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    expect(body.client_id).toBe('test-sid-uuid');
+    expect(body.proton_pulse_user_id).toBeNull();
+  });
+
+  test('reuses stored client_id across track() calls', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true });
+    const { ctx } = loadAnalytics({ session: null, fetchImpl });
+    await ctx.window.ppTrack('page_view', {});
+    await ctx.window.ppTrack('page_view', {});
+    const cid1 = JSON.parse(fetchImpl.mock.calls[0][1].body).client_id;
+    const cid2 = JSON.parse(fetchImpl.mock.calls[1][1].body).client_id;
+    expect(cid1).toBe(cid2);
+  });
+
+  test('still attaches client_id when signed in', async () => {
+    // Reports and votes carry client_id even for authed users; site_events
+    // should match so admin views (like the users tab count of anon ids)
+    // stay consistent.
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true });
+    const { ctx } = loadAnalytics({
+      session: { access_token: 'tok', user: { id: 'pp-1' } },
+      fetchImpl,
+    });
+    await ctx.window.ppTrack('page_view', {});
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    expect(body.client_id).toBe('test-sid-uuid');
+    expect(body.proton_pulse_user_id).toBe('pp-1');
   });
 
   test('no-ops when SUPABASE_URL is missing', async () => {

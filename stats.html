@@ -658,12 +658,89 @@ h2 {
   border: 1px solid rgba(200,80,80,0.3);
   background: rgba(200,80,80,0.08);
 }
+
+/* Phase B (#206): stats page tabs. Kept small so the existing chart-card
+   look dominates; the tab bar is chrome, not a headline. */
+.stats-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 14px 0 18px;
+  flex-wrap: wrap;
+}
+.stats-tab-btn {
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+.stats-tab-btn:hover { color: var(--text); }
+.stats-tab-btn--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.pattern-group { margin-top: 14px; }
+.pattern-group-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.pattern-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Chart.js canvas wrapper -- constrains height so responsive:true doesn't
+   grow forever inside a flex/grid parent. #207 */
+.purpose-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 240px;
+}
+.purpose-chart-wrap--tall { height: 320px; }
+.pattern-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+/* Compact recommendations table for the My Library tab (#209). Deliberately
+   sparse; the tab is meant to fit in one screen without scrolling. */
+.library-recs {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.library-recs th,
+.library-recs td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.library-recs th {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.library-recs td a { color: var(--text); text-decoration: none; }
+.library-recs td a:hover { color: var(--accent); text-decoration: underline; }
 </style>
 </head>
 <body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/lib/supabase-client.js?v=79bf62c6"></script>
-<script src="js/lib/analytics.js?v=e6dfbad8"></script>
+<script src="js/lib/analytics.js?v=7855fb4c"></script>
 <script src="js/lib/topbar.js?v=46897460"></script>
 <script src="js/lib/toast.js?v=7bb23014"></script>
 
@@ -678,6 +755,7 @@ h2 {
 
 </div></div>
 
-<script type="module" src="js/stats/main.js?v=9cd30c97"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script type="module" src="js/stats/main.js?v=6b1960e6"></script>
 </body>
 </html>
