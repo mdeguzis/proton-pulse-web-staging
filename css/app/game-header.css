@@ -441,12 +441,14 @@
 }
 [data-theme="light"] .game-os-chip--on { color: #256b25; }
 @media (max-width: 720px) {
-  /* Below the title area, above the grid, and full-width flex so all three
-     chips are visible without covering the title. */
+  /* Below the title area, above the grid. Left-align so the row starts
+     under the title instead of hugging the right edge -- overflow /
+     wrap looks intentional this way rather than crammed. */
   .game-os-strip {
     position: static;
     margin-bottom: 6px;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 .game-native-linux::before {
