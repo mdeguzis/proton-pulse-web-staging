@@ -1194,15 +1194,15 @@
    the flag-modal chrome for consistency. Table lists one row per runtime
    with report count + first / last seen dates. Fluid width mirrors the
    metadata modal so both fit small phones. */
-.runtime-history-modal {
+.flag-modal.runtime-history-modal {
   width: 100%;
   min-width: 0;
-  max-width: 480px;   /* widen the 420px .flag-modal cap for the table */
+  max-width: 520px;   /* widen the 420px .flag-modal cap for the table */
   max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
 @media (max-width: 720px) {
-  .runtime-history-modal { max-width: 100%; }
+  .flag-modal.runtime-history-modal { max-width: 100%; }
 }
 .rh-hint {
   margin: 0 0 12px;
@@ -1248,12 +1248,13 @@
    so the modal fills small phones (with a small border buffer inherited
    from the overlay's 16px padding) up to a comfortable desktop cap. The
    scroll lives on the body so the header + Close row stay pinned. Base
-   .flag-modal caps width at 420px; we widen it here without touching the
-   base rule so no other modal changes. */
-.game-metadata-modal {
+   .flag-modal caps width at 420px and loads later than this file
+   (game-header.css before reports.css); the compound selector below
+   bumps specificity so the 420px cap is beaten without !important. */
+.flag-modal.game-metadata-modal {
   width: 100%;
   min-width: 0;
-  max-width: 640px;   /* overrides the 420px cap from .flag-modal */
+  max-width: 720px;
   max-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
@@ -1261,19 +1262,30 @@
 @media (max-width: 720px) {
   /* Phones: fill the overlay -- overlay already has 16px padding on each
      side which acts as the border buffer, so no extra math needed. */
-  .game-metadata-modal { max-width: 100%; }
+  .flag-modal.game-metadata-modal { max-width: 100%; }
 }
 .game-metadata-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 12px;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
   padding-right: 4px;
 }
-.gm-section { display: flex; flex-direction: column; gap: 6px; }
+/* Each section is a label / value pair. Two columns on desktop for a
+   dense SteamDB-style read; stacks on phones so long values (languages,
+   category list) do not squeeze. */
+.gm-section {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px 16px;
+  align-items: baseline;
+}
+@media (max-width: 560px) {
+  .gm-section { grid-template-columns: 1fr; gap: 4px; }
+}
 .gm-section-title {
   font-family: var(--mono);
   font-size: 0.68rem;
