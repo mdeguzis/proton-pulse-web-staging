@@ -915,23 +915,22 @@ export async function renderGamePage(appId) {
         ${replacedBanner}
         <div class="game-title">${esc(title)} <span class="game-title-store" title="Storefront this entry maps to">(${esc(storeLabelFromAppId(appId) || 'Steam')})</span>${isDelisted ? ' <span class="game-detail-delisted" title="Removed from the Steam store. Reports still apply -- people still own this via family share, backups, or regional accounts.">DELISTED</span>' : ''}${replacedBy ? ` <span class="game-title-replaced-pill" title="Replaced by app ${esc(replacedBy)}: ${esc(replacedByTitle)}">REPLACED</span>` : ''}${/\bdemo\b/i.test(title) ? ' <span class="game-title-demo-pill" title="This entry looks like a demo based on the title. Reports may not reflect the full game.">DEMO</span>' : ''}</div>
         <div class="game-os-strip" id="game-os-strip" hidden aria-label="Supported operating systems">
-          <span class="game-os-chip" data-os="windows" title="Windows">
+          <button type="button" class="game-os-chip" data-os="windows" title="Windows">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 5.5L10 4.5V11H3V5.5zm8-1.2L21 3v8H11V4.3zM3 12h7v6.5L3 17.5V12zm8 0h10v9L11 19.5V12z"/></svg>
             <span>Win</span>
-          </span>
-          <span class="game-os-chip" data-os="mac" title="macOS">
+          </button>
+          <button type="button" class="game-os-chip" data-os="mac" title="macOS">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17.5 12.5c0-2.6 2.1-3.9 2.2-4-1.2-1.8-3.1-2-3.8-2.1-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 2 2.7 3.4 2.6 1.4 0 1.9-.9 3.6-.9 1.7 0 2.1.9 3.5.9 1.5 0 2.4-1.3 3.3-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.7-1-2.7-4zM14.5 4.7c.7-.9 1.2-2.1 1-3.3-1.1.1-2.4.8-3.1 1.6-.7.8-1.3 2-1.1 3.2 1.2.1 2.4-.6 3.2-1.5z"/></svg>
             <span>macOS</span>
-          </span>
-          <span class="game-os-chip" data-os="linux" title="Linux">
+          </button>
+          <button type="button" class="game-os-chip" data-os="linux" title="Linux">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2c-1.66 0-3 1.34-3 3v3.5c-1.5 1-3 2.5-3 5.5 0 2.5 1 4.5 2 5.5.5.5 1 1 1 2v.5h6V21c0-1 .5-1.5 1-2 1-1 2-3 2-5.5 0-3-1.5-4.5-3-5.5V5c0-1.66-1.34-3-3-3zm-1.5 5c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zm3 0c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 11l-1.5 2h3L12 11z"/></svg>
             <span>Linux</span>
-          </span>
+          </button>
         </div>
         <div class="game-header-grid">
           <div class="game-header-art-col">
             <img class="game-header-art" src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
-            <div class="game-native-linux" id="game-native-linux" hidden></div>
           </div>
           ${ratingPanel}
           <div class="game-header-actions">
@@ -1274,35 +1273,17 @@ export async function renderGamePage(appId) {
             const on = !!platforms[key];
             chip.classList.toggle('game-os-chip--on', on);
             const label = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }[key] || key;
-            chip.title = on ? `${label}: available` : `${label}: not offered by Steam`;
+            chip.title = on
+              ? `${label}: available. Click for metadata (developer, publisher, per-OS depot dates).`
+              : `${label}: not offered by Steam`;
+            // The chips are the click affordance for the Metadata modal
+            // now that the redundant 'Native Linux runtime available' hint
+            // has been retired -- the green Linux chip conveys the same
+            // availability signal, and the click matches the mental model
+            // of 'tell me more about this OS'.
+            chip.addEventListener('click', () => _openMetadataModal(appId));
           }
         }
-      }
-      // Reveal the "Native Linux runtime" hint under the box art only when
-      // Steam says yes. Absence is treated as "we don't know" so a Steam
-      // API blip doesn't look like a downgrade. Clicking opens the
-      // per-runtime version-history table.
-      const nativeEl = el.querySelector('#game-native-linux');
-      if (nativeEl && hasLinuxNative) {
-        nativeEl.innerHTML = `
-          <svg class="tux-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
-            <path d="M12 2c-1.66 0-3 1.34-3 3v3.5c-1.5 1-3 2.5-3 5.5 0 2.5 1 4.5 2 5.5.5.5 1 1 1 2v.5h6V21c0-1 .5-1.5 1-2 1-1 2-3 2-5.5 0-3-1.5-4.5-3-5.5V5c0-1.66-1.34-3-3-3zm-1.5 5c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zm3 0c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 11l-1.5 2h3L12 11z"/>
-          </svg>
-          Native Linux runtime available
-          <span class="game-native-linux-more">(metadata)</span>`;
-        // Clicking the hint opens the Metadata modal (where per-OS depot
-        // dates live once the #215 pipeline caches them) instead of the
-        // community-report runtime-history table. The two data sources
-        // measure different things (Steam depots vs Pulse/ProtonDB
-        // reports) and the earlier wiring was mixing them up.
-        nativeEl.title = 'Steam advertises a native Linux binary. Click to see the full metadata (developer, publisher, per-OS depot dates).';
-        nativeEl.hidden = false;
-        nativeEl.setAttribute('role', 'button');
-        nativeEl.tabIndex = 0;
-        nativeEl.addEventListener('click', () => _openMetadataModal(appId));
-        nativeEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openMetadataModal(appId); }
-        });
       }
       // update deck status button icon + modal
       const deckBtn = el.querySelector('#deck-status-btn');
