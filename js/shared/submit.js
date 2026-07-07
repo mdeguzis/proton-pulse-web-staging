@@ -596,6 +596,17 @@ export async function populateSubmitForm(el) {
           </div>
         </div>
       </div>
+      <div class="sf-row sf-row--fps-upload">
+        <label></label>
+        <div class="sf-fps-upload">
+          <label class="sf-fps-upload-btn" for="fpsCsvInput">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-14 9v2h14v-2H5z" style="transform:rotate(180deg);transform-origin:center"/></svg>
+            Upload MangoHud CSV
+          </label>
+          <input id="fpsCsvInput" name="fpsCsv" type="file" accept=".csv,text/csv" hidden>
+          <span class="sf-fps-upload-status" id="fpsCsvStatus"></span>
+        </div>
+      </div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
 
       <div class="sf-section-label" style="margin-top:16px">Compatibility Questions</div>
@@ -943,6 +954,44 @@ export async function populateSubmitForm(el) {
   // fields correctly. Once the plugin auto-populates these, the buttons
   // remain useful for anyone submitting from a browser.
   wireFpsInfoButtons(container);
+  wireFpsCsvUpload(container);
+}
+
+function wireFpsCsvUpload(container) {
+  const input = container.querySelector('#fpsCsvInput');
+  const status = container.querySelector('#fpsCsvStatus');
+  if (!input || !status) return;
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    status.textContent = 'Parsing...';
+    status.classList.remove('sf-fps-upload-status--err');
+    try {
+      const text = await file.text();
+      // Lazy-load the parser -- it is small but only relevant when someone
+      // actually uploads a file, and the module is separately testable.
+      const { parseMangohudCsv } = await import('../shared/mangohud-csv.js');
+      const result = parseMangohudCsv(text);
+      if (result.error) {
+        status.textContent = result.error;
+        status.classList.add('sf-fps-upload-status--err');
+        return;
+      }
+      const form = container.querySelector('#submit-report-form') || container.querySelector('form');
+      if (form) {
+        if (form.fpsMin && result.fpsMin != null) form.fpsMin.value = String(result.fpsMin);
+        if (form.fpsAvg && result.fpsAvg != null) form.fpsAvg.value = String(result.fpsAvg);
+        if (form.fpsMax && result.fpsMax != null) form.fpsMax.value = String(result.fpsMax);
+      }
+      status.textContent = `Filled from ${result.sampleCount.toLocaleString()} MangoHud samples`;
+    } catch (e) {
+      status.textContent = `Could not read file: ${(e && e.message) || e}`;
+      status.classList.add('sf-fps-upload-status--err');
+    } finally {
+      // Reset input so uploading the same file again re-triggers change.
+      input.value = '';
+    }
+  });
 }
 
 function wireFpsInfoButtons(container) {
@@ -968,6 +1017,9 @@ function wireFpsInfoButtons(container) {
           Enable <code>fps_min</code> and <code>fps_max</code> in
           <code>~/.config/MangoHud/MangoHud.conf</code>.
           <a href="https://github.com/flightlessmango/MangoHud#configuration" target="_blank" rel="noopener">MangoHud config -&gt;</a></li>
+        <li><strong>Have a MangoHud log?</strong> Use the
+          <em>Upload MangoHud CSV</em> button below the FPS row to
+          auto-fill min / avg / max from your file.</li>
         <li><strong>Coming soon:</strong> the Decky plugin will
           auto-sample MangoHud during play and pre-fill these fields.</li>
       </ul>
