@@ -4,7 +4,7 @@ import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
 import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=1b8ae722';
 import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/scoring/gameStats.js?v=8dc92cf7';
 import { getWebClientId } from '../../shared/submit.js?v=64f1a52e';
-import { fetchDeckStatusForApp, fetchMinRequirements } from '../api/deck-status.js?v=dfac69c8';
+import { fetchDeckStatusForApp, fetchMinRequirements, fetchLinuxNativeSupport } from '../api/deck-status.js?v=fbe031ae';
 import { _protonDbLiveCache, fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=083594fa';
 import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=d76564a6';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=aba6619f';
@@ -619,6 +619,7 @@ export async function renderGamePage(appId) {
       <div class="game-header">
         ${replacedBanner}
         <div class="game-title">${esc(title)} <span class="game-title-store" title="Storefront this entry maps to">(${esc(storeLabelFromAppId(appId) || 'Steam')})</span>${isDelisted ? ' <span class="game-detail-delisted" title="Removed from the Steam store. Reports still apply -- people still own this via family share, backups, or regional accounts.">DELISTED</span>' : ''}${replacedBy ? ` <span class="game-title-replaced-pill" title="Replaced by app ${esc(replacedBy)}: ${esc(replacedByTitle)}">REPLACED</span>` : ''}${/\bdemo\b/i.test(title) ? ' <span class="game-title-demo-pill" title="This entry looks like a demo based on the title. Reports may not reflect the full game.">DEMO</span>' : ''}</div>
+        <div class="game-native-linux" id="game-native-linux" hidden></div>
         <div class="game-header-grid">
           <img class="game-header-art" src="${STEAM_IMG(appId)}" data-appid="${appId}" alt="" onerror="window.__steamImgLoad(this)">
           ${ratingPanel}
@@ -907,12 +908,24 @@ export async function renderGamePage(appId) {
     // async-enhance author blocks with stats + avatars after the DOM is ready
     void enhanceAuthorBlocks(reps.filter(r => r._kind !== 'config'));
 
-    // fetch real Steam Deck compat + min requirements and patch the UI
+    // fetch real Steam Deck compat + min requirements and patch the UI.
+    // Also probe platforms.linux via the same shared appdetails cache so
+    // native-Linux titles get a small badge under the game title.
     void (async () => {
-      const [deckData, reqsData] = await Promise.all([
+      const [deckData, reqsData, hasLinuxNative] = await Promise.all([
         fetchDeckStatusForApp(appId),
         fetchMinRequirements(appId),
+        fetchLinuxNativeSupport(appId),
       ]);
+      // Reveal the "Native Linux version" hint only when Steam says yes.
+      // Absence is treated as "we don't know" and we render nothing so a
+      // Steam API blip doesn't look like a downgrade.
+      const nativeEl = el.querySelector('#game-native-linux');
+      if (nativeEl && hasLinuxNative) {
+        nativeEl.textContent = 'Native Linux version available';
+        nativeEl.title = 'Steam advertises a native Linux binary for this game (platforms.linux). You can play it without Proton.';
+        nativeEl.hidden = false;
+      }
       // update deck status button icon + modal
       const deckBtn = el.querySelector('#deck-status-btn');
       if (deckBtn && deckData.status !== 'unknown') {

@@ -382,6 +382,26 @@
   line-height: 1.1;
   margin-bottom: 6px;
 }
+/* Thin "Native Linux version available" hint under the title, populated
+   client-side from Steam appdetails.platforms.linux. Deliberately understated:
+   a green-tinted mono line, not a pill, so it reads as a fact rather than a
+   feature we're promoting. Light-mode override below keeps it legible. */
+.game-native-linux {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #7ed37a;
+  margin: -2px 0 8px;
+  cursor: help;
+}
+.game-native-linux::before {
+  content: '>_ ';
+  color: #7ed37a;
+  opacity: 0.75;
+}
+[data-theme="light"] .game-native-linux { color: #256b25; }
+[data-theme="light"] .game-native-linux::before { color: #256b25; }
 /* "DELISTED" chip surfaced inline next to the title on the game-detail page
    when the pipeline confirmed Steam appdetails returned success=false. */
 .game-detail-delisted {

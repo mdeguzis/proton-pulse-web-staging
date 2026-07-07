@@ -58,41 +58,63 @@ export function getDeckStatusForApp(appId) {
   return _deckCache[appId] || { status: 'unknown', criteria: null };
 }
 
-// cache fetched system requirements
-export const _reqsCache = {};
+// Page-lifetime cache of the raw appdetails `.data` object per appId, so
+// fetchMinRequirements + fetchLinuxNativeSupport (and any future readers
+// of the same payload) share a single network hit. We cache the in-flight
+// Promise, not just the resolved value, because concurrent callers (via
+// Promise.all) hit the cache lookup before the first fetch resolves.
+const _appBasicCache = {};
+
+function _fetchAppBasic(appId) {
+  if (!appId) return Promise.resolve(null);
+  if (_appBasicCache[appId] !== undefined) return _appBasicCache[appId];
+  const p = (async () => {
+    try {
+      const r = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic&l=english`);
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      return d?.[appId]?.data ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  _appBasicCache[appId] = p;
+  return p;
+}
+
+// legacy re-export: some callers read _reqsCache directly in tests. Keep a
+// derived view so the old debugging path still works.
+export const _reqsCache = _appBasicCache;
 
 /**
  * Fetch the PC minimum and recommended system requirements for a game from the Steam store API.
- * Results are cached in `_reqsCache` by appId for the page lifetime.
- * Hits `https://store.steampowered.com/api/appdetails?appids=&filters=basic`.
  * @param {string|number} appId - Steam app ID.
  * @returns {Promise<{minimum: string|null, recommended: string|null}|null>}
  *   Requirement strings (raw HTML from Steam), or null if unavailable or on failure.
  */
 export async function fetchMinRequirements(appId) {
-  if (!appId) return null;
-  if (_reqsCache[appId] !== undefined) return _reqsCache[appId];
-  try {
-    const r = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic&l=english`);
-    if (!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    const app = d?.[appId]?.data;
-    if (!app) { _reqsCache[appId] = null; return null; }
-    const reqs = app.pc_requirements;
-    if (!reqs || (typeof reqs === 'object' && !reqs.minimum)) {
-      _reqsCache[appId] = null;
-      return null;
-    }
-    const ret = {
-      minimum: reqs.minimum || null,
-      recommended: reqs.recommended || null,
-    };
-    _reqsCache[appId] = ret;
-    return ret;
-  } catch {
-    _reqsCache[appId] = null;
-    return null;
-  }
+  const app = await _fetchAppBasic(appId);
+  if (!app) return null;
+  const reqs = app.pc_requirements;
+  if (!reqs || (typeof reqs === 'object' && !reqs.minimum)) return null;
+  return {
+    minimum: reqs.minimum || null,
+    recommended: reqs.recommended || null,
+  };
+}
+
+/**
+ * Does this game ship a native Linux binary per Steam's `platforms.linux`
+ * flag? Uses the same cached appdetails fetch as fetchMinRequirements so
+ * calling both on the same page hits Steam once.
+ * @param {string|number} appId
+ * @returns {Promise<boolean>} true when Steam advertises a native Linux
+ *   build; false for both "Steam says no" and "we couldn't tell". Callers
+ *   render nothing on false, so a false-negative just hides the badge.
+ */
+export async function fetchLinuxNativeSupport(appId) {
+  const app = await _fetchAppBasic(appId);
+  return !!(app && app.platforms && app.platforms.linux === true);
 }
 
 // Inline SVGs for Deck status icons. All 24x24 viewBox + currentColor so a
