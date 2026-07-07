@@ -1,7 +1,7 @@
 // report-card (components) for the app page. Relocated from app.js.
 
 import { estimateScore } from '../../shared/scoring.js?v=1b8ae722';
-import { getWebClientId } from '../../shared/submit.js?v=64f1a52e';
+import { getWebClientId } from '../../shared/submit.js?v=4ccc3807';
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
 import { renderAuthorBlock } from './author.js?v=3a8cb3c7';
 import { buildFormRows } from './config-cards.js?v=c67740f8';
@@ -87,6 +87,7 @@ export function renderCard(r, votes, userVotes = {}, configPlaytimeTotals = []) 
       <div class="row"><span class="label">OS</span><span>${na(esc(r.os))}</span></div>
       <div class="row"><span class="label">Proton</span><span>${na(esc(r.protonVersion))}</span></div>
       ${(r.durationMinutes != null || fmtDuration(r.duration)) ? `<div class="row"><span class="label">Steam playtime</span><span>${r.durationMinutes != null ? fmtMinutes(r.durationMinutes) : fmtDuration(r.duration)}</span></div>` : ''}
+      ${(r.fpsMin != null || r.fpsAvg != null || r.fpsMax != null) ? `<div class="row"><span class="label">FPS (min / avg / max)</span><span class="fps-values" title="Reported frames-per-second measurements">${r.fpsMin != null ? Number(r.fpsMin).toFixed(1) : '-'} / ${r.fpsAvg != null ? Number(r.fpsAvg).toFixed(1) : '-'} / ${r.fpsMax != null ? Number(r.fpsMax).toFixed(1) : '-'}</span></div>` : ''}
       ${(() => { const pt = r.configKey && configPlaytimeTotals.find(t => t.config_key === r.configKey); return pt ? `<div class="row"><span class="label">Config playtime</span><span title="${pt.session_count} session${pt.session_count !== 1 ? 's' : ''}">${fmtMinutes(pt.total_minutes)}</span></div>` : ''; })()}
       ${r.notes ? `<div class="row"><span class="label">Notes</span><div class="notes-full">${renderNotes(r.notes)}</div></div>` : ''}
       ${r.launchOptions ? `<div class="row"><span class="label">Launch Options</span><span class="launch-options-value">${esc(r.launchOptions)}</span></div>` : ''}

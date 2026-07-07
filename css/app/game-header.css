@@ -947,6 +947,87 @@
   font-family: inherit;
   outline: none;
 }
+/* FPS row: three narrow inputs on the same line, each with an inline (i)
+   info button that opens a popover explaining MangoHud + SteamOS QAM
+   measurement. Row is optional; nothing else in the form depends on it. */
+.sf-row--fps .sf-fps-group {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.sf-row--fps .sf-fps-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sf-row--fps .sf-fps-cell input {
+  flex: 1;
+  min-width: 0;
+}
+.sf-fps-info {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  background: var(--s1);
+  color: var(--accent);
+  border-radius: 999px;
+  font-family: var(--font-display, serif);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sf-fps-info:hover { border-color: var(--accent); background: var(--s2); }
+.sf-fps-popover {
+  position: absolute;
+  z-index: 1000;
+  max-width: 340px;
+  padding: 12px 14px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.sf-fps-popover-title {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.sf-fps-popover ul { margin: 0; padding-left: 16px; }
+.sf-fps-popover li { margin-bottom: 8px; }
+.sf-fps-popover li:last-child { margin-bottom: 0; }
+.sf-fps-popover a { color: var(--accent); text-decoration: none; }
+.sf-fps-popover a:hover { text-decoration: underline; }
+.sf-fps-popover code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sf-fps-popover-close-row { margin-top: 10px; text-align: right; }
+.sf-fps-popover-close {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.sf-fps-popover-close:hover { color: var(--text); border-color: var(--accent); }
+/* Report card: FPS trio rendered in mono so the "-" placeholder columns
+   line up when only one or two of the three fields have data. */
+.fps-values { font-family: var(--mono); }
 .sf-row input:focus, .sf-row select:focus, .sf-row textarea:focus { border-color: var(--accent); }
 .sf-row textarea { resize: vertical; }
 .sf-row--check { flex-direction: column; gap: 3px; }

@@ -360,6 +360,11 @@ export async function submitReport(appId, title, form, editReportId = null) {
     confidence_score: null,
     source: form.reportSource?.value || getWebSource(),
     vram_mb: form.vramMb.value ? Number(form.vramMb.value) : null,
+    // Optional FPS metrics. Plugin will populate these automatically from
+    // MangoHud samples in a follow-up; web submissions capture manual entry.
+    fps_min: form.fpsMin?.value ? Number(form.fpsMin.value) : null,
+    fps_avg: form.fpsAvg?.value ? Number(form.fpsAvg.value) : null,
+    fps_max: form.fpsMax?.value ? Number(form.fpsMax.value) : null,
     game_owned: true,  // authenticated web users own the game by definition
     owner_verified: await isAppIdInMyLibrary(appId, session),
     form_responses: formResponses,
@@ -574,6 +579,23 @@ export async function populateSubmitForm(el) {
       <div class="sf-row"><label>OS Version</label><input name="osVersion" placeholder="e.g. 24.04"></div>
       <div class="sf-row"><label>Kernel</label><input name="kernel" placeholder="e.g. 6.8.0"></div>
       <div class="sf-row"><label>Steam Playtime</label><select name="duration">${durationOpts}</select></div>
+      <div class="sf-row sf-row--fps">
+        <label>FPS (optional)</label>
+        <div class="sf-fps-group">
+          <div class="sf-fps-cell">
+            <input name="fpsMin" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="min">
+            <button type="button" class="sf-fps-info" data-fps-info="min" aria-label="How to measure minimum FPS">i</button>
+          </div>
+          <div class="sf-fps-cell">
+            <input name="fpsAvg" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="avg">
+            <button type="button" class="sf-fps-info" data-fps-info="avg" aria-label="How to measure average FPS">i</button>
+          </div>
+          <div class="sf-fps-cell">
+            <input name="fpsMax" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="max">
+            <button type="button" class="sf-fps-info" data-fps-info="max" aria-label="How to measure maximum FPS">i</button>
+          </div>
+        </div>
+      </div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
 
       <div class="sf-section-label" style="margin-top:16px">Compatibility Questions</div>
@@ -913,5 +935,66 @@ export async function populateSubmitForm(el) {
       }
       if (parsed.kernel && f.kernel) f.kernel.value = parsed.kernel;
     });
+  }
+
+  // Wire the "how to measure FPS" info buttons on the FPS row. All three
+  // buttons open the same popover with quick instructions for MangoHud and
+  // the SteamOS QAM performance overlay so users know how to fill the
+  // fields correctly. Once the plugin auto-populates these, the buttons
+  // remain useful for anyone submitting from a browser.
+  wireFpsInfoButtons(container);
+}
+
+function wireFpsInfoButtons(container) {
+  const buttons = container.querySelectorAll('.sf-fps-info');
+  if (!buttons.length) return;
+  const showPopover = (btn) => {
+    document.querySelectorAll('.sf-fps-popover').forEach(n => n.remove());
+    const pop = document.createElement('div');
+    pop.className = 'sf-fps-popover';
+    pop.innerHTML = `
+      <div class="sf-fps-popover-title">How to measure FPS</div>
+      <ul>
+        <li><strong>SteamOS (Steam Deck):</strong>
+          Press the <em>...</em> button to open Quick Access,
+          go to Performance, turn on
+          <em>Show Performance Overlay</em> at level 3 or higher.
+          Min / avg / max show while you play.
+          <a href="https://www.steamdeck.com/en/support" target="_blank" rel="noopener">Steam Deck docs -&gt;</a></li>
+        <li><strong>MangoHud (desktop Linux):</strong>
+          install <code>mangohud</code>, then launch Steam games with
+          <code>mangohud %command%</code> in the launch options,
+          or <code>MANGOHUD=1 %command%</code>.
+          Enable <code>fps_min</code> and <code>fps_max</code> in
+          <code>~/.config/MangoHud/MangoHud.conf</code>.
+          <a href="https://github.com/flightlessmango/MangoHud#configuration" target="_blank" rel="noopener">MangoHud config -&gt;</a></li>
+        <li><strong>Coming soon:</strong> the Decky plugin will
+          auto-sample MangoHud during play and pre-fill these fields.</li>
+      </ul>
+      <div class="sf-fps-popover-close-row">
+        <button type="button" class="sf-fps-popover-close">Close</button>
+      </div>`;
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    // Anchor to the button; nudge into viewport if we overflow the right edge.
+    pop.style.top = `${window.scrollY + r.bottom + 6}px`;
+    const preferredLeft = r.left + window.scrollX;
+    const rightEdge = preferredLeft + pop.offsetWidth;
+    const overflow = rightEdge - (window.scrollX + window.innerWidth) + 12;
+    pop.style.left = `${Math.max(8, preferredLeft - Math.max(0, overflow))}px`;
+    const close = () => pop.remove();
+    pop.querySelector('.sf-fps-popover-close')?.addEventListener('click', close);
+    // Dismiss on outside click / Escape.
+    setTimeout(() => {
+      document.addEventListener('click', function onDoc(e) {
+        if (!pop.contains(e.target) && e.target !== btn) { close(); document.removeEventListener('click', onDoc); }
+      });
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+      });
+    }, 0);
+  };
+  for (const btn of buttons) {
+    btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showPopover(btn); });
   }
 }
