@@ -382,10 +382,11 @@
   line-height: 1.1;
   margin-bottom: 6px;
 }
-/* "Native Linux runtime available" hint sits UNDER the box art (inside the
-   .game-header-art-col wrapper) so the header layout stays balanced. A
-   small Tux glyph precedes the copy. Clicking opens the runtime history
-   modal. */
+/* Box-art column wraps the img so its width is easy to control and future
+   overlays (badges, share buttons) have a natural home. The 'Native Linux
+   runtime available' hint that used to live here was retired -- the OS
+   chip strip at the top of the header carries the same availability
+   signal, and clicking a chip opens the Metadata modal directly. */
 .game-header-art-col {
   grid-column: 1;
   grid-row: 1;
@@ -396,22 +397,6 @@
   align-self: stretch;
 }
 .game-header-art-col .game-header-art { width: 100%; height: auto; }
-.game-native-linux {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: #7ed37a;
-  cursor: pointer;
-  user-select: none;
-  align-self: flex-start;
-}
-.game-native-linux .tux-icon { flex-shrink: 0; }
-.game-native-linux:hover { text-decoration: underline; }
-.game-native-linux-more { opacity: 0.7; margin-left: 4px; }
 
 /* OS availability strip: top-right of the game-header block. Three
    chips (Windows / macOS / Linux) lit up green when Steam advertises the
@@ -439,14 +424,20 @@
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   opacity: 0.55;
-  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
 .game-os-chip svg { display: block; }
+.game-os-chip:hover { border-color: var(--accent); }
 .game-os-chip--on {
   opacity: 1;
   color: #7ed37a;
   border-color: rgba(126,211,122,0.55);
   background: rgba(126,211,122,0.08);
+}
+.game-os-chip--on:hover {
+  border-color: rgba(126,211,122,0.9);
+  background: rgba(126,211,122,0.16);
 }
 [data-theme="light"] .game-os-chip--on { color: #256b25; }
 @media (max-width: 720px) {
