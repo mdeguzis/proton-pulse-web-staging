@@ -130,10 +130,16 @@ describe('validateRuntimeVersion', () => {
     expect(validateRuntimeVersion('native', 'anything').ok).toBeNull();
   });
 
-  test('proton accepts stable + hotfix syntax', () => {
+  test('proton accepts stable, hotfix, experimental, and next branches', () => {
     expect(validateRuntimeVersion('proton', 'Proton 9.0-4').ok).toBe(true);
     expect(validateRuntimeVersion('proton', 'Proton 8.0-5c').ok).toBe(true);
     expect(validateRuntimeVersion('proton', 'Proton Hotfix').ok).toBe(true);
+    // Valve ships Experimental and Next under the same "Proton" umbrella
+    // in Steam. The plain "Proton" runType should accept them without
+    // firing a fake "does not look like Proton" warning.
+    expect(validateRuntimeVersion('proton', 'Proton Experimental').ok).toBe(true);
+    expect(validateRuntimeVersion('proton', 'proton experimental').ok).toBe(true);
+    expect(validateRuntimeVersion('proton', 'Proton Next').ok).toBe(true);
     // Rejects unrelated strings
     expect(validateRuntimeVersion('proton', 'GE-Proton9-27').ok).toBe(false);
     expect(validateRuntimeVersion('proton', 'wine 9.0').ok).toBe(false);

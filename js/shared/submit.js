@@ -2,7 +2,7 @@
 
 import { SupaAuth } from './config.js?v=f6f2c00a';
 import { FAULT_KEYS_WEB, deriveRatingFromState, inferProtonType } from './scoring.js?v=1b8ae722';
-import { RUN_TYPES, normalizeRunType, validateRuntimeVersion } from './run-type.js?v=01ec5b4d';
+import { RUN_TYPES, normalizeRunType, validateRuntimeVersion } from './run-type.js?v=c38e39e0';
 import { detectGpuArch } from '../lib/gpu-arch-detector.js?v=b4fbb7ef';
 
 // Form submission + populate-submit-form -- factored out of app.js.

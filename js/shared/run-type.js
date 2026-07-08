@@ -37,8 +37,12 @@ export const RUN_TYPES = Object.freeze({
     key:      'proton',
     label:    'Proton',
     subtitle: 'Valve\'s official Proton (stable / hotfix)',
-    versionPattern: /^proton[\s-]?(\d+(?:\.\d+)*(?:[-_]\w+)?|hotfix)$/i,
-    versionExample: 'e.g. Proton 9.0-4 or Proton Hotfix',
+    // Also accepts the named branches Valve ships under the same "Proton"
+    // umbrella in the Steam client (Experimental, Next, Hotfix) so the user
+    // doesn't get a fake "does not look like Proton" warning when they pick
+    // plain Proton but paste one of those variant strings.
+    versionPattern: /^proton[\s-]?(\d+(?:\.\d+)*(?:[-_]\w+)?|hotfix|experimental|next)$/i,
+    versionExample: 'e.g. Proton 9.0-4, Proton Hotfix, or Proton Experimental',
   },
   'proton-experimental': {
     key:      'proton-experimental',
