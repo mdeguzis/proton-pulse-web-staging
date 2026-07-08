@@ -41,12 +41,11 @@ describe('game page: ProtonDB live-only handling', () => {
     expect(src).toContain("safeFetch(() => fetchProtonDbLive(appId), 'fetchProtonDbLive', [])");
   });
 
-  test('live-only shows an explanatory note instead of fake cards', () => {
+  test('live-only shows an explanatory note in the cards area, not fake cards', () => {
+    // The .live-summary-note block still exists to explain why there are no
+    // report cards below when the mirror is empty.
     expect(src).toContain('class="live-summary-note"');
-    // The old "Per-tier breakdown is not available" fallback was replaced by
-    // a synthesized primary-tier bar (#219 follow-up). See the "synthesized
-    // primary-tier bar" test above for the new contract.
-    expect(src).toContain('Aggregate tier from ProtonDB');
+    expect(src).toContain('checked live');
   });
 
   test('report_moderation fetch does not double the /rest/v1 prefix', () => {
@@ -77,12 +76,14 @@ describe('game page: rating panel (dial + per-tier bars + flag)', () => {
     expect(src).toContain('background:${RATING_COLORS[t]}');
   });
 
-  test('live-only games show a synthesized primary-tier bar instead of empty rows', () => {
-    // Old behavior showed 5 empty PLATINUM/GOLD/... 0 bars or a plain note.
-    // New behavior (#219 follow-up): render a single filled bar for the tier
-    // ProtonDB's summary reports.
-    expect(src).toContain('class="grp-bars-note grp-bars-note--sample"');
-    expect(src).toContain('Aggregate tier from ProtonDB');
+  test('live-only games still show the 5-bar breakdown, with a ProtonDB rating + count note above', () => {
+    // ProtonDB's summary API has no per-tier counts, so the bars will read
+    // 0/0/0/0/0 for a live-only game. We prepend a one-line note telling
+    // users the aggregate rating + count so the section still communicates
+    // something (#219 follow-up).
+    expect(src).toContain('class="grp-bars"');
+    expect(src).toContain('grp-bars-note--live');
+    expect(src).toContain('ProtonDB rating:');
   });
 
   test('confidence summary links to the scoring breakdown via a "why?" link', () => {
@@ -106,22 +107,13 @@ describe('game page: rating panel (dial + per-tier bars + flag)', () => {
     expect(src).toContain('src="${STEAM_IMG(appId)}"');
   });
 
-  test('mirror-sample note appears when live total exceeds mirror sample (#219)', () => {
-    // When cdn/native samples exist but ProtonDB reports more total, tier bars
-    // are only from our slice. Attribution note tells users the dial confidence
-    // uses the live total instead.
-    expect(src).toContain("grp-bars-note--sample");
-    expect(src).toContain("liveTotal > _mirrorTotalCount");
-    expect(src).toContain("Per-tier bars reflect our mirrored sample");
-  });
-
-  test('synthesized primary-tier bar renders when mirror sample is empty (#219)', () => {
-    // When we have no valid mirror ratings but a live summary tier is known,
-    // show a single filled bar for that tier instead of five empty rows.
-    expect(src).toContain("_useLiveBar");
-    expect(src).toContain("_mirrorTotalCount === 0");
-    expect(src).toContain("Aggregate tier from ProtonDB");
-    expect(src).toContain("grp-bar-${_liveTierKey}");
+  test('ProtonDB rating + count note renders above the 5-bar stack when live data exists (#219)', () => {
+    // Kept the classic 5-bar breakdown even when mirror sample is empty; just
+    // prepend a one-line "ProtonDB rating: PLATINUM * 371 reports" note so
+    // users see the aggregate alongside the (possibly empty) bars.
+    expect(src).toContain("grp-bars-note--live");
+    expect(src).toContain("ProtonDB rating:");
+    expect(src).toContain("liveTotal.toLocaleString()");
   });
 
   test('summary tags source when count is driven by ProtonDB live (#219)', () => {
