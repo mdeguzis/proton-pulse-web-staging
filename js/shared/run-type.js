@@ -48,28 +48,35 @@ export const RUN_TYPES = Object.freeze({
     key:      'proton-experimental',
     label:    'Proton Experimental',
     subtitle: 'Valve\'s bleeding-edge Proton branch',
-    versionPattern: /(proton[\s-]?experimental|bleeding[-\s]?edge)/i,
+    // Also accepts bare "Experimental" -- when the user already picked the
+    // proton-experimental runtime, "Experimental" is unambiguous.
+    versionPattern: /(proton[\s-]?experimental|bleeding[-\s]?edge|^\s*experimental\s*$)/i,
     versionExample: 'e.g. Proton Experimental',
   },
   'proton-ge': {
     key:      'proton-ge',
     label:    'Proton GE',
     subtitle: 'GloriousEggroll community fork',
-    versionPattern: /^(ge[-_ ]?proton|proton[-_ ]?ge)[-_ ]?\d+([-_.]\d+)*$/i,
+    // Accepts alphanumeric suffixes (rc1, beta, "9-27b") since GE tags
+    // ship those variants. \w in the trailing segments covers letters +
+    // digits without breaking anchored matching.
+    versionPattern: /^(ge[-_ ]?proton|proton[-_ ]?ge)[-_ ]?\d+([-_.]\w+)*$/i,
     versionExample: 'e.g. GE-Proton9-27',
   },
   'proton-cachyos': {
     key:      'proton-cachyos',
     label:    'CachyOS Proton',
     subtitle: 'CachyOS-tuned Proton',
-    versionPattern: /cachy(os)?[-\s]?proton/i,
+    // Also accepts bare "CachyOS" when the user already picked cachyos.
+    versionPattern: /(cachy(os)?[-\s]?proton|^\s*cachy(os)?\s*$)/i,
     versionExample: 'e.g. CachyOS Proton 9.0-4',
   },
   'proton-tkg': {
     key:      'proton-tkg',
     label:    'Proton-TKG',
     subtitle: 'TKG custom Proton build',
-    versionPattern: /(proton[-_ ]?tkg|tkg[-_ ]?proton)/i,
+    // Also accepts bare "TKG" when the user already picked tkg.
+    versionPattern: /(proton[-_ ]?tkg|tkg[-_ ]?proton|^\s*tkg\s*$)/i,
     versionExample: 'e.g. Proton-TKG 9.0-4',
   },
   'proton-lsfg': {
