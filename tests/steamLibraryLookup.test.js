@@ -3,7 +3,7 @@
  *
  * The edge fn (supabase/functions/steam-library-lookup/index.ts) wraps three
  * Steam endpoints -- GetOwnedGames, GetRecentlyPlayedGames, ResolveVanityURL --
- * behind a manage_admins permission check + STEAM_WEB_API_KEY. This test file
+ * behind a manage_admins permission check + STEAM_API_KEY. This test file
  * pins the contract at the edge fn, the client wrapper, the Explorer wiring,
  * and the deploy plumbing so the Steam Web API key can never leak to a
  * non-admin caller.

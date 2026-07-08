@@ -15,7 +15,7 @@
 //   steam_resolve_vanity          ISteamUser/ResolveVanityURL/v1/
 //
 // Env:
-//   STEAM_WEB_API_KEY  - get at https://steamcommunity.com/dev/apikey
+//   STEAM_API_KEY  - get at https://steamcommunity.com/dev/apikey
 
 import { createRequestAuthClient } from "../_shared/auth.ts";
 
@@ -157,11 +157,11 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const apiKey = Deno.env.get("STEAM_WEB_API_KEY");
+  const apiKey = Deno.env.get("STEAM_API_KEY");
   if (!apiKey) {
-    console.error(`[steam-library-lookup] STEAM_WEB_API_KEY not configured`);
+    console.error(`[steam-library-lookup] STEAM_API_KEY not configured`);
     return jsonResponse(
-      { ok: false, endpoint, arg: rawArg, url: "", method: "GET", error: "server misconfigured: missing STEAM_WEB_API_KEY" },
+      { ok: false, endpoint, arg: rawArg, url: "", method: "GET", error: "server misconfigured: missing STEAM_API_KEY" },
       500,
     );
   }
