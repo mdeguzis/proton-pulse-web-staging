@@ -32,6 +32,7 @@ export const TAB_PERMISSIONS = {
   analytics:      ['view_analytics'],
   boxart:         ['view_analytics'],
   'api-explorer': ['view_analytics'],
+  'depot-tracking': ['view_analytics'],
   games:          ['manage_games'],
 };
 
