@@ -1394,6 +1394,14 @@
   text-decoration: none;
 }
 .gm-depot-file svg { width: 14px; height: 14px; }
+/* Depots column is icon-only after #237 v2, so keep it narrow: right-aligned,
+   fixed width so long dates in other columns don't shove it around. */
+.gm-plat-table .gm-plat-depots,
+.gm-plat-table .gm-plat-depots-th {
+  width: 40px;
+  text-align: right;
+  padding-right: 6px;
+}
 .gm-plat-foot {
   padding-top: 6px !important;
   font-size: 0.68rem;

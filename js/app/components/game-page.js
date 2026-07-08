@@ -283,53 +283,60 @@ async function _openMetadataModal(appId) {
     // we publish alongside latest.json. GitHub blob URL so users see the
     // raw JSON with syntax highlighting + a "Raw" download button.
     const DEPOT_FILE_URL = `https://github.com/mdeguzis/proton-pulse-web/blob/gh-pages/data/${esc(String(meta.appId))}/depots.json`;
-    const _packageIcon = (os) => `
-      <a class="gm-depot-file" href="${DEPOT_FILE_URL}#os=${esc(os)}" target="_blank" rel="noopener" title="View the raw depots.json this modal was built from">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M21 8V19a2 2 0 01-2 2H5a2 2 0 01-2-2V8"/>
-          <path d="M1 5h22v3H1z"/>
-          <path d="M10 12h4"/>
-        </svg>
-      </a>`;
     const row = (key, label) => {
       const on = !!p[key];
       const cached = dOs[key];
       const lastFmt = fmtDate(cached?.last_updated);
       const trackedFmt = fmtDate(cached?.tracked_since);
-      let depotsCell, trackedCell, lastCell;
+      let trackedCell, lastCell, depotsCell;
       if (!on) {
-        depotsCell  = '<span class="gm-mute">not offered</span>';
         trackedCell = '-';
         lastCell    = '-';
+        depotsCell  = '<span class="gm-mute" title="No depot on this OS">-</span>';
       } else if (cached) {
-        depotsCell  = `<span class="gm-mute">${cached.depots} tracked</span>${_packageIcon(key)}`;
+        // Tracked-since is the honest floor: earliest first_observed_at we
+        // recorded for this (app, os). It is NOT "when the OS build was
+        // added" for existing games -- see the footer note.
         trackedCell = trackedFmt
-          ? `<span class="gm-depot-date" title="Earliest first_observed_at from steam_depot_manifest_history (#226)">${esc(trackedFmt)}</span>`
-          : '<span class="gm-mute" title="No observation history yet -- once the nightly pipeline observes this depot again with the same manifest, we will record a real tracked-since date">-</span>';
+          ? `<span class="gm-depot-date" title="Earliest observation date we recorded for this OS. Retroactive 'added on' isn't derivable from PICS (see footer).">${esc(trackedFmt)}</span>`
+          : '<span class="gm-mute" title="No observation history yet. Once the nightly pipeline observes this depot a second time, we lock in a real tracked-since date.">-</span>';
         lastCell    = lastFmt
-          ? `<span class="gm-depot-date" title="Branch-level timeupdated from PICS -- every OS depot on a shared branch inherits this value">${esc(lastFmt)}</span>`
+          ? `<span class="gm-depot-date" title="Branch-level timeupdated from PICS -- every OS depot on a shared branch inherits this value.">${esc(lastFmt)}</span>`
           : '-';
+        // #237 (v2): depots column now icon-only. Count moves into the icon's
+        // tooltip so we save a column on mobile. The icon links to the raw
+        // depots.json we publish for this app.
+        depotsCell = `<a class="gm-depot-file" href="${DEPOT_FILE_URL}#os=${esc(key)}" target="_blank" rel="noopener" title="${cached.depots} depot${cached.depots !== 1 ? 's' : ''} tracked -- click to open the raw depots.json this modal was built from">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M21 8V19a2 2 0 01-2 2H5a2 2 0 01-2-2V8"/>
+            <path d="M1 5h22v3H1z"/>
+            <path d="M10 12h4"/>
+          </svg>
+        </a>`;
       } else {
-        depotsCell  = '<span class="gm-mute" title="Not cached yet -- pipeline #215 populates this nightly">pending</span>';
         trackedCell = '-';
         lastCell    = `<a class="gm-depot-link" href="https://steamdb.info/app/${esc(meta.appId)}/depots/" target="_blank" rel="noopener">SteamDB -&gt;</a>`;
+        depotsCell  = '<span class="gm-mute" title="Not cached yet -- pipeline #215 populates this nightly">-</span>';
       }
       return `
         <tr>
           <td><span class="gm-plat${on ? ' gm-plat--on' : ''}">${esc(label)}</span></td>
-          <td>${depotsCell}</td>
           <td>${trackedCell}</td>
           <td>${lastCell}</td>
+          <td class="gm-plat-depots">${depotsCell}</td>
         </tr>`;
     };
     return `<table class="gm-plat-table">
-      <thead><tr><th>OS</th><th>Depots</th><th>Tracked since</th><th>Last update</th></tr></thead>
+      <thead><tr><th>OS</th><th>Tracked since</th><th>Last update</th><th class="gm-plat-depots-th">Depots</th></tr></thead>
       <tbody>${row('windows','Windows')}${row('mac','macOS')}${row('linux','Linux')}</tbody>
-      <tfoot><tr><td colspan="4" class="gm-plat-foot">Tracked-since is the earliest observation we recorded for that OS. Last update is the branch-level PICS timestamp -- every depot on a shared branch inherits it. The brown icon on each row opens the raw <code>depots.json</code> we publish for this game. ${
-        newsInfo?.found && newsInfo.newest_ts
-          ? `App-wide 'Last patch note' (${esc(new Date(newsInfo.newest_ts * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }))}) below is the public-API fallback when a specific OS row shows 'pending'.`
-          : ''
-      }</td></tr></tfoot>
+      <tfoot><tr><td colspan="4" class="gm-plat-foot">
+        <strong>Tracked since</strong> is the earliest observation we recorded for that OS -- not the historical date the OS build was added. Steam doesn't expose depot creation dates via PICS, so for games already shipping all three OSes when we started tracking, this is our observation floor. Newly-added OS builds for games we're already tracking WILL show an accurate add-date going forward.
+        <br><strong>Last update</strong> is the branch-level PICS timestamp -- every depot on a shared branch inherits it.
+        <br>The brown package icon opens the raw <code>depots.json</code> we publish for this game.
+        ${newsInfo?.found && newsInfo.newest_ts
+          ? `<br>App-wide 'Last patch note' (${esc(new Date(newsInfo.newest_ts * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }))}) below is the public-API fallback when a specific OS row shows 'pending'.`
+          : ''}
+      </td></tr></tfoot>
     </table>`;
   };
   // System requirements: fold into one collapsible block per OS. Text is

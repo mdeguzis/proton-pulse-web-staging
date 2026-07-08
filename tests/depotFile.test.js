@@ -49,22 +49,41 @@ describe('#237: steam-depot-info edge fn returns tracked_since', () => {
 });
 
 describe('#237: metadata modal wires tracked_since + depot file icon', () => {
-  test('renders a 4-column table (OS / Depots / Tracked since / Last update)', () => {
-    expect(COMP).toContain('<th>OS</th><th>Depots</th><th>Tracked since</th><th>Last update</th>');
-    // Footer colspan updated to match the new column count.
+  test('renders a 4-column table with Depots as the icon-only last column', () => {
+    // #237 v2: Depots moved to the right so mobile can collapse it to just
+    // the icon without pushing the important date columns off-screen.
+    expect(COMP).toContain('<th>OS</th><th>Tracked since</th><th>Last update</th><th class="gm-plat-depots-th">Depots</th>');
+    // Footer colspan matches the column count.
     expect(COMP).toContain('colspan="4"');
+  });
+
+  test('depots cell is icon-only (no "N tracked" text) with count in the tooltip', () => {
+    // Old cell had `${cached.depots} tracked` visible text; new cell inlines
+    // the icon directly and puts the count in the title attribute.
+    expect(COMP).toContain('gm-plat-depots');
+    expect(COMP).not.toContain('${cached.depots} tracked');
+    expect(COMP).toMatch(/\$\{cached\.depots\} depot\$\{cached\.depots !== 1 \? 's' : ''\} tracked/);
+  });
+
+  test('footer explains that tracked-since is our observation floor, not the historical add-date', () => {
+    // Users kept asking "why isn't this the date macOS was added?" -- spell
+    // out that PICS doesn't expose depot creation dates.
+    expect(COMP).toContain("not the historical date the OS build was added");
+    expect(COMP).toContain("Newly-added OS builds");
   });
 
   test('formats tracked_since from cached.tracked_since', () => {
     expect(COMP).toContain('const trackedFmt = fmtDate(cached?.tracked_since)');
-    expect(COMP).toContain('Earliest first_observed_at');
+    // Tooltip explains the field is our observation floor, not a historical
+    // add-date -- prevents users from misreading it as "when Mac was added".
+    expect(COMP).toContain('Earliest observation date we recorded');
   });
 
   test('brown package icon links to the gh-pages depots.json blob', () => {
     expect(COMP).toContain('gm-depot-file');
     expect(COMP).toContain('/blob/gh-pages/data/${esc(String(meta.appId))}/depots.json');
     // Deep-links to the OS anchor so we can scroll to a specific block later.
-    expect(COMP).toContain('#os=${esc(os)}');
+    expect(COMP).toContain('#os=${esc(key)}');
     // Package icon markup lives in an inline SVG so we don't need a new asset.
     expect(COMP).toContain('<svg viewBox="0 0 24 24"');
   });
