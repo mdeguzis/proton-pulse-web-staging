@@ -33,34 +33,43 @@ BATCH_DELAY = 0.35
 
 
 def _follow_redirects(app_id: str) -> dict:
-    """Follow redirects for a Steam store page and return the resolution."""
+    """Follow redirects for a Steam store page and return the resolution.
+
+    Steam categorization comes from the final path segment after urllib
+    resolves 3xx redirects transparently:
+      - `/app/<same_id>/...` -> valid
+      - `/app/<different_id>/...` -> replaced (superseded appid)
+      - no `/app/<digits>/` -> dead (redirected to homepage or elsewhere)
+    """
     url = STEAM_STORE_URL.format(app_id=app_id)
     try:
         req = urllib.request.Request(
             url,
             headers={
+                # Age-gate bypass cookies -- mature titles otherwise redirect
+                # to /agecheck/ instead of the store page.
                 "User-Agent": "Mozilla/5.0 (compatible; ProtonPulse/1.0)",
                 "Cookie": "birthtime=0; wants_mature_content=1",
             },
         )
-        opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler)
-        resp = opener.open(req, timeout=15)
+        # urlopen() already follows 3xx via the default opener; no need for
+        # a custom HTTPRedirectHandler.
+        resp = urllib.request.urlopen(req, timeout=15)
         final_url = resp.url
         resp.close()
 
-        if f"/app/{app_id}" in final_url:
-            return {"status": "valid"}
-
+        # Compare IDs exactly against the extracted numeric segment. A naive
+        # substring check like `f"/app/{app_id}" in final_url` false-positives
+        # when the redirect target's ID starts with app_id -- e.g. app_id=26
+        # redirected to /app/2670/ would look "valid" but is actually replaced.
         app_match = re.search(r"/app/(\d+)", final_url)
         if app_match:
             new_id = app_match.group(1)
-            if new_id != app_id:
-                return {"status": "replaced", "replaced_by": new_id, "final_url": final_url}
+            if new_id == app_id:
+                return {"status": "valid"}
+            return {"status": "replaced", "replaced_by": new_id, "final_url": final_url}
 
-        if "/app/" not in final_url:
-            return {"status": "dead", "final_url": final_url}
-
-        return {"status": "valid"}
+        return {"status": "dead", "final_url": final_url}
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return {"status": "dead", "final_url": url, "http_status": 404}
