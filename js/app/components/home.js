@@ -255,8 +255,8 @@ export async function renderHomePage() {
           </button>
           <div class="filter-panel filter-panel--stack" id="home-filter-panel">
             <div class="filter-item filter-item--mobile-only">
-              <label class="home-filter-label" for="home-text-filter-mobile">Filter loaded list</label>
-              <input id="home-text-filter-mobile" class="home-filter-text home-filter-text--in-panel" type="search" placeholder="Type to filter" autocomplete="off" />
+              <label class="home-filter-label" for="home-text-filter-mobile">Search titles</label>
+              <input id="home-text-filter-mobile" class="home-filter-text home-filter-text--in-panel" type="search" placeholder="Search all titles" autocomplete="off" />
             </div>
             <div class="filter-item">
               <label class="home-filter-label" for="home-sort-select">Sort</label>
@@ -304,7 +304,7 @@ export async function renderHomePage() {
             </div>
           </div>
         </div>
-        <input id="home-text-filter" class="home-filter-text" type="search" placeholder="Filter loaded list" autocomplete="off" />
+        <input id="home-text-filter" class="home-filter-text" type="search" placeholder="Search all titles" autocomplete="off" />
         </div>
         <div class="home-view-controls">
           <div class="home-view-controls-row">
@@ -329,6 +329,7 @@ export async function renderHomePage() {
         </div>
         <div class="page-nav" id="page-nav-recent" hidden></div>
         <div class="cards" id="cards-recent"></div>
+        <div class="page-nav page-nav--bottom" id="page-nav-recent-bottom" hidden></div>
         <div id="load-more-recent"></div>
       </div>
       <div class="section-label-row" style="margin-top:24px;margin-bottom:10px">
@@ -337,6 +338,7 @@ export async function renderHomePage() {
       </div>
       <div class="page-nav" id="page-nav-popular" hidden></div>
       <div class="cards" id="cards-popular"></div>
+      <div class="page-nav page-nav--bottom" id="page-nav-popular-bottom" hidden></div>
       <div id="load-more-popular"></div>`;
 
     let currentSort = 'recent';
@@ -434,7 +436,7 @@ export async function renderHomePage() {
         const isLastPage = popularPage >= totalPages;
         padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: !isLastPage });
         _updateShownCount('popular-count', cardsEl, filtered.length);
-        _renderPageNavFor('page-nav-popular', popularPage, totalPages, (n) => {
+        _renderPageNavFor(['page-nav-popular', 'page-nav-popular-bottom'], popularPage, totalPages, (n) => {
           if (n === popularPage) return;
           popularPage = n;
           renderPopular();
@@ -470,13 +472,20 @@ export async function renderHomePage() {
       const loaded = cardsEl ? cardsEl.querySelectorAll(':scope .game-card:not(.tile-filler)').length : 0;
       c.textContent = total ? `${loaded} of ${total}` : '';
     }
-    function _renderPageNavFor(navId, currentPage, totalPages, onJump) {
-      const nav = document.getElementById(navId);
-      if (!nav) return;
+    // Renders the numbered pagination into every id in `navIds`. Long lists
+    // (like a full library) mean users may finish reading tiles at the
+    // bottom of the grid, so we mirror the nav below the cards too --
+    // scrolling back up to hit the next-page arrow is friction.
+    function _renderPageNavFor(navIds, currentPage, totalPages, onJump) {
+      const ids = Array.isArray(navIds) ? navIds : [navIds];
       const html = pageNavHtml(currentPage, totalPages);
-      nav.innerHTML = html;
-      nav.hidden = !html;
-      wirePageNav(nav, onJump);
+      for (const id of ids) {
+        const nav = document.getElementById(id);
+        if (!nav) continue;
+        nav.innerHTML = html;
+        nav.hidden = !html;
+        wirePageNav(nav, onJump);
+      }
     }
 
     function applyRecentFilters() {
@@ -519,7 +528,7 @@ export async function renderHomePage() {
         const isLastPage = recentPage >= totalPages;
         padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: !isLastPage });
         _updateShownCount('recent-count', cardsEl, filtered.length);
-        _renderPageNavFor('page-nav-recent', recentPage, totalPages, (n) => {
+        _renderPageNavFor(['page-nav-recent', 'page-nav-recent-bottom'], recentPage, totalPages, (n) => {
           if (n === recentPage) return;
           recentPage = n;
           renderRecent();

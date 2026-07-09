@@ -375,6 +375,14 @@
   justify-content: flex-end;
   margin-bottom: 10px;
 }
+/* Mirror nav under the grid: centered so it reads as a footer rather
+   than a top-right menu, and given breathing room above so it doesn't
+   crowd the last row of tiles. */
+.page-nav--bottom {
+  justify-content: center;
+  margin-top: 16px;
+  margin-bottom: 0;
+}
 .page-nav-inner {
   display: inline-flex;
   gap: 4px;

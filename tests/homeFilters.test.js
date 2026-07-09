@@ -110,10 +110,13 @@ describe('home page popular section -- store-aware label and pool', () => {
 });
 
 describe('home page browse -- text filter box', () => {
-  test('text filter input placeholder makes clear it only filters the loaded list', () => {
+  test('text filter input placeholder makes clear it searches all titles', () => {
+    // Previous placeholder "Filter loaded list" sold the box short --
+    // with windowed pagination every title is in the filterable set, so
+    // typing narrows across every page not just the visible one.
     expect(homeSrc).toContain('id="home-text-filter"');
     expect(homeSrc).toContain('class="home-filter-text"');
-    expect(homeSrc).toContain('placeholder="Filter loaded list"');
+    expect(homeSrc).toContain('placeholder="Search all titles"');
   });
 
   test('text box lives in the bar (home-filter-left), outside the filter panel', () => {
@@ -290,6 +293,29 @@ describe('home page browse -- windowed pagination (page turner)', () => {
     // grid replaces in place. scrollIntoView threw the viewport around and
     // felt like the browser was "jumping back" on every click.
     expect(homeSrc).not.toContain('scrollIntoView');
+  });
+
+  test('page nav is mirrored below the grid, centered', () => {
+    // Long lists (a full library) mean the reader lands at the bottom of
+    // the grid before wanting to turn the page. A bottom mirror saves a
+    // scroll-back-up trip.
+    expect(homeSrc).toContain('id="page-nav-recent-bottom"');
+    expect(homeSrc).toContain('id="page-nav-popular-bottom"');
+    expect(homeSrc).toContain("_renderPageNavFor(['page-nav-recent', 'page-nav-recent-bottom']");
+    expect(homeSrc).toContain("_renderPageNavFor(['page-nav-popular', 'page-nav-popular-bottom']");
+  });
+});
+
+describe('home page browse -- text filter searches all titles', () => {
+  test('text filter runs before pagination, not against a page slice', () => {
+    // _filterByText receives the full sorted+filtered array; the caller
+    // then slices for the current page. So typing "cyber" narrows the
+    // 714-row dataset to matching titles across every page, not just the
+    // 50 visible tiles.
+    expect(homeSrc).toContain('_filterByText(_filterByLibrary(');
+    // Placeholder wording matches the actual behavior (previous text
+    // "Filter loaded list" implied only visible items).
+    expect(homeSrc).toContain('placeholder="Search all titles"');
   });
 });
 
