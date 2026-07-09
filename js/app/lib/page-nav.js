@@ -35,26 +35,50 @@ export function pageSlots(current, total, maxSlots = 10) {
  * Render the nav HTML. Caller stores the returned innerHTML and wires
  * clicks via `wirePageNav`. Splitting render + wire lets the caller
  * substitute in a document fragment or a virtualized shadow root.
+ *
+ * Layout: "Page X of Y" label + Prev arrow + [numbered slots] + Next arrow.
+ * The label anchors the reader when the middle slots rearrange as the
+ * current page moves (standard for compact pagination). Arrows give an
+ * always-visible +/-1 fallback so a click doesn't require aiming for a
+ * tiny number.
  */
 export function pageNavHtml(current, total, { maxSlots = 10 } = {}) {
   const t = Math.max(1, Math.floor(total));
   if (t <= 1) return '';
-  const slots = pageSlots(current, t, maxSlots);
-  const parts = slots.map((slot) => {
+  const c = Math.min(Math.max(1, Math.floor(current)), t);
+  const slots = pageSlots(c, t, maxSlots);
+  const slotParts = slots.map((slot) => {
     if (slot === '...') return `<span class="page-nav-ellipsis" aria-hidden="true">...</span>`;
-    const isActive = slot === current;
+    const isActive = slot === c;
     return `<button class="page-nav-btn${isActive ? ' page-nav-btn--active' : ''}" data-page="${slot}" type="button" ${isActive ? 'aria-current="page"' : ''}>${slot}</button>`;
   });
-  return `<nav class="page-nav-inner" aria-label="Page navigation">${parts.join('')}</nav>`;
+  const prevDisabled = c <= 1;
+  const nextDisabled = c >= t;
+  const prev = `<button class="page-nav-btn page-nav-btn--arrow" data-page="${c - 1}" type="button" aria-label="Previous page" ${prevDisabled ? 'disabled' : ''}>&larr;</button>`;
+  const next = `<button class="page-nav-btn page-nav-btn--arrow" data-page="${c + 1}" type="button" aria-label="Next page" ${nextDisabled ? 'disabled' : ''}>&rarr;</button>`;
+  const label = `<span class="page-nav-label">Page ${c} of ${t}</span>`;
+  return `<nav class="page-nav-inner" aria-label="Page navigation">${label}${prev}${slotParts.join('')}${next}</nav>`;
 }
 
-/** Wire click handlers on all `[data-page]` buttons in the container. */
+const _HANDLER_KEY = '__pageNavHandler';
+
+/**
+ * Wire click handlers on all `[data-page]` buttons in the container.
+ * Idempotent -- a second call REPLACES the previous handler so callers
+ * can wire on every re-render without stacking listeners. Disabled
+ * buttons (prev on page 1, next on last page) are ignored.
+ */
 export function wirePageNav(container, onSelect) {
   if (!container) return;
-  container.addEventListener('click', (ev) => {
+  if (container[_HANDLER_KEY]) {
+    container.removeEventListener('click', container[_HANDLER_KEY]);
+  }
+  const handler = (ev) => {
     const btn = ev.target.closest('[data-page]');
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
     const page = Number(btn.dataset.page);
     if (Number.isFinite(page)) onSelect(page);
-  });
+  };
+  container[_HANDLER_KEY] = handler;
+  container.addEventListener('click', handler);
 }

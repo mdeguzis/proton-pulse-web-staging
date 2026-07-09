@@ -11,7 +11,7 @@ import { filterAdult } from '../../lib/adult-filter.js?v=e4e9d845';
 import { readActive as _readPillGroup, wireGroup as _wirePillGroup } from '../lib/filter-group.js?v=dc2c1e0a';
 import { renderHomeLibraryChart } from './home-library-chart.js?v=c7e8a2d8';
 import { getMyLibraryAppIds } from '../lib/user-library.js?v=1d8e72df';
-import { pageNavHtml, wirePageNav } from '../lib/page-nav.js?v=234f51e1';
+import { pageNavHtml, wirePageNav } from '../lib/page-nav.js?v=2cdc55e4';
 import { synthesizeMyLibrary } from '../lib/my-library-synth.js?v=58a32db3';
 
 const LOAD_COUNT_KEY = 'pp:load-count';

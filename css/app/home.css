@@ -379,6 +379,25 @@
   display: inline-flex;
   gap: 4px;
   flex-wrap: wrap;
+  align-items: center;
+}
+.page-nav-label {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 4px 8px 4px 0;
+  white-space: nowrap;
+}
+.page-nav-btn--arrow {
+  min-width: 30px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.page-nav-btn--arrow[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 .page-nav-btn {
   min-width: 30px;
