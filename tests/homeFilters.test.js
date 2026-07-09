@@ -240,13 +240,59 @@ describe('home page browse -- loaded count display', () => {
   test('_updateShownCount shows loaded vs total and refreshes on load-more', () => {
     expect(homeSrc).toContain('function _updateShownCount(countId, cardsEl, total)');
     // Still surfaces a "N of N loaded" string; template shape shifted so
-    // the counter could also feed the corner "showing N/N games" strip.
+    // the counter could also feed the corner "Showing N/N games" strip.
     expect(homeSrc).toContain('${loaded} of ${total} loaded');
-    // called for both sections on render and on load-more append
+    // called for both sections on render and on the empty-guard early return
     const recent = homeSrc.match(/_updateShownCount\('recent-count'/g) || [];
     const popular = homeSrc.match(/_updateShownCount\('popular-count'/g) || [];
     expect(recent.length).toBeGreaterThanOrEqual(2);
     expect(popular.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('home-result-count strip reads "Showing N/N games" (capitalised)', () => {
+    // The corner strip is the single-line summary that pins next to the
+    // page-nav row. Lowercase "showing" was the previous style but reads as
+    // a stray label -- capital S matches typical UI conventions.
+    expect(homeSrc).toContain('`Showing ${loaded}/${total} games`');
+  });
+});
+
+describe('home page browse -- windowed pagination (page turner)', () => {
+  test('renderRecent slices by page window, not cumulatively', () => {
+    // Page N shows tiles [(N-1)*size, N*size] -- clicking a page number
+    // REPLACES the visible set instead of appending more below. This is
+    // the "page turner" behaviour a numbered pagination is expected to
+    // deliver; the older cumulative model felt like a hidden Load More.
+    expect(homeSrc).toContain('const start = (recentPage - 1) * recentPageSize;');
+    expect(homeSrc).toContain('filtered.slice(start, end)');
+    // No Load More button on the recent section.
+    expect(homeSrc).not.toContain("_loadMoreBtn('recent')");
+  });
+
+  test('renderPopular slices by page window too', () => {
+    expect(homeSrc).toContain('const start = (popularPage - 1) * popularPageSize;');
+    expect(homeSrc).not.toContain("_loadMoreBtn('popular')");
+  });
+
+  test('page click ignores clicks on the already-active page', () => {
+    // No-op guard so smooth-scroll doesn't fire on the current page.
+    expect(homeSrc).toContain('if (n === recentPage) return;');
+    expect(homeSrc).toContain('if (n === popularPage) return;');
+  });
+});
+
+describe('home page browse -- sort options', () => {
+  test('sort select carries A-Z and Z-A options', () => {
+    expect(homeSrc).toContain('<option value="alpha">A-Z (Title)</option>');
+    expect(homeSrc).toContain('<option value="alpha_desc">Z-A (Title)</option>');
+  });
+
+  test('_sortReports handles alpha and alpha_desc', () => {
+    expect(homeSrc).toContain("sort === 'alpha'");
+    expect(homeSrc).toContain("sort === 'alpha_desc'");
+    // Uses localeCompare with base sensitivity so Á == A and ordering is
+    // predictable across accented characters.
+    expect(homeSrc).toContain("sensitivity: 'base'");
   });
 });
 

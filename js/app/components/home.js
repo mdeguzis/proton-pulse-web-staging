@@ -50,6 +50,10 @@ function _sortReports(reports, sort) {
     copy.sort((a, b) =>
       ((b.protondbCount || 0) + (b.pulseCount || 0)) -
       ((a.protondbCount || 0) + (a.pulseCount || 0)));
+  } else if (sort === 'alpha') {
+    copy.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' }));
+  } else if (sort === 'alpha_desc') {
+    copy.sort((a, b) => String(b.title || '').localeCompare(String(a.title || ''), undefined, { sensitivity: 'base' }));
   }
   return copy;
 }
@@ -261,6 +265,8 @@ export async function renderHomePage() {
                 <option value="best">Best Tier</option>
                 <option value="worst">Worst Tier</option>
                 <option value="count">Most Reported</option>
+                <option value="alpha">A-Z (Title)</option>
+                <option value="alpha_desc">Z-A (Title)</option>
               </select>
             </div>
             <div class="pg-filter-group" id="home-store-checks">
@@ -301,7 +307,6 @@ export async function renderHomePage() {
         <input id="home-text-filter" class="home-filter-text" type="search" placeholder="Filter loaded list" autocomplete="off" />
         </div>
         <div class="home-view-controls">
-          <div class="home-result-count" id="home-result-count" title="Total games matching current filters">--</div>
           <div class="home-view-controls-row">
             <div class="home-size-toggle" id="home-size-toggle" title="Card size">
               <button class="home-size-btn" data-size="sm" type="button" title="Small cards">S</button>
@@ -322,7 +327,10 @@ export async function renderHomePage() {
           <span class="section-label" id="recent-section-label" style="margin:0">${_isMyLibrary ? 'My Library -- Recent Reports' : 'Recent Reports'}</span>
           <span class="section-count" id="recent-count"></span>
         </div>
-        <div class="page-nav" id="page-nav-recent" hidden></div>
+        <div class="page-nav-strip">
+          <div class="home-result-count" id="home-result-count" title="Total games matching current filters">--</div>
+          <div class="page-nav" id="page-nav-recent" hidden></div>
+        </div>
         <div class="cards" id="cards-recent"></div>
         <div id="load-more-recent"></div>
       </div>
@@ -330,7 +338,10 @@ export async function renderHomePage() {
         <span class="section-label" id="popular-section-label" style="margin:0">${_isMyLibrary ? 'My Library -- Popular' : 'Popular on Steam'}</span>
         <span class="section-count" id="popular-count"></span>
       </div>
-      <div class="page-nav" id="page-nav-popular" hidden></div>
+      <div class="page-nav-strip">
+        <div class="home-result-count-spacer" aria-hidden="true"></div>
+        <div class="page-nav" id="page-nav-popular" hidden></div>
+      </div>
       <div class="cards" id="cards-popular"></div>
       <div id="load-more-popular"></div>`;
 
@@ -415,44 +426,33 @@ export async function renderHomePage() {
         if (loadMoreEl) loadMoreEl.innerHTML = '';
         return;
       }
-      let popularShown = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+      let popularPage = 1;
+      let popularPageSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
       const renderPopular = () => {
-        // Recompute the row-target now that the grid layout is applied
-        // (initial value was set when the container wasn't yet display:
-        // grid so cols=1 and the size fell to the floor).
-        const popularTarget = pageSizeForFullRows(cardsEl, targetRowsForViewport());
-        if (popularShown < popularTarget) popularShown = popularTarget;
-        const shown = Math.min(popularShown, filtered.length);
-        cardsEl.innerHTML = filtered.slice(0, shown).map(_popularItemHtml).join('');
-        // hasMore=true trims trailing orphans so the last row stays flush; the
-        // trimmed tiles come back via the Load more click below.
-        padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: filtered.length > shown });
-        const rendered = cardsEl.querySelectorAll(':scope .game-card:not(.tile-filler)').length;
+        popularPageSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+        const totalPages = Math.max(1, Math.ceil(filtered.length / Math.max(1, popularPageSize)));
+        if (popularPage > totalPages) popularPage = totalPages;
+        if (popularPage < 1) popularPage = 1;
+        const start = (popularPage - 1) * popularPageSize;
+        const end = start + popularPageSize;
+        const windowRows = filtered.slice(start, end);
+        cardsEl.innerHTML = windowRows.map(_popularItemHtml).join('');
+        const isLastPage = popularPage >= totalPages;
+        padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: !isLastPage });
         _updateShownCount('popular-count', cardsEl, filtered.length);
-        _renderPageNavFor('page-nav-popular', cardsEl, filtered.length, popularTarget, (n) => {
-          popularShown = n * popularTarget;
+        _renderPageNavFor('page-nav-popular', popularPage, totalPages, (n) => {
+          if (n === popularPage) return;
+          popularPage = n;
           renderPopular();
           const anchor = document.getElementById('popular-section-label');
           if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-        if (loadMoreEl) {
-          if (filtered.length > rendered) {
-            loadMoreEl.innerHTML = _loadMoreBtn('popular');
-            loadMoreEl.querySelector('button').addEventListener('click', () => {
-              popularShown = rendered + pageSizeForFullRows(cardsEl, targetRowsForViewport());
-              renderPopular();
-            });
-          } else {
-            loadMoreEl.innerHTML = _allShownNote(filtered.length);
-          }
-        }
+        if (loadMoreEl) loadMoreEl.innerHTML = '';
       };
       renderPopular();
-      // Same next-frame backstop as the recent section -- see the comment
-      // there for why this second pass is needed for full-row alignment.
       requestAnimationFrame(() => {
-        const nextTarget = pageSizeForFullRows(cardsEl, targetRowsForViewport());
-        if (popularShown < nextTarget) renderPopular();
+        const nextSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+        if (nextSize !== popularPageSize) renderPopular();
       });
       watchTileRerender(cardsEl, renderPopular);
     }
@@ -488,21 +488,14 @@ export async function renderHomePage() {
       if (!el) return;
       const loaded = _sectionCounts.recent.loaded + _sectionCounts.popular.loaded;
       const total  = _sectionCounts.recent.total  + _sectionCounts.popular.total;
-      el.textContent = total ? `showing ${loaded}/${total} games` : '';
+      el.textContent = total ? `Showing ${loaded}/${total} games` : '';
     }
-    function _renderPageNavFor(navId, cardsEl, filteredLength, pageSize, onJump) {
+    function _renderPageNavFor(navId, currentPage, totalPages, onJump) {
       const nav = document.getElementById(navId);
       if (!nav) return;
-      const totalPages = Math.max(1, Math.ceil(filteredLength / Math.max(1, pageSize)));
-      const currentPage = Math.min(
-        totalPages,
-        Math.max(1, Math.ceil((cardsEl?.children.length || pageSize) / Math.max(1, pageSize))),
-      );
       const html = pageNavHtml(currentPage, totalPages);
       nav.innerHTML = html;
       nav.hidden = !html;
-      // Wire is idempotent because addEventListener on an empty innerHTML
-      // replaces the previous DOM anyway; safe to call on every render.
       wirePageNav(nav, onJump);
     }
 
@@ -514,48 +507,42 @@ export async function renderHomePage() {
       // Hide the whole recent section when empty so there's no blank state box.
       if (sectionEl) sectionEl.hidden = !filtered.length;
       if (!filtered.length) { if (cardsEl) cardsEl.innerHTML = ''; _updateShownCount('recent-count', cardsEl, 0); return; }
-      let recentShown = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+      // Windowed pagination: page N shows tiles N*pageSize .. (N+1)*pageSize
+      // (traditional page turner -- clicking page N replaces the visible set
+      // instead of cumulatively adding more below). Load More is retired.
+      let recentPage = 1;
+      let recentPageSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
       const renderRecent = () => {
-        // Recompute the row-target now that the grid layout is applied
-        // (initial value can fall to the floor when cols hasn't resolved).
-        const recentTarget = pageSizeForFullRows(cardsEl, targetRowsForViewport());
-        if (recentShown < recentTarget) recentShown = recentTarget;
-        const shown = Math.min(recentShown, filtered.length);
-        cardsEl.innerHTML = filtered.slice(0, shown).map(_recentCardHtml).join('');
-        // hasMore=true trims trailing orphans so the last row stays flush; the
-        // trimmed tiles come back via the Load more click below.
-        padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: filtered.length > shown });
-        const rendered = cardsEl.querySelectorAll(':scope .game-card:not(.tile-filler)').length;
+        recentPageSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+        const totalPages = Math.max(1, Math.ceil(filtered.length / Math.max(1, recentPageSize)));
+        if (recentPage > totalPages) recentPage = totalPages;
+        if (recentPage < 1) recentPage = 1;
+        const start = (recentPage - 1) * recentPageSize;
+        const end = start + recentPageSize;
+        const windowRows = filtered.slice(start, end);
+        cardsEl.innerHTML = windowRows.map(_recentCardHtml).join('');
+        // hasMore=false on the last page (pad with fillers so the row stays
+        // aligned); true elsewhere (trim orphans so the row stays flush).
+        const isLastPage = recentPage >= totalPages;
+        padTileRows(cardsEl, { tileSelector: '.game-card', hasMore: !isLastPage });
         _updateShownCount('recent-count', cardsEl, filtered.length);
-        // Numbered page nav (cumulative: page N shows first N pages worth).
-        // Click page N -> set recentShown to N * pageSize and re-render.
-        _renderPageNavFor('page-nav-recent', cardsEl, filtered.length, recentTarget, (n) => {
-          recentShown = n * recentTarget;
+        _renderPageNavFor('page-nav-recent', recentPage, totalPages, (n) => {
+          if (n === recentPage) return;
+          recentPage = n;
           renderRecent();
           const anchor = document.getElementById('recent-section');
           if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-        if (loadMoreEl) {
-          if (filtered.length > rendered) {
-            loadMoreEl.innerHTML = _loadMoreBtn('recent');
-            loadMoreEl.querySelector('button').addEventListener('click', () => {
-              recentShown = rendered + pageSizeForFullRows(cardsEl, targetRowsForViewport());
-              renderRecent();
-            });
-          } else {
-            loadMoreEl.innerHTML = _allShownNote(filtered.length);
-          }
-        }
+        if (loadMoreEl) loadMoreEl.innerHTML = '';
       };
       renderRecent();
       // Belt-and-suspenders: if the initial pageSize was computed before
       // the grid finished laying out, the first render can ship a partial
-      // row (12 tiles with 2 orphans on a 5-col grid). Re-run once on the
-      // next frame so the second read gets the resolved column count and
-      // trims to full rows. No-op when the first render was already flush.
+      // row. Re-run once on the next frame so the second read gets the
+      // resolved column count. No-op when the first render was already flush.
       requestAnimationFrame(() => {
-        const nextTarget = pageSizeForFullRows(cardsEl, targetRowsForViewport());
-        if (recentShown < nextTarget) renderRecent();
+        const nextSize = pageSizeForFullRows(cardsEl, targetRowsForViewport());
+        if (nextSize !== recentPageSize) renderRecent();
       });
       watchTileRerender(cardsEl, renderRecent);
     }
