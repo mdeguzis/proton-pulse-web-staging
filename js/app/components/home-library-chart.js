@@ -111,7 +111,7 @@ async function _fetchAppIds(source) {
   return getMyLibraryAppIds().catch(() => new Set());
 }
 
-export async function renderHomeLibraryChart(mountEl) {
+export async function renderHomeLibraryChart(mountEl, { preferredSource } = {}) {
   if (!mountEl) return;
   const session = await window.SupaAuth?.getSession?.();
   if (!session?.user) {
@@ -119,7 +119,14 @@ export async function renderHomeLibraryChart(mountEl) {
     return;
   }
   await loadSearchIndex().catch(() => null);
-  let source = _readSource();
+  // Nav-driven override wins on this render so hitting the "My Wishlist"
+  // link auto-swaps the chart even if the user last picked Library on
+  // the home landing. The chip click below still updates localStorage so
+  // subsequent home visits without a nav hint reflect the latest choice.
+  let source = preferredSource === 'library' || preferredSource === 'wishlist'
+    ? preferredSource
+    : _readSource();
+  if (preferredSource) _writeSource(source);
   let appIds = await _fetchAppIds(source);
   mountEl.innerHTML = _renderChartHtml(source, appIds);
   // Chip click swaps the source. State lives in localStorage so a reload

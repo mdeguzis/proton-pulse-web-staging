@@ -10,7 +10,7 @@ import { padTileRows, watchTileRerender, pageSizeForFullRows, targetRowsForViewp
 import { getEffectivePageSize, isAutoLoadEnabled } from '../../lib/pagination-prefs.js?v=15d0747d';
 import { filterAdult } from '../../lib/adult-filter.js?v=e4e9d845';
 import { readActive as _readPillGroup, wireGroup as _wirePillGroup } from '../lib/filter-group.js?v=dc2c1e0a';
-import { renderHomeLibraryChart } from './home-library-chart.js?v=4660f7ad';
+import { renderHomeLibraryChart } from './home-library-chart.js?v=9ab82e0c';
 import { getMyLibraryAppIds } from '../lib/user-library.js?v=1d8e72df';
 import { getMyWishlistAppIds } from '../lib/user-wishlist.js?v=9c88bc65';
 import { loadDeckStatusMap } from '../api/deck-status.js?v=456b6112';
@@ -1121,7 +1121,16 @@ export async function renderHomePage() {
     applyPopularFilters();
 
     // Signed-in library breakdown chart. No-op when signed out (#199).
-    void renderHomeLibraryChart(document.getElementById('home-library-chart-mount'));
+    // Nav-driven override: when the user came in via ?filter=mine or
+    // ?filter=wishlist, mirror that on the chart's Library/Wishlist chips
+    // so the bars match whatever list they're actually browsing.
+    const _chartPref = _isMyLibrary ? 'library'
+      : _isMyWishlist ? 'wishlist'
+      : undefined;
+    void renderHomeLibraryChart(
+      document.getElementById('home-library-chart-mount'),
+      { preferredSource: _chartPref },
+    );
   } catch {
     el.innerHTML = '<div class="state-box">Search for a game above or navigate to <code>#/app/{appId}</code></div>';
   }
