@@ -77,24 +77,17 @@
       <path d="M5 10h13a1 1 0 011 1v3H5v-4z"/>
       <path d="M3 15h16a1 1 0 011 1v3a1 1 0 01-1 1H3v-5z"/>
     </symbol>
-    <!-- Steam Deck brand mark: D-shield with the blue-to-purple gradient
-         dot inside. Simplified from Valve's official mark so it holds
-         up at chip size. Used as the mobile-only glyph on the at-a-glance
-         Deck chip. Gradient uses a linearGradient definition so the
-         blue -> purple transition matches Valve's brand palette. -->
-    <symbol id="icon-steam-deck" viewBox="0 0 24 24">
-      <defs>
-        <linearGradient id="deck-dot-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#4fa4ff"/>
-          <stop offset="1" stop-color="#8a6cff"/>
-        </linearGradient>
-      </defs>
-      <!-- D-shield: filled outline with even-odd cutout so the middle
-           reads as empty (matching the real logo). -->
-      <path fill-rule="evenodd" fill="currentColor"
-            d="M3 3h9.5a9 9 0 010 18H3V3zm2 2v14h7.5a7 7 0 000-14H5z"/>
-      <!-- Blue-purple gradient dot sitting in the open left of the D. -->
-      <circle cx="8" cy="12" r="2.7" fill="url(#deck-dot-grad)"/>
+    <!-- Steam Deck brand mark: right-side crescent arc opening left, plus
+         a filled dot centered in the opening. Matches Valve's real logo
+         shape (see steamgriddb.com/logo/52989). Uses currentColor so the
+         glyph follows the chip's theme -- white on dark, dark on light.
+         The monochrome variant reads cleaner at chip size than the
+         blue-to-purple gradient version. -->
+    <symbol id="icon-steam-deck" viewBox="0 0 24 24" fill="currentColor">
+      <!-- Right-side crescent: outer 10r arc down + inner 6r arc up. -->
+      <path d="M12 2a10 10 0 010 20L12 18a6 6 0 000-12z"/>
+      <!-- Solid dot in the left opening of the crescent. -->
+      <circle cx="8" cy="12" r="3"/>
     </symbol>
     <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
