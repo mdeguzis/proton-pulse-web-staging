@@ -1,7 +1,9 @@
 // Signed-in-only home page section: horizontal bar chart showing the rating
-// breakdown across the user's cached Steam library (#199). Cross-references
-// user_steam_library.appids with search-index tiers.
+// breakdown across the user's cached Steam library (#199) or Steam wishlist
+// (#266 refinement). Two chips ("Library" / "Wishlist") next to the title
+// swap the source; only one is selected at a time.
 import { getMyLibraryAppIds } from '../lib/user-library.js?v=1d8e72df';
+import { getMyWishlistAppIds } from '../lib/user-wishlist.js?v=9c88bc65';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=f9591262';
 import { esc } from '../utils.js?v=c7e1268c';
@@ -38,31 +40,36 @@ export function computeLibraryTierCounts(appIdSet, indexRows) {
   return counts;
 }
 
-export async function renderHomeLibraryChart(mountEl) {
-  if (!mountEl) return;
-  const session = await window.SupaAuth?.getSession?.();
-  if (!session?.user) {
-    mountEl.innerHTML = '';
-    return;
-  }
-  await loadSearchIndex().catch(() => null);
-  const appIds = await getMyLibraryAppIds();
+// Copy per source so the subtitle stays natural for both modes.
+const SOURCE_COPY = {
+  library:  { title: 'Your library at a glance',  noun: 'owned',     empty: 'No Steam library synced yet.',  sync: 'library'  },
+  wishlist: { title: 'Your wishlist at a glance', noun: 'wishlisted', empty: 'No Steam wishlist synced yet.', sync: 'wishlist' },
+};
+
+function _renderChartHtml(source, appIds, opts = {}) {
+  const copy = SOURCE_COPY[source] || SOURCE_COPY.library;
+  const chipsHtml = `
+    <div class="hlc-chips" role="tablist" aria-label="Data source">
+      <button type="button" class="hlc-chip${source === 'library'  ? ' hlc-chip--active' : ''}" data-source="library"  role="tab" aria-selected="${source === 'library'}">Library</button>
+      <button type="button" class="hlc-chip${source === 'wishlist' ? ' hlc-chip--active' : ''}" data-source="wishlist" role="tab" aria-selected="${source === 'wishlist'}">Wishlist</button>
+    </div>`;
   if (!appIds || appIds.size === 0) {
-    mountEl.innerHTML = `
+    return `
       <div class="home-library-chart home-library-chart--empty">
-        <div class="hlc-title">Your library</div>
+        <div class="hlc-header">
+          <div class="hlc-title">${esc(copy.title)}</div>
+          ${chipsHtml}
+        </div>
         <div class="hlc-empty-body">
-          No Steam library synced yet.
-          <a href="profile.html">Sync your library</a> to see a compatibility breakdown here.
+          ${esc(copy.empty)}
+          <a href="profile.html">Sync your ${esc(copy.sync)}</a> to see a compatibility breakdown here.
         </div>
       </div>`;
-    return;
   }
   const counts = computeLibraryTierCounts(appIds, searchIndex);
   const rated = TIER_ORDER.reduce((sum, t) => sum + (counts[t] || 0), 0);
-  const totalOwned = appIds.size;
+  const total = appIds.size;
   const maxBar = Math.max(1, ...TIER_ORDER.map((t) => counts[t] || 0));
-
   const barsHtml = TIER_ORDER.map((tier) => {
     const n = counts[tier] || 0;
     const pct = Math.round((n / maxBar) * 100);
@@ -75,13 +82,60 @@ export async function renderHomeLibraryChart(mountEl) {
         <div class="hlc-count">${n.toLocaleString()}</div>
       </div>`;
   }).join('');
-
-  mountEl.innerHTML = `
+  return `
     <div class="home-library-chart">
-      <div class="hlc-title">Your library at a glance</div>
+      <div class="hlc-header">
+        <div class="hlc-title">${esc(copy.title)}</div>
+        ${chipsHtml}
+      </div>
       <div class="hlc-subtitle">
-        ${rated.toLocaleString()} of ${totalOwned.toLocaleString()} owned games have compatibility data.
+        ${rated.toLocaleString()} of ${total.toLocaleString()} ${esc(copy.noun)} games have compatibility data.
       </div>
       <div class="hlc-bars">${barsHtml}</div>
     </div>`;
+}
+
+const HLC_SOURCE_KEY = 'pp:hlc-source';
+function _readSource() {
+  try {
+    const v = localStorage.getItem(HLC_SOURCE_KEY);
+    return v === 'wishlist' ? 'wishlist' : 'library';
+  } catch { return 'library'; }
+}
+function _writeSource(v) {
+  try { localStorage.setItem(HLC_SOURCE_KEY, v === 'wishlist' ? 'wishlist' : 'library'); } catch { /* ignore */ }
+}
+
+async function _fetchAppIds(source) {
+  if (source === 'wishlist') return getMyWishlistAppIds().catch(() => new Set());
+  return getMyLibraryAppIds().catch(() => new Set());
+}
+
+export async function renderHomeLibraryChart(mountEl) {
+  if (!mountEl) return;
+  const session = await window.SupaAuth?.getSession?.();
+  if (!session?.user) {
+    mountEl.innerHTML = '';
+    return;
+  }
+  await loadSearchIndex().catch(() => null);
+  let source = _readSource();
+  let appIds = await _fetchAppIds(source);
+  mountEl.innerHTML = _renderChartHtml(source, appIds);
+  // Chip click swaps the source. State lives in localStorage so a reload
+  // keeps whichever view the user prefers.
+  mountEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.hlc-chip');
+    if (!btn) return;
+    const next = btn.dataset.source === 'wishlist' ? 'wishlist' : 'library';
+    if (next === source) return;
+    source = next;
+    _writeSource(source);
+    // Show a lightweight transitional state so the swap feels responsive
+    // even if the wishlist Set has to lazy-sync on first click.
+    const busy = mountEl.querySelector('.hlc-bars, .hlc-empty-body');
+    if (busy) busy.style.opacity = '0.4';
+    appIds = await _fetchAppIds(source);
+    mountEl.innerHTML = _renderChartHtml(source, appIds);
+  });
 }
