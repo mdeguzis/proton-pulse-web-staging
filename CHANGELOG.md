@@ -2,6 +2,10 @@
 
 All notable changes to Proton Pulse (web) should be recorded here.
 
+## v1.6.1
+
+- Fix: game page box art no longer upscales past its native resolution or fills the full rating-panel height. `object-fit: contain` with a 240px cap preserves the aspect ratio without cropping. Follow-up to v1.6.0's aspect fix; the earlier change had left admin-uploaded overrides rendering blurry on wide viewports.
+
 ## v1.6.0
 
 - My Library view: deep-linking from the profile "View my games" now lands on a clearly labeled My Library page. Every owned Steam appid appears, not just games that intersect with recent reports (was capped at ~12 to ~65 on real libraries)
