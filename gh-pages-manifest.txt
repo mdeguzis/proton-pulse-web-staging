@@ -51,6 +51,9 @@ about.html
 options.html
 js/options/main.js
 css/options/options.css
+status.html
+js/status/main.js
+css/status/status.css
 
 auth.html
 js/auth/main.js
@@ -123,6 +126,7 @@ js/lib/topbar.js
 js/lib/toast.js
 js/lib/data-url.js
 js/lib/tile-pad.js
+js/lib/pagination-prefs.js
 js/lib/adult-filter.js
 js/lib/user-prefs.js
 js/lib/store-url-parser.js

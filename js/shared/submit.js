@@ -750,6 +750,7 @@ export async function populateSubmitForm(el) {
           <option value="web-windows"${getWebSource()==='web-windows'?' selected':''}>Windows</option>
           <option value="web-macos"${getWebSource()==='web-macos'?' selected':''}>macOS</option>
           <option value="web-steamdeck"${getWebSource()==='web-steamdeck'?' selected':''}>Steam Deck</option>
+          <option value="web-steammachine"${getWebSource()==='web-steammachine'?' selected':''}>Steam Machine</option>
           <option value="web"${getWebSource()==='web'?' selected':''}>Other / Unknown</option>
         </select>
       </div>

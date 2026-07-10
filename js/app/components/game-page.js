@@ -3,14 +3,14 @@
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
 import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=1b8ae722';
 import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/scoring/gameStats.js?v=8dc92cf7';
-import { getWebClientId } from '../../shared/submit.js?v=bfe659f0';
+import { getWebClientId } from '../../shared/submit.js?v=75603703';
 import { fetchAppDepotInfo, fetchAppMetadata, fetchAppNews, fetchDeckStatusForApp, fetchMinRequirements, fetchLinuxNativeSupport } from '../api/deck-status.js?v=09d5c67e';
 import { fetchCdn, fetchProtonDbLive } from '../api/protondb.js?v=55a861cb';
 import { fetchConfigPlaytimeTotals, fetchNativeReports, fetchSupabase, flagReport } from '../api/supabase.js?v=01961c8d';
 import { castVote, fetchUserVotes, fetchVotes } from '../api/votes.js?v=aba6619f';
 import { enhanceAuthorBlocks } from './author.js?v=3a8cb3c7';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
-import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=a1a075ee';
+import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=c223a42e';
 import { renderCard } from './report-card.js?v=faa750d4';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
@@ -35,7 +35,7 @@ async function _fetchSteamCatalog() {
   return _steamCatalogCache;
 }
 
-const DISCORD_URL = 'https://discord.gg/4p6e4X7xW';
+const DISCORD_URL = 'https://discord.gg/UdPaEsMtd';
 
 // Report key used to match a ProtonDB mirror report against a suppression row.
 // Must stay identical to the key the admin flag flow stores (api/flagged.js).

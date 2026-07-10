@@ -51,6 +51,7 @@ from .game_images import build_game_images, enrich_search_index_with_delisted
 from .deck_status import build_deck_status
 from .most_played import build_most_played
 from .release_years import enrich_search_index_with_release_years
+from .steam_type import enrich_search_index_with_steam_type
 from .pulse import merge_pulse_into_data_dir
 from .write_depot_files import write_depot_files
 from .state import read_pipeline_state
@@ -1777,6 +1778,13 @@ def finalize_output(output_dir, skip_probe: bool = False):
     # is not CORS-enabled) and published as deck-status.json (task #37). Runs
     # after the search index exists so it can scope to games with reports.
     build_deck_status(output_path)
+    # #250 / #258: run steam_type BEFORE game_images. game_images can stall
+    # against Steam under 403 conditions, and when it hangs the type filter
+    # never gets its data. steam_type is smaller, hardened with a wall-clock
+    # budget, and writes column 11 to disk before returning -- so putting it
+    # first guarantees the DLC / Mod / Software filter always has fresh data
+    # even when the rest of finalize has a rough day.
+    enrich_search_index_with_steam_type(output_path)
     overrides = build_game_images(output_path)
     # Game-images probing now knows which Steam IDs returned success=false from
     # appdetails. Flag them in search-index.json column 7 so the frontend can

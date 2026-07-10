@@ -137,9 +137,9 @@ describe('home page browse -- text filter box', () => {
   });
 
   test('both filter pipelines pass results through _filterByText with textFilter', () => {
-    // Recent and Popular sections must both honor the text box. The library
-    // filter now sits between store and text so match _filterByLibrary too.
-    const matches = homeSrc.match(/_filterByText\(_filterByLibrary\(_filterByStore\([^]*?, textFilter\)/g) || [];
+    // Recent and Popular sections must both honor the text box. The kind
+    // filter (#250) now sits between library and text so match it too.
+    const matches = homeSrc.match(/_filterByText\(_filterByKind\(_filterByLibrary\(_filterByStore\([^]*?, textFilter\)/g) || [];
     expect(matches.length).toBe(2);
   });
 
@@ -152,7 +152,7 @@ describe('home page browse -- text filter box', () => {
   });
 
   test('text filter counts toward the active-filter badge when non-empty', () => {
-    expect(homeSrc).toContain('storeSel.size + librarySel.size + (textFilter.trim() ? 1 : 0)');
+    expect(homeSrc).toContain('librarySel.size + kindSel.size + (textFilter.trim() ? 1 : 0)');
   });
 
   test('clear filters resets BOTH the desktop and mobile inputs', () => {
@@ -219,17 +219,13 @@ describe('home page browse -- Save filters (persist)', () => {
   });
 });
 
-describe('home page browse -- page size targets full rows', () => {
-  test('initial + Load more sizes come from pageSizeForFullRows(cardsEl, 4)', () => {
-    // Replaces the older fixed pp:load-count preference (50/100/150/200)
-    // with a row-count target so the grid always shows ~4 complete rows
-    // regardless of viewport (mobile drops to the 8-item floor). See
-    // pageSizeForFullRows in js/lib/tile-pad.js.
-    // Row target is now viewport-aware (5 mobile / 4 desktop) via
-    // targetRowsForViewport() in lib/tile-pad.js.
-    expect(homeSrc).toContain('pageSizeForFullRows(cardsEl, targetRowsForViewport())');
-    // Old fixed preload count is no longer wired to paging (kept in
-    // localStorage for backwards compat, but not read by the render).
+describe('home page browse -- page size comes from user pref (#253)', () => {
+  test('page size is read from getEffectivePageSize, not fixed row targets', () => {
+    // Replaces the older fixed pp:load-count preference and the row-count
+    // target (pageSizeForFullRows) with a user-facing tiles-per-page pref
+    // that defaults per viewport (mobile 20, desktop 50) and can be
+    // overridden on the Site Options page. See js/lib/pagination-prefs.js.
+    expect(homeSrc).toContain('getEffectivePageSize()');
     expect(homeSrc).not.toContain('const PAGE_SIZE = _loadCount();');
   });
 });
@@ -265,44 +261,48 @@ describe('home page browse -- loaded count display', () => {
   });
 });
 
-describe('home page browse -- windowed pagination (page turner)', () => {
-  test('renderRecent slices by page window, not cumulatively', () => {
-    // Page N shows tiles [(N-1)*size, N*size] -- clicking a page number
-    // REPLACES the visible set instead of appending more below. This is
-    // the "page turner" behaviour a numbered pagination is expected to
-    // deliver; the older cumulative model felt like a hidden Load More.
-    expect(homeSrc).toContain('const start = (recentPage - 1) * recentPageSize;');
-    expect(homeSrc).toContain('filtered.slice(start, end)');
-    // No Load More button on the recent section.
+describe('home page browse -- visible-pages pagination (#253)', () => {
+  test('renderRecent tracks a set of visible pages and slices each one', () => {
+    // The append model: visibleRecentPages is the Set of contiguous page
+    // numbers currently rendered. Top nav click resets it to {N}; the
+    // Show More button below the grid extends it by one. flatMap over
+    // the sorted set builds windowRows so the visible tiles keep their
+    // natural page-order.
+    expect(homeSrc).toContain('let visibleRecentPages = new Set([1]);');
+    expect(homeSrc).toContain('sortedPages.flatMap');
     expect(homeSrc).not.toContain("_loadMoreBtn('recent')");
   });
 
-  test('renderPopular slices by page window too', () => {
-    expect(homeSrc).toContain('const start = (popularPage - 1) * popularPageSize;');
+  test('renderPopular tracks its own visible-pages set too', () => {
+    expect(homeSrc).toContain('let visiblePopularPages = new Set([1]);');
     expect(homeSrc).not.toContain("_loadMoreBtn('popular')");
   });
 
-  test('page click ignores clicks on the already-active page', () => {
-    // No-op guard so a click on the current page number is truly a no-op.
-    expect(homeSrc).toContain('if (n === recentPage) return;');
-    expect(homeSrc).toContain('if (n === popularPage) return;');
+  test('top nav click resets visible-pages to just the chosen page', () => {
+    // Explicit reset: clicking page N replaces the whole visible set
+    // with {N} so any Show More expansion below is dropped. This is the
+    // "click a page link, view resets to that page" behavior.
+    expect(homeSrc).toContain('visibleRecentPages = new Set([n]);');
+    expect(homeSrc).toContain('visiblePopularPages = new Set([n]);');
   });
 
-  test('page click does not scroll the viewport', () => {
-    // Page turn should keep the tiles in the same on-screen position -- the
-    // grid replaces in place. scrollIntoView threw the viewport around and
-    // felt like the browser was "jumping back" on every click.
-    expect(homeSrc).not.toContain('scrollIntoView');
-  });
-
-  test('page nav is mirrored below the grid, centered', () => {
-    // Long lists (a full library) mean the reader lands at the bottom of
-    // the grid before wanting to turn the page. A bottom mirror saves a
-    // scroll-back-up trip.
+  test('Show More button appends the next contiguous page', () => {
+    // The bottom slot (page-nav-*-bottom) is now the Show More entry
+    // point instead of a mirrored numbered nav. Clicking it adds
+    // lastPage + 1 to the visible set.
     expect(homeSrc).toContain('id="page-nav-recent-bottom"');
     expect(homeSrc).toContain('id="page-nav-popular-bottom"');
-    expect(homeSrc).toContain("_renderPageNavFor(['page-nav-recent', 'page-nav-recent-bottom']");
-    expect(homeSrc).toContain("_renderPageNavFor(['page-nav-popular', 'page-nav-popular-bottom']");
+    expect(homeSrc).toContain('_renderShowMore');
+    expect(homeSrc).toContain('visibleRecentPages.add(lastPage + 1)');
+    expect(homeSrc).toContain('visiblePopularPages.add(lastPage + 1)');
+  });
+
+  test('top nav click scrolls the section back into view', () => {
+    // The reset drops appended pages, so the previous scroll position may
+    // be well past the section header. Scrolling back keeps the user
+    // oriented instead of stranded halfway down the old view.
+    expect(homeSrc).toContain("_scrollToSection('recent-section')");
+    expect(homeSrc).toContain("_scrollToSection('popular-section')");
   });
 });
 
@@ -312,10 +312,48 @@ describe('home page browse -- text filter searches all titles', () => {
     // then slices for the current page. So typing "cyber" narrows the
     // 714-row dataset to matching titles across every page, not just the
     // 50 visible tiles.
-    expect(homeSrc).toContain('_filterByText(_filterByLibrary(');
+    expect(homeSrc).toContain('_filterByText(_filterByKind(_filterByLibrary(');
     // Placeholder wording matches the actual behavior (previous text
     // "Filter loaded list" implied only visible items).
     expect(homeSrc).toContain('placeholder="Search all titles"');
+  });
+});
+
+describe('home page browse -- Type filter (#250)', () => {
+  test('Type filter chip group is rendered in the filter panel', () => {
+    // The panel is markup inside home.js so a source-level check is
+    // enough here; a full DOM assertion lives in the smoke test.
+    expect(homeSrc).toContain('id="home-kind-checks"');
+    expect(homeSrc).toContain('<span class="pg-filter-group-label">Type</span>');
+    // Standard Steam appdetails type buckets we surface as filters.
+    expect(homeSrc).toContain('data-value="game"');
+    expect(homeSrc).toContain('data-value="dlc"');
+    expect(homeSrc).toContain('data-value="mod"');
+    expect(homeSrc).toContain('data-value="demo"');
+    expect(homeSrc).toContain('data-value="software"');
+  });
+
+  test('_filterByKind drops non-matching Steam entries, lets non-Steam pass', () => {
+    // Steam entries with a `type` come through the search-index column
+    // 11 lookup. Non-Steam ids (gog:*, epic:*) always pass -- the
+    // pipeline does not enrich them with a Steam-side type.
+    expect(homeSrc).toContain('function _filterByKind(reports, sel)');
+    expect(homeSrc).toContain("if (!/^\\d+$/.test(id)) return true;");
+    // Missing entries fall back to 'game' so payloads that predate the
+    // enrichment stay visible when a specific kind chip is selected.
+    expect(homeSrc).toContain("_lookupSteamType(id) || 'game'");
+  });
+
+  test('Type filter runs inside both applyRecentFilters and applyPopularFilters', () => {
+    const inRecent  = homeSrc.match(/_filterByKind\(_filterByLibrary/g) || [];
+    expect(inRecent.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('kindSel state is added to save/restore and clear-filters flows', () => {
+    expect(homeSrc).toContain('let kindSel = new Set();');
+    expect(homeSrc).toContain('kind: [...kindSel]');
+    expect(homeSrc).toContain('kindSel = new Set(saved.kind || []);');
+    expect(homeSrc).toContain('kindSel = new Set();');
   });
 });
 

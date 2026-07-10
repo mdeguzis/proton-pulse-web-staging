@@ -1023,6 +1023,18 @@ function setupTableSort(tableId) {
     indicator.setAttribute('aria-hidden', 'true');
     th.appendChild(indicator);
 
+    // If this column is marked as the default sort in the HTML, paint the
+    // arrow immediately so the user can see which column the list is
+    // sorted by without having to click first. The rows are already in
+    // that order (server-side sort) -- we just render the indicator.
+    const defaultDir = th.dataset.sortDefault;
+    if (defaultDir === 'asc' || defaultDir === 'desc') {
+      th.dataset.sortActive = '1';
+      th.dataset.sortDir    = defaultDir;
+      th.classList.add('admin-th--sorted');
+      indicator.textContent = defaultDir === 'asc' ? ' \u25b2' : ' \u25bc';
+    }
+
     th.addEventListener('click', () => {
       const col  = parseInt(th.dataset.sortCol, 10);
       const type = th.dataset.sortType || 'text';
@@ -1030,7 +1042,11 @@ function setupTableSort(tableId) {
       if (!tbody) return;
 
       const wasActive = th.dataset.sortActive === '1';
-      const nowAsc    = wasActive ? th.dataset.sortDir !== 'asc' : true;
+      // First click on a new column defaults to DESC (down arrow) -- for the
+      // most common admin tables the reader wants "biggest / most recent
+      // first", not "A / oldest first". Subsequent clicks on the already-
+      // active column toggle direction as before.
+      const nowAsc    = wasActive ? th.dataset.sortDir !== 'asc' : false;
 
       ths.forEach(h => {
         h.dataset.sortActive = '';
