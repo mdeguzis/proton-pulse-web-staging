@@ -12,7 +12,7 @@ const TIER_COLORS = {
   borked:   { bg: '#c85050', color: '#fff' },
 };
 
-// opts: { href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend, replacedBy, steamType }
+// opts: { href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend, replacedBy, steamType, miniBadges }
 // imgUrl: pre-resolved Steam image URL (bypasses CDN guessing entirely)
 // tier: one of platinum/gold/silver/bronze/borked - auto-colours the badge
 // badge: raw label string - used when tier is not applicable
@@ -29,7 +29,10 @@ const TIER_COLORS = {
 //   Anything other than "game" renders a small corner tag on the thumbnail so
 //   users scanning a library grid can pick out the DLC bundles and mods at a
 //   glance. Empty / "game" render no tag.
-export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend, replacedBy, steamType }) {
+// miniBadges: pre-rendered HTML from js/lib/card-badges.js -- small Steam-blue
+//   tiles like "On wishlist" / "In library" that appear beneath the title
+//   in place of the older report-count sub line. Empty string skips the row.
+export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, badgeColor, imgUrl, sourceLabel, storePill, trend, replacedBy, steamType, miniBadges }) {
   const primarySrc = imgUrl || (appId ? STEAM_IMG(appId) : '');
   const aid = appId != null ? String(appId) : '';
   const thumbInner = primarySrc
@@ -137,5 +140,13 @@ export function renderGameCard({ href, appId, title, sub, tier, badge, badgeBg, 
     : '';
   // Strip is a sibling of the row (not inside the body) so it can extend
   // the full card width including under the thumbnail when strip mode is on.
-  return `<a class="game-card" href="${href}">${cornerTagHtml}${comboTagHtml}<div class="game-card-row">${thumbHtml}<div class="game-card-body"><div class="game-card-title">${esc(title)}</div><div class="game-card-sub">${sub}</div></div>${rightHtml}</div>${stripHtml}</a>`;
+  // Mini-badges row lives directly under the title. When there are none it
+  // renders nothing so cards without any qualifying badges (default state,
+  // signed-out users, non-matching appids) stay compact.
+  const miniBadgesHtml = miniBadges || '';
+  // The report-count "sub" line is now only rendered when the caller supplies
+  // it. Home browse cards deliberately pass an empty sub since that data
+  // lives on the game details page; the mini-badges row replaces it.
+  const subHtml = sub ? `<div class="game-card-sub">${sub}</div>` : '';
+  return `<a class="game-card" href="${href}">${cornerTagHtml}${comboTagHtml}<div class="game-card-row">${thumbHtml}<div class="game-card-body"><div class="game-card-title">${esc(title)}</div>${subHtml}${miniBadgesHtml}</div>${rightHtml}</div>${stripHtml}</a>`;
 }

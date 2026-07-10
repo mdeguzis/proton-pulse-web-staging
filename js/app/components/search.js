@@ -5,7 +5,7 @@ import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../ap
 import { renderGamePage } from './game-page.js?v=8cb14541';
 import { STEAM_IMG, SITE_ROOT, USES_PROD_DATA, storeLabelFromAppId, fetchDataWithProdFallback } from '../config.js?v=f9591262';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=c7e1268c';
-import { renderGameCard } from '../lib/card.js?v=9b3edb74';
+import { renderGameCard } from '../lib/card.js?v=047833b8';
 import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { filterAdultEntries, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 
