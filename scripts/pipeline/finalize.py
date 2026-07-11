@@ -1641,6 +1641,13 @@ def write_proton_versions_json(output_path: Path) -> None:
     proton-versions.json as a sorted JSON array of strings. Silently no-ops on
     any error so a Supabase outage never fails the overall pipeline."""
     url = os.environ.get("SUPABASE_URL", _SB_URL_DEFAULT).rstrip("/")
+    # The SUPABASE_URL secret in CI is the base host (used elsewhere as
+    # $SUPABASE_URL/functions/v1/...), while the local default already carries
+    # the /rest/v1 suffix. Normalize so the REST path is correct either way --
+    # otherwise the request 404s, the except below swallows it, and
+    # proton-versions.json never gets written (silent 404 on the site).
+    if not url.endswith("/rest/v1"):
+        url = f"{url}/rest/v1"
     key = os.environ.get("SUPABASE_ANON_KEY", _SB_ANON_KEY_DEFAULT)
     endpoint = (
         f"{url}/user_configs"
