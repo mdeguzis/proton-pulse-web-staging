@@ -78,30 +78,38 @@
   max-width: 96vw;
 }
 
-/* Mobile: stretch the panel to fill the viewport width so the pill grid
-   isn't cramped in a half-width dropdown. Fixed-position pins it to the
-   screen edges regardless of the toggle button's horizontal offset. Breakpoint
-   is 720px to match the game-header collapse, so anything phone-sized (portrait
-   or landscape) gets the vertical scrollable panel instead of a desktop-style
-   wide overlay that clips off-screen. */
+/* Mobile filter modal (<=720px). The desktop dropdown behavior falls apart on
+   phones -- it collides with the fixed topbar, overflows off-screen, and never
+   feels native. So on mobile the open panel becomes a full-viewport modal with
+   a sticky header (title + close X), a scrollable body, and a sticky footer
+   with the existing action buttons. Same state, same JS wiring, mobile-only
+   markup: the .filter-panel-mobile-header + .filter-panel-close row is hidden
+   on desktop and rendered as the modal header on mobile. */
 @media (max-width: 720px) {
   .filter-panel.open,
   .pg-filter-panel.open,
   .filter-panel--stack.open {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    top: auto;
+    /* Fill the viewport. Using inset:0 + dynamic viewport height so mobile
+       browser chrome (iOS URL bar, Android nav bar) hides/shows correctly. */
+    inset: 0;
+    z-index: 300;  /* above the fixed .topbar which sits at z-index: 200 */
+    width: auto;
     min-width: 0;
     max-width: none;
-    width: auto;
-    box-sizing: border-box;
-    /* Cap the height and scroll the panel itself; overscroll-behavior:contain
-       stops the touch scroll from chaining to the page behind it. */
-    max-height: 78vh;
+    max-height: none;
+    height: 100dvh;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--bg-bot);
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    /* Padding lives on the header/body/footer children so header + footer can
+       stick to their respective edges without gap. Body gets its own inline
+       padding so the pills don't hug the modal edge. */
   }
   /* Force the group into a vertical stack on mobile: each label + its pills
      on their own row, pills wrap within the row. The desktop masonry
@@ -111,7 +119,70 @@
     flex-direction: row;
     flex-wrap: wrap;
   }
+  /* Body items get inline padding so pills don't sit flush against the edge.
+     Header + footer set their own padding so they can stretch full width. */
+  .filter-panel.open > *:not(.filter-panel-mobile-header):not(.filter-panel-footer):not(.filter-panel-footer--stack),
+  .pg-filter-panel.open > *:not(.filter-panel-mobile-header):not(.filter-panel-footer):not(.filter-panel-footer--stack),
+  .filter-panel--stack.open > *:not(.filter-panel-mobile-header):not(.filter-panel-footer):not(.filter-panel-footer--stack) {
+    margin-inline: 14px;
+  }
+  /* Mobile-only header: sticky bar at top with "Filters" title + close X.
+     .filter-panel-mobile-header is hidden by default (desktop rule below),
+     shown as a sticky header when the panel is open on mobile. */
+  .filter-panel.open .filter-panel-mobile-header,
+  .pg-filter-panel.open .filter-panel-mobile-header,
+  .filter-panel--stack.open .filter-panel-mobile-header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--s1);
+    border-bottom: 1px solid var(--border);
+    margin: 0;  /* override the body-inline-padding rule above */
+  }
+  .filter-panel-mobile-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--strong);
+  }
+  .filter-panel-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .filter-panel-close:hover { border-color: var(--accent); color: var(--accent); }
+  /* Footer: sticky at the bottom so Save / Clear stay in reach while the
+     body scrolls. Only affects the two panels that ship a footer (home,
+     game-page); the index panel has no footer and is unaffected. */
+  .filter-panel.open .filter-panel-footer,
+  .filter-panel--stack.open .filter-panel-footer--stack {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 12px 16px;
+    background: var(--s1);
+    border-top: 1px solid var(--border);
+    margin: 0;  /* override the body-inline-padding rule above */
+  }
 }
+/* Hide the mobile header on desktop -- markup lives in every panel but only
+   renders on viewports below 721px. */
+.filter-panel-mobile-header { display: none; }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 /* Grow the panel with the viewport so pill rows stop wrapping into a tall

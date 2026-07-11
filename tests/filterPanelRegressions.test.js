@@ -130,6 +130,49 @@ describe('home (app.html browse) -- pill button filter group structure', () => {
   });
 });
 
+describe('mobile filter modal (<= 720px) -- full-viewport modal pattern', () => {
+  // Bug: on mobile the anchored dropdown collided with the fixed topbar,
+  // overflowed off-screen, and could not scroll. Fix: at <= 720px the panel
+  // is a full-viewport modal with sticky header (title + X) and sticky
+  // footer for the action buttons. This test guards the CSS + markup shape
+  // so a future refactor doesn't quietly regress it back to a dropdown.
+  const flat = flatten(filtersCss);
+
+  test('mobile media query at 720px pins the open panel to inset:0 at z-index above topbar', () => {
+    expect(flat).toMatch(/@media \(max-width: 720px\)/);
+    expect(flat).toMatch(/\.filter-panel\.open[\s\S]*?position: fixed[\s\S]*?inset: 0/);
+    // Topbar sits at z-index: 200; modal must sit above that.
+    expect(flat).toMatch(/\.filter-panel\.open[\s\S]*?z-index: 300/);
+  });
+
+  test('mobile-only header is hidden on desktop and sticky at top when the panel is open on mobile', () => {
+    // Hidden by default at any viewport size (desktop rule).
+    expect(flat).toMatch(/\.filter-panel-mobile-header\s*\{\s*display: none/);
+    // Shown as sticky inside the mobile modal.
+    expect(flat).toMatch(/\.filter-panel\.open \.filter-panel-mobile-header[\s\S]*?position: sticky[\s\S]*?top: 0/);
+  });
+
+  test('mobile footer sticks to the bottom so Save / Clear stay in reach', () => {
+    expect(flat).toMatch(/\.filter-panel\.open \.filter-panel-footer[\s\S]*?position: sticky[\s\S]*?bottom: 0/);
+  });
+
+  test('home.js filter panel ships the mobile header markup with a close X', () => {
+    expect(homeSrc).toContain('filter-panel-mobile-header');
+    expect(homeSrc).toContain('class="filter-panel-close"');
+    expect(homeSrc).toContain('aria-label="Close filters"');
+  });
+
+  test('topbar.js wires a delegated close handler that resets aria-expanded', () => {
+    const topbarSrc = fs.readFileSync(
+      path.join(__dirname, '..', 'js', 'lib', 'topbar.js'),
+      'utf8'
+    );
+    expect(topbarSrc).toContain('wireFilterPanelClose');
+    expect(topbarSrc).toMatch(/closest\(['"`]\.filter-panel-close/);
+    expect(topbarSrc).toMatch(/aria-expanded[^\n]*false/);
+  });
+});
+
 describe('home (app.html browse) -- XL card size parity with index.html', () => {
   // Bug: XL only existed on index.html. Browse view should match.
   test('SIZES array includes xl alongside sm/md/lg', () => {

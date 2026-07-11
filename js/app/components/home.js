@@ -414,6 +414,10 @@ export async function renderHomePage() {
             Filters<span class="filter-badge" id="home-filter-badge" hidden></span>
           </button>
           <div class="filter-panel filter-panel--stack" id="home-filter-panel">
+            <div class="filter-panel-mobile-header">
+              <span class="filter-panel-mobile-title">Filters</span>
+              <button type="button" class="filter-panel-close" aria-label="Close filters">&times;</button>
+            </div>
             <div class="filter-item filter-item--mobile-only">
               <label class="home-filter-label" for="home-text-filter-mobile">Search titles</label>
               <input id="home-text-filter-mobile" class="home-filter-text home-filter-text--in-panel" type="search" placeholder="Search all titles" autocomplete="off" />

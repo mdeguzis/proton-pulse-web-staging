@@ -1167,6 +1167,10 @@ export async function renderGamePage(appId) {
             </button>
             ${anyActive ? `<span class="filter-count">${reps.length} of ${combined.length} shown</span>` : ''}
             <div class="filter-panel" id="filterPanel">
+              <div class="filter-panel-mobile-header">
+                <span class="filter-panel-mobile-title">Filters</span>
+                <button type="button" class="filter-panel-close" aria-label="Close filters">&times;</button>
+              </div>
               <div class="filter-panel-grid">
                 ${gpuSel}${archSel}${osSel}${srcSel}${ratingSel}${runTypeSel}${deviceSel}${playtimeSel}
               </div>

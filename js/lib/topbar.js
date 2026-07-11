@@ -616,6 +616,46 @@
     wireThemeToggle();
     wireDropdowns();
     wireStatusDot();
+    wireFilterPanelClose();
+  }
+
+  // ---- Mobile filter modal close button (delegated) --------------------
+  //
+  // On mobile (<= 720px) the .filter-panel opens as a full-viewport modal
+  // with a header row containing a .filter-panel-close X button. Every
+  // filter panel across the site (home, index, game-page) ships that
+  // markup, so a single delegated click handler in topbar.js -- which
+  // loads on every page -- covers all of them. Clicking the X closes the
+  // nearest .filter-panel / .pg-filter-panel and resets its toggle's
+  // aria-expanded state so screen readers stay in sync.
+  function wireFilterPanelClose() {
+    document.addEventListener('click', function (e) {
+      const btn = e.target && e.target.closest && e.target.closest('.filter-panel-close');
+      if (!btn) return;
+      e.stopPropagation();
+      const panel = btn.closest('.filter-panel, .pg-filter-panel');
+      if (!panel) return;
+      panel.classList.remove('open');
+      // Reset the associated toggle's aria-expanded. Toggles live as a
+      // sibling ancestor -- check the enclosing wrap for a button that
+      // currently claims to be expanded.
+      const wrap = panel.parentElement;
+      if (wrap) {
+        const toggle = wrap.querySelector('[aria-expanded="true"]');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      }
+      void logFrontendEvent('DEBUG', 'filter panel closed via mobile modal X', {
+        panelId: panel.id || null,
+        source: 'wireFilterPanelClose',
+      });
+    });
+  }
+  // Debug-log helper: filter-modal close is a good candidate to spot the
+  // "close does nothing" class of bug across pages. Reuses the topbar's
+  // existing logging pattern (no-op when window.ppTrack isn't available).
+  function logFrontendEvent(level, msg, ctx) {
+    try { if (typeof window.ppTrack === 'function') window.ppTrack('log', { level: level, msg: msg, ctx: ctx || {} }); } catch (_) {}
+    return Promise.resolve();
   }
 
   // ---- Site status dot on the topbar (see #254) ------------------------
