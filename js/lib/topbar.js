@@ -60,34 +60,38 @@
       <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/>
       <circle cx="5" cy="18" r="1.4" fill="currentColor" stroke="none"/>
     </symbol>
-    <!-- Wishlist corner badge: red heart with a white plus overlaid, so
-         the glyph reads as "add to wishlist" (Steam's own convention).
-         Black hairline outline so the shape reads on any store color at
-         small chip sizes. -->
+    <!-- Wishlist corner badge: a wrapped present (lid + body + bow + ribbon
+         groove). White fills with black hairline outlines so it reads on any
+         store-pill color at 11-13px without the old white halo. Id kept for
+         call-site stability (home.js references #icon-wishlist-heart). -->
     <symbol id="icon-wishlist-heart" viewBox="0 0 24 24">
-      <path d="M12 21s-8-4.9-8-11a5 5 0 019-3 5 5 0 019 3c0 6.1-8 11-8 11z"
-            fill="#e53935" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/>
-      <path d="M11.25 8.5h1.5v6.5h-1.5z M8.5 11.25h6.5v1.5h-6.5z" fill="#fff"/>
+      <g fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round">
+        <path d="M4.6 8.2h14.8v3.4H4.6z"/>
+        <path d="M5.6 11.6h12.8v7a1.4 1.4 0 0 1-1.4 1.4H7a1.4 1.4 0 0 1-1.4-1.4z"/>
+        <path d="M12 8.2C10.6 8.2 8 7.9 7.5 6.3 7.1 5.1 8.4 4.3 9.5 5 10.6 5.7 11.5 6.8 12 8.2z"/>
+        <path d="M12 8.2C13.4 8.2 16 7.9 16.5 6.3 16.9 5.1 15.6 4.3 14.5 5 13.4 5.7 12.5 6.8 12 8.2z"/>
+      </g>
+      <path d="M12 8.4v11.8" stroke="#000" stroke-width="1.2"/>
     </symbol>
-    <!-- Library corner badge: three-book stack. White fills with black
-         outlines so the stack still reads on any store color at 11-13px.
-         Explicit hairline stroke > relying on background contrast alone. -->
-    <symbol id="icon-book-open" viewBox="0 0 24 24" fill="#fff" stroke="#000" stroke-width="1.4" stroke-linejoin="round">
-      <path d="M4 4h13a1 1 0 011 1v4H4V4z"/>
-      <path d="M5 10h13a1 1 0 011 1v3H5v-4z"/>
-      <path d="M3 15h16a1 1 0 011 1v3a1 1 0 01-1 1H3v-5z"/>
+    <!-- Library corner badge: a 2x2 collection grid. White fills with black
+         outlines so the tiles read on any store color at 11-13px. Id kept for
+         call-site stability (home.js references #icon-book-open). -->
+    <symbol id="icon-book-open" viewBox="0 0 24 24" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round">
+      <rect x="3.4" y="3.4" width="7" height="7" rx="1.5"/>
+      <rect x="13.6" y="3.4" width="7" height="7" rx="1.5"/>
+      <rect x="3.4" y="13.6" width="7" height="7" rx="1.5"/>
+      <rect x="13.6" y="13.6" width="7" height="7" rx="1.5"/>
     </symbol>
-    <!-- Steam Deck brand mark: right-side crescent arc opening left, plus
-         a filled dot centered in the opening. Matches Valve's real logo
-         shape (see steamgriddb.com/logo/52989). Uses currentColor so the
-         glyph follows the chip's theme -- white on dark, dark on light.
-         The monochrome variant reads cleaner at chip size than the
-         blue-to-purple gradient version. -->
+    <!-- Steam Deck brand mark: dot nested in a right-facing crescent, traced
+         from Valve's official mark (SteamGridDB 1920px source). Monochrome
+         currentColor so the chip themes cleanly (white on dark, dark on the
+         active accent chip, dark on light). The ~1.5u gap between dot and
+         crescent keeps it reading as dot-in-crescent even in one color, like
+         the plain mark. The two-tone blue/white version lives in
+         assets/icons/steam/steam-deck.svg for larger contexts. -->
     <symbol id="icon-steam-deck" viewBox="0 0 24 24" fill="currentColor">
-      <!-- Right-side crescent: outer 10r arc down + inner 6r arc up. -->
-      <path d="M12 2a10 10 0 010 20L12 18a6 6 0 000-12z"/>
-      <!-- Solid dot in the left opening of the crescent. -->
-      <circle cx="8" cy="12" r="3"/>
+      <path d="M9.2 1.2A10.8 10.8 0 0 1 9.2 22.8L9.2 18.9A6.9 6.9 0 0 0 9.2 5.1Z"/>
+      <circle cx="9.4" cy="12" r="5.2"/>
     </symbol>
     <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
