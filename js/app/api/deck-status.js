@@ -41,8 +41,19 @@ export async function fetchDeckStatusForApp(appId) {
   const map = await _loadDeckMap();
   const entry = map[String(appId)];
   const ret = entry && entry.status
-    ? { status: entry.status, criteria: entry.criteria || null, machine: entry.machine || 'unknown', steamos: entry.steamos || 'unknown' }
-    : { status: 'unknown', criteria: null, machine: 'unknown', steamos: 'unknown' };
+    ? {
+        status: entry.status,
+        criteria: entry.criteria || null,
+        machine: entry.machine || 'unknown',
+        steamos: entry.steamos || 'unknown',
+        // Per-criterion arrays for the Machine + SteamOS tabs, published by
+        // the pipeline as [[display_type, short_token], ...]. Missing key ==
+        // no items, so default to []; the frontend treats an empty array as
+        // "no notes to show" rather than "unknown verdict".
+        machine_criteria: Array.isArray(entry.machine_criteria) ? entry.machine_criteria : [],
+        steamos_criteria: Array.isArray(entry.steamos_criteria) ? entry.steamos_criteria : [],
+      }
+    : { status: 'unknown', criteria: null, machine: 'unknown', steamos: 'unknown', machine_criteria: [], steamos_criteria: [] };
   _deckCache[appId] = ret;
   return ret;
 }
@@ -55,7 +66,11 @@ export async function fetchDeckStatusForApp(appId) {
  * @returns {{status: string, criteria: Array<boolean|null>|null}}
  */
 export function getDeckStatusForApp(appId) {
-  return _deckCache[appId] || { status: 'unknown', criteria: null, machine: 'unknown', steamos: 'unknown' };
+  return _deckCache[appId] || {
+    status: 'unknown', criteria: null,
+    machine: 'unknown', steamos: 'unknown',
+    machine_criteria: [], steamos_criteria: [],
+  };
 }
 
 /**

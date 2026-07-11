@@ -53,10 +53,66 @@ def test_verified_game_maps_category_and_criteria():
             "criteria": [True, True, True, True],
             "machine": "unknown",
             "steamos": "unknown",
+            "machine_criteria": [],
+            "steamos_criteria": [],
         }
         # second call is served from cache -- no re-fetch
         assert fetch_deck_compat("1245620") == out
         assert m.call_count == 1
+
+
+def test_machine_and_steamos_per_criterion_items_captured():
+    """TF2-shape payload: Deck + Machine + SteamOS all rated, with per-criterion
+    resolved_items on each side. Store the machine + steamos arrays as
+    [[display_type, short_token], ...] so the frontend can render a checklist
+    matching Valve's own tabs."""
+    payload = {
+        "success": 1,
+        "results": {
+            "resolved_category": 2,
+            "resolved_items": [
+                {"display_type": 3, "loc_token": "#SteamDeckVerified_TestResult_DefaultControllerConfigNotFullyFunctional"},
+                {"display_type": 3, "loc_token": "#SteamDeckVerified_TestResult_ControllerGlyphsDoNotMatchDeckDevice"},
+                {"display_type": 3, "loc_token": "#SteamDeckVerified_TestResult_InterfaceTextIsNotLegible"},
+                {"display_type": 4, "loc_token": "#SteamDeckVerified_TestResult_DefaultConfigurationIsPerformant"},
+            ],
+            "machine_resolved_category": 2,
+            "machine_resolved_items": [
+                {"display_type": 3, "loc_token": "#SteamMachine_TestResult_DefaultControllerConfigNotFullyFunctional"},
+                {"display_type": 4, "loc_token": "#SteamMachine_TestResult_DefaultConfigurationIsPerformant"},
+            ],
+            "steamos_resolved_category": 2,
+            "steamos_resolved_items": [
+                {"display_type": 4, "loc_token": "#SteamOS_TestResult_GameStartupFunctional"},
+                {"display_type": 1, "loc_token": "#SteamOS_TestResult_DefaultControllerConfigNotFullyFunctional"},
+            ],
+        },
+    }
+    with patch.object(deck, "_fetch_raw", return_value=payload):
+        out = fetch_deck_compat("440")
+    assert out["machine"] == "playable"
+    assert out["steamos"] == "compatible"
+    # Prefix stripped, display_type preserved for the frontend to render.
+    assert out["machine_criteria"] == [
+        [3, "DefaultControllerConfigNotFullyFunctional"],
+        [4, "DefaultConfigurationIsPerformant"],
+    ]
+    assert out["steamos_criteria"] == [
+        [4, "GameStartupFunctional"],
+        [1, "DefaultControllerConfigNotFullyFunctional"],
+    ]
+
+
+def test_extract_criteria_handles_missing_or_bad_input():
+    assert deck._extract_criteria(None, "#pfx") == []
+    assert deck._extract_criteria([], "#pfx") == []
+    assert deck._extract_criteria([None, "not a dict"], "#pfx") == []
+    # Item with no loc_token gets an empty short_token but is still recorded.
+    assert deck._extract_criteria([{"display_type": 4}], "#pfx") == [[4, ""]]
+    # Token that doesn't match the prefix is left as-is (defensive).
+    assert deck._extract_criteria(
+        [{"display_type": 4, "loc_token": "#Other_Prefix_Something"}], "#pfx"
+    ) == [[4, "#Other_Prefix_Something"]]
 
 
 def test_display_type_mapping_pass_info_fail():
