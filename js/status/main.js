@@ -14,7 +14,7 @@ const REFRESH_MS = 60 * 1000;
 // staging read. Leave '' until the worker is deployed; until then the page
 // falls back to the static edge-status.json on gh-pages. Paste the deployed
 // worker URL here (e.g. https://pp-edge-status.<subdomain>.workers.dev).
-const EDGE_STATUS_ENDPOINT = '';
+const EDGE_STATUS_ENDPOINT = 'https://pp-edge-status.mdeguzis.workers.dev';
 
 // Supabase globals exposed by js/lib/supabase-client.js (loaded as a plain
 // script before this module). Used to gate the admin-only "Check now" action.
