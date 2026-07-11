@@ -9,11 +9,54 @@ from scripts.pipeline.finalize import (
     generate_search_index,
     generate_recent_reports,
     generate_nonsteam_images,
+    write_proton_versions_json,
     _extract_title,
     _resolve_coverage_title,
     _compute_game_summary,
     _score_to_tier,
 )
+
+
+# ── write_proton_versions_json ────────────────────────────────────────────────
+
+def _capture_proton_versions_url(monkeypatch_env, tmp_path, base_url):
+    """Run write_proton_versions_json with SUPABASE_URL=base_url and return the
+    URL that was actually requested plus whether the file was written."""
+    captured = {}
+
+    class _FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return json.dumps([{"proton_version": "GE-Proton9-1"}]).encode("utf-8")
+
+    def _fake_urlopen(req, timeout=30):
+        captured["url"] = req.full_url
+        return _FakeResp()
+
+    with patch.dict("os.environ", {"SUPABASE_URL": base_url}), \
+         patch("scripts.pipeline.finalize.urllib.request.urlopen", _fake_urlopen):
+        write_proton_versions_json(tmp_path)
+    out = tmp_path / "proton-versions.json"
+    return captured.get("url", ""), out
+
+
+def test_proton_versions_uses_rest_v1_when_env_is_base_host(tmp_path):
+    # In CI SUPABASE_URL is the base host; the REST path must still be built.
+    url, out = _capture_proton_versions_url(None, tmp_path, "https://x.supabase.co")
+    assert "/rest/v1/user_configs" in url
+    assert out.exists()
+    assert json.loads(out.read_text()) == ["GE-Proton9-1"]
+
+
+def test_proton_versions_does_not_double_rest_v1(tmp_path):
+    # A base that already carries /rest/v1 must not get it appended twice.
+    url, _ = _capture_proton_versions_url(None, tmp_path, "https://x.supabase.co/rest/v1")
+    assert url.count("/rest/v1") == 1
 
 
 # ── generate_nonsteam_images ──────────────────────────────────────────────────

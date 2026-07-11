@@ -1,6 +1,6 @@
 // deck-status (components) for the app page. Relocated from app.js.
 
-import { getDeckStatusForApp } from '../api/deck-status.js?v=d39add5f';
+import { getDeckStatusForApp } from '../api/deck-status.js?v=a8d355d8';
 import { esc } from '../utils.js?v=c7e1268c';
 
 export const DECK_STATUS_LABELS = {
@@ -15,6 +15,88 @@ export const DECK_CRITERIA_LABELS = [
   'In-game interface text is legible on Steam Deck',
   'This game\'s default graphics configuration performs well on Steam Deck',
 ];
+
+// Human-readable labels for Steam Machine + SteamOS resolved_items (see #273
+// follow-up). The pipeline strips the `#SteamMachine_TestResult_` /
+// `#SteamOS_TestResult_` prefix before storing, so keys here are already
+// short. Any token missing from the map falls back to camelCase-to-prose
+// conversion via `_tokenToProse` so a new Valve token still reads reasonably
+// even before we hand-tune its label.
+export const CRITERIA_TOKEN_LABELS = {
+  // Steam Machine
+  DefaultControllerConfigNotFullyFunctional: 'Some functionality is not accessible when using the default controller configuration, requiring use of the touchscreen or virtual keyboard, or a community configuration',
+  DefaultControllerConfigFullyFunctional: 'All functionality is accessible when using the default controller configuration',
+  ControllerGlyphsDoNotMatchDevice: 'This game sometimes shows mouse, keyboard, or non-Steam controller icons',
+  ControllerGlyphsMatchDevice: 'This game shows Steam Machine controller icons',
+  DefaultConfigurationIsPerformant: "This game's default graphics configuration performs well on Steam Machine",
+  DefaultConfigurationIsNotPerformant: "This game's default graphics configuration does not perform well on Steam Machine",
+  ExternalControllersNotSupportedPrimaryPlayer: 'This game does not default to external Bluetooth/USB controllers, and may require manually switching the active controller',
+  // SteamOS
+  GameStartupFunctional: 'This game runs successfully on SteamOS',
+  GameStartupNotFunctional: 'This game does not start successfully on SteamOS',
+  InterfaceTextIsLegible: 'In-game interface text is legible',
+  InterfaceTextIsNotLegible: 'Some in-game text is small and may be difficult to read',
+};
+
+export function _tokenToProse(tok) {
+  if (!tok || typeof tok !== 'string') return '';
+  // Split CamelCase on capital boundaries + digit runs, e.g.
+  // "DefaultControllerConfigNotFullyFunctional" -> "Default controller config not fully functional"
+  const words = tok
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function _criterionLabel(tok) {
+  return CRITERIA_TOKEN_LABELS[tok] || _tokenToProse(tok);
+}
+
+// display_type → status key for the round icon: 4=pass, 3=info/caveat, 1/2=fail.
+// Matches DECK_DISPLAY_MAP in the pipeline + api/deck-status.js. Used only as a
+// last-resort fallback now -- see _iconKeyForCriterion for why the token wins.
+export function _iconKeyForDisplayType(dt) {
+  if (dt === 4) return 'verified';
+  if (dt === 3) return 'playable';
+  return 'unsupported';
+}
+
+// Per-criterion outcome by token. Valve's `display_type` is NOT consistent
+// across the Deck / Machine / SteamOS reports: on SteamOS `GameStartupFunctional`
+// comes back display_type=3 but reads as a pass (green check), and the two
+// controller caveats come back display_type=1 but read as info ("i"), not
+// failures. Deck/Machine use 4=pass, 3=info. So the token is the reliable
+// signal for the icon; display_type is only a fallback. Values: pass | info | fail.
+export const CRITERIA_TOKEN_OUTCOME = {
+  DefaultControllerConfigFullyFunctional: 'pass',
+  DefaultControllerConfigNotFullyFunctional: 'info',
+  ControllerGlyphsMatchDevice: 'pass',
+  ControllerGlyphsDoNotMatchDevice: 'info',
+  DefaultConfigurationIsPerformant: 'pass',
+  DefaultConfigurationIsNotPerformant: 'info',
+  ExternalControllersNotSupportedPrimaryPlayer: 'info',
+  GameStartupFunctional: 'pass',
+  GameStartupNotFunctional: 'fail',
+  InterfaceTextIsLegible: 'pass',
+  InterfaceTextIsNotLegible: 'info',
+};
+const _OUTCOME_ICON = { pass: 'verified', info: 'playable', fail: 'unsupported' };
+
+// Pick the round icon for one Machine/SteamOS criterion. Curated token map
+// first (matches Valve's store modals exactly), then a name heuristic so a new
+// token still reads sensibly ("...NotFunctional" fails, other "...Not..." /
+// "DoNot..." caveats show info, anything else passes), then display_type.
+export function _iconKeyForCriterion(displayType, tok) {
+  const outcome = CRITERIA_TOKEN_OUTCOME[tok];
+  if (outcome) return _OUTCOME_ICON[outcome];
+  if (typeof tok === 'string' && tok) {
+    if (/NotFunctional/i.test(tok)) return 'unsupported';
+    if (/(?:^|[a-z])(?:DoNot|Not)[A-Z]/.test(tok) || /Not[A-Z]/.test(tok)) return 'playable';
+    return 'verified';
+  }
+  return _iconKeyForDisplayType(displayType);
+}
 
 // Steam's resolved_category values: 0=unknown, 1=unsupported, 2=playable, 3=verified
 
@@ -79,17 +161,25 @@ function _tabLabel(id, iconId, name, status) {
   </label>`;
 }
 
-// One device panel: heading + verdict badge + summary. Steam Deck also shows
-// its four-point criteria checklist (the only device the pipeline stores
-// per-criterion data for); Machine / SteamOS show the verdict + summary.
-function _devicePanel(kind, name, status, criteria) {
+// One device panel: heading + verdict badge + summary + per-criterion checklist.
+// Steam Deck's checklist comes from the four-point boolean `criteria` array
+// (fixed order, hand-wrote labels). Machine + SteamOS ship variable-length
+// `[[display_type, short_token], ...]` arrays; we look up the token in
+// CRITERIA_TOKEN_LABELS and fall back to camelCase-to-prose conversion so a
+// new Valve token still reads reasonably even before we tune the label.
+function _devicePanel(kind, name, status, criteria, tokenizedCriteria) {
   const label = _statusLabel(kind, status);
   const summary = (_DEVICE_SUMMARY[kind] || {})[status] || '';
-  let body;
-  if (kind === 'deck' && criteria) {
+  let body = '';
+  if (kind === 'deck' && Array.isArray(criteria)) {
     body = `<div class="deck-criteria-list">${criteria.map((pass, i) => {
       const iconKey = pass === true ? 'verified' : pass === false ? 'unsupported' : 'playable';
       return `<div class="deck-criterion"><span class="deck-criterion-icon"><svg width="18" height="18" viewBox="0 0 24 24">${DECK_STATUS_ICON_SVG[iconKey]}</svg></span><span>${esc(DECK_CRITERIA_LABELS[i])}</span></div>`;
+    }).join('')}</div>`;
+  } else if ((kind === 'machine' || kind === 'steamos') && Array.isArray(tokenizedCriteria) && tokenizedCriteria.length) {
+    body = `<div class="deck-criteria-list">${tokenizedCriteria.map(([dt, tok]) => {
+      const iconKey = _iconKeyForCriterion(dt, tok);
+      return `<div class="deck-criterion"><span class="deck-criterion-icon"><svg width="18" height="18" viewBox="0 0 24 24">${DECK_STATUS_ICON_SVG[iconKey]}</svg></span><span>${esc(_criterionLabel(tok))}</span></div>`;
     }).join('')}</div>`;
   } else {
     body = `<p class="dt-source">${status === 'unknown' ? 'Valve has not published a verdict for this title yet.' : "Source: Valve's official compatibility report."}</p>`;
@@ -118,9 +208,9 @@ export function renderDeckStatusModalContent(appId) {
         ${_tabLabel('machine', 'icon-steam-machine', 'Steam Machine', machineStatus)}
         ${_tabLabel('steamos', 'icon-steamos', 'SteamOS', osStatus)}
       </div>
-      <div class="dt-panel dt-panel-deck">${_devicePanel('deck', 'Steam Deck', deckStatus, d.criteria)}</div>
-      <div class="dt-panel dt-panel-machine">${_devicePanel('machine', 'Steam Machine', machineStatus, null)}</div>
-      <div class="dt-panel dt-panel-steamos">${_devicePanel('steamos', 'SteamOS', osStatus, null)}</div>
+      <div class="dt-panel dt-panel-deck">${_devicePanel('deck', 'Steam Deck', deckStatus, d.criteria, null)}</div>
+      <div class="dt-panel dt-panel-machine">${_devicePanel('machine', 'Steam Machine', machineStatus, null, d.machine_criteria)}</div>
+      <div class="dt-panel dt-panel-steamos">${_devicePanel('steamos', 'SteamOS', osStatus, null, d.steamos_criteria)}</div>
     </div>`;
 }
 

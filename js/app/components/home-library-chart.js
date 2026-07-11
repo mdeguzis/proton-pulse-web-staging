@@ -7,7 +7,7 @@ import { getMyWishlistAppIds } from '../lib/user-wishlist.js?v=9c88bc65';
 import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
 import { RATING_COLORS, RATING_TEXT } from '../config.js?v=f9591262';
 import { esc } from '../utils.js?v=c7e1268c';
-import { loadDeckStatusMap } from '../api/deck-status.js?v=d39add5f';
+import { loadDeckStatusMap } from '../api/deck-status.js?v=a8d355d8';
 
 const TIER_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
 const TIER_LABEL = {
@@ -31,19 +31,19 @@ const DEVICE = {
     field: 'status',
     order: ['verified', 'playable', 'unsupported', 'unknown'],
     label: { verified: 'Deck Verified', playable: 'Deck Playable', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your Steam Deck at a glance', chip: 'Steam Deck', icon: 'icon-steam-deck',
+    title: "Your Library's compatibility with Steam Deck", chip: 'Steam Deck', icon: 'icon-steam-deck',
   },
   machine: {
     field: 'machine',
     order: ['verified', 'playable', 'unsupported', 'unknown'],
     label: { verified: 'Verified', playable: 'Playable', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your Steam Machine at a glance', chip: 'Steam Machine', icon: 'icon-steam-machine',
+    title: "Your Library's compatibility with the Steam Machine", chip: 'Steam Machine', icon: 'icon-steam-machine',
   },
   steamos: {
     field: 'steamos',
     order: ['compatible', 'unsupported', 'unknown'],
     label: { compatible: 'Compatible', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your SteamOS at a glance', chip: 'SteamOS', icon: 'icon-steamos',
+    title: "Your Library's compatibility with SteamOS", chip: 'SteamOS', icon: 'icon-steamos',
   },
 };
 

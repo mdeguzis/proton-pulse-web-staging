@@ -8,6 +8,107 @@ import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
 
 const REFRESH_MS = 60 * 1000;
 
+// Live status endpoint served by the pp-edge-status Cloudflare Worker (#275).
+// The worker runs a true 15-min Cron Trigger and serves the same payload shape
+// as the old edge-status.json, from one CORS endpoint that both prod and
+// staging read. Leave '' until the worker is deployed; until then the page
+// falls back to the static edge-status.json on gh-pages. Paste the deployed
+// worker URL here (e.g. https://pp-edge-status.<subdomain>.workers.dev).
+const EDGE_STATUS_ENDPOINT = 'https://pp-edge-status.mdeguzis.workers.dev';
+
+// Supabase globals exposed by js/lib/supabase-client.js (loaded as a plain
+// script before this module). Used to gate the admin-only "Check now" action.
+const SUPABASE_URL      = (typeof window !== 'undefined' && window.SUPABASE_URL) || '';
+const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && window.SUPABASE_ANON_KEY) || '';
+const SupaAuth          = (typeof window !== 'undefined' && window.SupaAuth) || null;
+
+// Super-admin / site-maintenance gate for the per-tile "Check now" button.
+// RLS on the admins table is the real gate (and the worker re-verifies the
+// token server-side); this flag only decides whether to render the control.
+let _isSuperAdmin = false;
+let _session = null;
+
+async function detectSuperAdmin() {
+  try {
+    if (!SupaAuth || !SUPABASE_URL) return;
+    _session = await SupaAuth.getSession();
+    if (!_session?.user?.id) { _isSuperAdmin = false; return; }
+    const url = `${SUPABASE_URL}/rest/v1/admins?proton_pulse_user_id=eq.${encodeURIComponent(_session.user.id)}&role=eq.super_admin&select=role&limit=1`;
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${_session.access_token}` },
+    });
+    if (!res.ok) { _isSuperAdmin = false; return; }
+    const rows = await res.json();
+    _isSuperAdmin = Array.isArray(rows) && rows.length > 0;
+    console.debug('[status] super-admin gate', { uid: _session.user.id, isSuperAdmin: _isSuperAdmin, source: 'admins table role=super_admin' });
+  } catch (err) {
+    _isSuperAdmin = false;
+    console.debug('[status] super-admin gate check failed', { error: String(err && err.message || err) });
+  }
+}
+
+// Admin-triggered re-check of one function. POSTs the user's Supabase token to
+// the worker, which re-verifies super_admin before probing. On success it
+// returns the fresh full payload; we re-render the page and the open modal.
+async function checkServiceNow(svcName, btn, statusEl) {
+  if (!EDGE_STATUS_ENDPOINT) {
+    statusEl.textContent = 'Live check endpoint not configured yet.';
+    return;
+  }
+  const session = _session || (SupaAuth ? await SupaAuth.getSession() : null);
+  if (!session?.access_token) {
+    statusEl.textContent = 'Sign in as a super admin to run a check.';
+    return;
+  }
+  btn.disabled = true;
+  statusEl.textContent = 'Checking...';
+  try {
+    const res = await fetch(EDGE_STATUS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ fn: svcName }),
+    });
+    if (res.status === 401 || res.status === 403) {
+      statusEl.textContent = 'Not authorized (super admin only).';
+      console.warn('[status] check-now rejected', { svcName, status: res.status });
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    renderFromPayload(payload);
+    const fresh = (payload.services || []).find((s) => s.name === svcName);
+    console.debug('[status] check-now ok', { svcName, status: fresh?.status, http_status: fresh?.http_status });
+    if (fresh) openServiceModal(fresh); // re-render modal with the fresh result
+  } catch (err) {
+    statusEl.textContent = `Check failed: ${err.message || err}`;
+    console.warn('[status] check-now failed', { svcName, error: String(err && err.message || err) });
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Fetch the live payload: try the worker first, fall back to the static file
+// written by the (soon-retired) GitHub Actions workflow so the page still
+// renders if the worker is unreachable or not yet deployed.
+async function fetchStatusPayload() {
+  if (EDGE_STATUS_ENDPOINT) {
+    try {
+      const res = await fetch(EDGE_STATUS_ENDPOINT, { cache: 'no-store' });
+      if (res.ok) {
+        console.debug('[status] loaded from worker endpoint', { source: 'worker', url: EDGE_STATUS_ENDPOINT });
+        return await res.json();
+      }
+      console.warn('[status] worker endpoint non-ok, falling back to static file', { source: 'worker', status: res.status });
+    } catch (err) {
+      console.warn('[status] worker endpoint fetch failed, falling back to static file', { source: 'worker', error: String(err && err.message || err) });
+    }
+  }
+  const res = await fetch(await dataUrl('edge-status.json'), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  console.debug('[status] loaded from static file', { source: 'gh-pages', file: 'edge-status.json' });
+  return await res.json();
+}
+
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -86,23 +187,11 @@ function renderService(svc) {
   `;
 }
 
-async function loadAndRender() {
+function renderFromPayload(payload) {
   const listEl    = document.getElementById('status-list');
   const overallEl = document.getElementById('status-overall');
   const metaEl    = document.getElementById('status-meta');
   if (!listEl || !overallEl) return;
-
-  let payload;
-  try {
-    const res = await fetch(await dataUrl('edge-status.json'), { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    payload = await res.json();
-  } catch (err) {
-    overallEl.setAttribute('data-state', 'unknown');
-    overallEl.querySelector('.status-overall-text').textContent = 'Could not load status data';
-    if (metaEl) metaEl.textContent = String(err.message || err);
-    return;
-  }
 
   const overall = payload.overall || 'unknown';
   overallEl.setAttribute('data-state', overall);
@@ -125,6 +214,76 @@ async function loadAndRender() {
     '<div class="state-box">No services reported.</div>';
 }
 
+async function loadAndRender() {
+  const overallEl = document.getElementById('status-overall');
+  const metaEl    = document.getElementById('status-meta');
+  if (!overallEl) return;
+  let payload;
+  try {
+    payload = await fetchStatusPayload();
+  } catch (err) {
+    overallEl.setAttribute('data-state', 'unknown');
+    overallEl.querySelector('.status-overall-text').textContent = 'Could not load status data';
+    if (metaEl) metaEl.textContent = String(err.message || err);
+    return;
+  }
+  renderFromPayload(payload);
+}
+
+// Fetch one function's rolling latency history ([[epochSec, ms], ...]) from
+// the worker for the modal sparkline. Null on any failure so the modal simply
+// omits the graph rather than erroring.
+async function fetchHistory(fn) {
+  if (!EDGE_STATUS_ENDPOINT) return null;
+  try {
+    const res = await fetch(`${EDGE_STATUS_ENDPOINT}?history=${encodeURIComponent(fn)}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data?.[fn]) ? data[fn] : [];
+  } catch (err) {
+    console.debug('[status] history fetch failed', { fn, error: String(err && err.message || err) });
+    return null;
+  }
+}
+
+// Render a small inline-SVG latency sparkline from a [[t,ms],...] series.
+// Time-scaled x so gaps in the history show as gaps in cadence, not evenly
+// spaced points. No external chart lib -- one path plus min/avg/max labels.
+function renderSparkline(series) {
+  const pts = (series || []).filter((p) => Array.isArray(p) && p.length >= 2 && Number.isFinite(p[1]));
+  if (pts.length < 2) {
+    return '<div class="status-graph-empty">Latency history is still collecting. Check back after a few 15-minute cycles.</div>';
+  }
+  const W = 320, H = 64, PAD = 5;
+  const ts = pts.map((p) => p[0]);
+  const ms = pts.map((p) => p[1]);
+  const t0 = ts[0], t1 = ts[ts.length - 1];
+  const tSpan = (t1 - t0) || 1;
+  const minMs = Math.min(...ms), maxMs = Math.max(...ms);
+  const msSpan = (maxMs - minMs) || 1;
+  const x = (t) => PAD + ((t - t0) / tSpan) * (W - 2 * PAD);
+  const y = (m) => PAD + (1 - (m - minMs) / msSpan) * (H - 2 * PAD);
+  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' ');
+  const last = ms[ms.length - 1];
+  const avg = Math.round(ms.reduce((a, b) => a + b, 0) / ms.length);
+  const spanDays = Math.max(1, Math.round(tSpan / 86400));
+  return `
+    <div class="status-graph">
+      <div class="status-graph-head">
+        <span>Latency, last ${esc(spanDays)}d (${esc(pts.length)} checks)</span>
+        <span>min ${esc(minMs)} / avg ${esc(avg)} / max ${esc(maxMs)} ms</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" class="status-graph-svg" preserveAspectRatio="none" role="img" aria-label="Latency over the last ${esc(spanDays)} days, latest ${esc(last)} ms">
+        <path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+      </svg>
+      <div class="status-graph-foot">
+        <span>${esc(new Date(t0 * 1000).toLocaleDateString())}</span>
+        <span>latest ${esc(last)} ms</span>
+        <span>now</span>
+      </div>
+    </div>`;
+}
+
 // Click-to-open modal: shows the full stdout-like blob for one service.
 // The card element carries the raw service JSON on a data-service attribute
 // (set in renderService); we delegate the click on the list so the handler
@@ -142,13 +301,41 @@ function openServiceModal(svc) {
     ['Latency',       `${svc.latency_ms} ms`],
     ['Last checked',  `${svc.checked_at || ''} (${formatRelative(svc.checked_at)})`],
   ];
+  // Super admins get a live "Check now" that re-probes this one function on
+  // demand instead of waiting for the next 15-min cron. Hidden for everyone
+  // else; the worker re-verifies the token server-side regardless.
+  const adminControls = _isSuperAdmin
+    ? `
+    <div class="status-modal-admin">
+      <button type="button" id="status-check-now-btn" class="status-check-now-btn" data-fn="${esc(svc.name)}">Check now</button>
+      <span id="status-check-now-status" class="status-check-now-status"></span>
+    </div>`
+    : '';
   body.innerHTML = `
     <h3>${esc(svc.name)}</h3>
     <dl class="status-modal-dl">
       ${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}
     </dl>
+    ${adminControls}
     <pre class="status-modal-raw">${esc(JSON.stringify(svc, null, 2))}</pre>
+    <div id="status-modal-graph" class="status-graph-wrap"></div>
   `;
+  const checkBtn = document.getElementById('status-check-now-btn');
+  if (checkBtn) {
+    checkBtn.addEventListener('click', () => {
+      const statusEl = document.getElementById('status-check-now-status');
+      checkServiceNow(svc.name, checkBtn, statusEl);
+    });
+  }
+  // Async-fill the latency sparkline so the modal opens instantly.
+  const graphEl = document.getElementById('status-modal-graph');
+  if (graphEl && EDGE_STATUS_ENDPOINT) {
+    graphEl.innerHTML = '<div class="status-graph-empty">Loading latency history...</div>';
+    fetchHistory(svc.name).then((series) => {
+      if (!graphEl.isConnected) return;
+      graphEl.innerHTML = renderSparkline(series);
+    });
+  }
   backdrop.hidden = false;
   document.body.style.overflow = 'hidden';
 }
@@ -176,7 +363,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeServiceModal();
 });
 
-loadAndRender();
+// Resolve the super-admin gate before the first render so a maintainer who
+// opens a tile right away already sees the "Check now" control.
+detectSuperAdmin().finally(() => loadAndRender());
 setInterval(loadAndRender, REFRESH_MS);
 
 // Announcements: pulled directly from the public GitHub issues API for the

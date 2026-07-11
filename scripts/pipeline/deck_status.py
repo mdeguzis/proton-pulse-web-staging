@@ -41,6 +41,28 @@ STEAMOS_CAT_MAP = {0: "unknown", 1: "unsupported", 2: "compatible", 3: "compatib
 # display_type -> per-criterion result. 4 pass, 3 info/caveat, 2 fail.
 DECK_DISPLAY_MAP = {4: True, 3: None, 2: False}
 
+def _extract_criteria(items, prefix):
+    """Compact machine/steamos resolved_items into [[display_type, short_token], ...].
+
+    Strips the `#SteamMachine_TestResult_` / `#SteamOS_TestResult_` prefix from
+    each loc_token so the JSON stays small. Returns an empty list when the
+    upstream array is empty or missing so the frontend can distinguish
+    "evaluated with no notes" from an "unknown" verdict.
+    """
+    if not isinstance(items, list):
+        return []
+    out = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        dt = it.get("display_type")
+        tok = it.get("loc_token") or ""
+        if isinstance(tok, str) and tok.startswith(prefix):
+            tok = tok[len(prefix):]
+        out.append([dt, tok])
+    return out
+
+
 CACHE_PATH = Path(__file__).resolve().parents[2] / ".cache" / "steam-deck-compat-cache.json"
 CACHE_MAX_AGE_SECONDS = 30 * 86400  # confirmed verdicts
 # Unresolved / rate-limited responses expire sooner so a throttled fetch isn't
@@ -98,10 +120,12 @@ def fetch_deck_compat(app_id):
     cached = cache.get(key)
     if isinstance(cached, dict):
         cval = cached.get("val")
-        # Old-schema positive entries predate #273 and lack machine/steamos --
-        # force a refetch so they get enriched. Negative (None) entries have
-        # nothing to enrich, so honor their TTL as before.
-        stale_schema = isinstance(cval, dict) and "machine" not in cval
+        # Old-schema positive entries lack machine/steamos or the per-criterion
+        # arrays -- force a refetch so they get enriched. Negative (None)
+        # entries have nothing to enrich, so honor their TTL as before.
+        stale_schema = isinstance(cval, dict) and (
+            "machine" not in cval or "machine_criteria" not in cval
+        )
         ok = cached.get("ok")
         if ok is None:  # legacy entries: a stored verdict implies a confirmed fetch
             ok = bool(cval)
@@ -133,13 +157,20 @@ def fetch_deck_compat(app_id):
         if len(items) >= 4
         else None
     )
-    # machine/steamos keys are ALWAYS present (even "unknown") so the schema
-    # check above can distinguish a #273-enriched cache entry from an old one.
+    # Steam Machine + SteamOS ship parallel resolved_items arrays. Length varies
+    # per game (TF2 has 3 for both, some games have more or fewer). Frontend
+    # needs display_type + a compact token so it can render a per-criterion
+    # checklist matching Valve's own tabs. Store as [[display_type, token], ...]
+    # with the `#Device_TestResult_` prefix stripped to keep the file small.
+    machine_criteria = _extract_criteria(results.get("machine_resolved_items"), "#SteamMachine_TestResult_")
+    steamos_criteria = _extract_criteria(results.get("steamos_resolved_items"), "#SteamOS_TestResult_")
     val = {
         "status": DECK_CAT_MAP.get(deck_cat, "unknown"),
         "criteria": criteria,
         "machine": MACHINE_CAT_MAP.get(machine_cat, "unknown"),
         "steamos": STEAMOS_CAT_MAP.get(steamos_cat, "unknown"),
+        "machine_criteria": machine_criteria,
+        "steamos_criteria": steamos_criteria,
     }
     cache[key] = {"val": val, "ts": now, "ok": True}
     _cache_dirty = True
@@ -185,6 +216,14 @@ def build_deck_status(output_dir, app_ids=None, delay=0.0):
                 entry["machine"] = val["machine"]
             if val.get("steamos") and val["steamos"] != "unknown":
                 entry["steamos"] = val["steamos"]
+            # Only carry the per-criterion arrays when non-empty. A rated
+            # machine/steamos with zero items is possible (Valve caveat-free
+            # game) but rare -- the frontend treats a missing key the same as
+            # an empty list, so dropping the key saves a few bytes per entry.
+            if val.get("machine_criteria"):
+                entry["machine_criteria"] = val["machine_criteria"]
+            if val.get("steamos_criteria"):
+                entry["steamos_criteria"] = val["steamos_criteria"]
             result[app_id] = entry
         if delay:
             time.sleep(delay)
