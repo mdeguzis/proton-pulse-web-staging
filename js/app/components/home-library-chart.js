@@ -31,19 +31,19 @@ const DEVICE = {
     field: 'status',
     order: ['verified', 'playable', 'unsupported', 'unknown'],
     label: { verified: 'Deck Verified', playable: 'Deck Playable', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your Steam Deck at a glance', chip: 'Steam Deck', icon: 'icon-steam-deck',
+    title: "Your Library's compatibility with Steam Deck", chip: 'Steam Deck', icon: 'icon-steam-deck',
   },
   machine: {
     field: 'machine',
     order: ['verified', 'playable', 'unsupported', 'unknown'],
     label: { verified: 'Verified', playable: 'Playable', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your Steam Machine at a glance', chip: 'Steam Machine', icon: 'icon-steam-machine',
+    title: "Your Library's compatibility with the Steam Machine", chip: 'Steam Machine', icon: 'icon-steam-machine',
   },
   steamos: {
     field: 'steamos',
     order: ['compatible', 'unsupported', 'unknown'],
     label: { compatible: 'Compatible', unsupported: 'Unsupported', unknown: 'Not rated' },
-    title: 'Your SteamOS at a glance', chip: 'SteamOS', icon: 'icon-steamos',
+    title: "Your Library's compatibility with SteamOS", chip: 'SteamOS', icon: 'icon-steamos',
   },
 };
 
