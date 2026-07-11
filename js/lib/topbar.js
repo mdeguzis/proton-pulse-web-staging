@@ -73,10 +73,11 @@
       </g>
       <path d="M12 8.4v11.8" stroke="#000" stroke-width="1.2"/>
     </symbol>
-    <!-- Library corner badge: a 2x2 collection grid. White fills with black
-         outlines so the tiles read on any store color at 11-13px. Id kept for
-         call-site stability (home.js references #icon-book-open). -->
-    <symbol id="icon-book-open" viewBox="0 0 24 24" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round">
+    <!-- Library corner badge: a 2x2 collection grid, clean white tiles (no
+         outline) to match the picker mockup. The gaps between tiles read as
+         the store-pill color. Id kept for call-site stability (home.js
+         references #icon-book-open). -->
+    <symbol id="icon-book-open" viewBox="0 0 24 24" fill="#fff">
       <rect x="3.4" y="3.4" width="7" height="7" rx="1.5"/>
       <rect x="13.6" y="3.4" width="7" height="7" rx="1.5"/>
       <rect x="3.4" y="13.6" width="7" height="7" rx="1.5"/>

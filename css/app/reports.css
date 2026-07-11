@@ -284,22 +284,26 @@
    full-width groups, each group an even pill grid so they align in tidy
    columns. Mobile keeps the compact stack from the max-width:560 rule above. */
 @media (min-width: 561px) {
+  /* Desktop: stretch the filter popover across the content width and lay the
+     groups out side by side (row wrap) so the panel is wide and short. The
+     Save / Clear footer then stays visible without scrolling on a laptop. */
   .filter-panel--stack.open {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    gap: 14px;
-    min-width: 540px;
-  }
-  .filter-panel--stack .filter-item,
-  .filter-panel--stack .pg-filter-group {
-    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px 24px;
+    width: min(calc(100vw - 2 * var(--content-pad)), calc(var(--content-max) - 2 * var(--content-pad)));
     min-width: 0;
+    max-width: none;
   }
+  .filter-panel--stack .filter-item { min-width: 160px; }
   .filter-panel--stack .pg-filter-group {
+    flex: 1 1 190px;
+    min-width: 170px;
+    align-content: start;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
     gap: 8px;
-    align-items: stretch;
   }
   .filter-panel--stack .pg-filter-group-label { grid-column: 1 / -1; }
   .filter-panel--stack .pg-filter {

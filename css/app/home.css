@@ -300,7 +300,7 @@
 /* ---- Signed-in library breakdown chart (#199) ---- */
 .home-library-chart {
   margin: 4px 0 20px;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--panel);
@@ -334,9 +334,9 @@
   border: none;
   background: transparent;
   color: var(--muted);
-  padding: 4px 12px;
+  padding: 6px 15px;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -380,18 +380,20 @@
 .hlc-bars { display: flex; flex-direction: column; gap: 6px; }
 .hlc-row {
   display: grid;
-  /* Label column is at least 84px but grows to fit the widest label (e.g.
-     "Deck Verified") so every pill stays on ONE line and long words like
-     "Unsupported" are never clipped. width:100% on the label (below) makes
-     all pills fill that column, so they stay a uniform width and line up in
-     a tidy column like the tier bars do. */
-  grid-template-columns: minmax(84px, max-content) 1fr 56px;
+  /* Fixed label column so every pill is the SAME width and lines up in a tidy
+     column (a fixed grid track reliably stretches its item, unlike an
+     intrinsic max-content track). 84px fits the tier labels; the deck view
+     has longer labels ("Deck Verified") so it widens the column below. */
+  grid-template-columns: 84px 1fr 56px;
   gap: 10px;
   align-items: center;
 }
+/* Deck view labels are longer, so give them a wider uniform column that fits
+   "Deck Verified" / "Deck Playable" on one line without clipping. */
+.home-library-chart--deck .hlc-row {
+  grid-template-columns: 116px 1fr 56px;
+}
 .hlc-label {
-  width: 100%;
-  box-sizing: border-box;
   padding: 2px 8px;
   border-radius: 3px;
   font-size: 0.75rem;

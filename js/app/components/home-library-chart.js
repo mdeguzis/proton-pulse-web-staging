@@ -158,7 +158,7 @@ function _renderChartHtml(view, appIds, deckMap) {
     }).join('');
   }
   return `
-    <div class="home-library-chart">
+    <div class="home-library-chart${view === 'deck' ? ' home-library-chart--deck' : ''}">
       <div class="hlc-header">
         <div class="hlc-title">${esc(copy.title)}</div>
         ${chipsHtml}
