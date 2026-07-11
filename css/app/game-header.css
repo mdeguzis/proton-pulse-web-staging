@@ -564,7 +564,36 @@
 }
 .deck-status-badge.deck-status-verified    { background: #5ba32b; color: #fff; }
 .deck-status-badge.deck-status-playable    { background: #d4a72c; color: #0a0c10; }
+.deck-status-badge.deck-status-compatible  { background: #3a7fc8; color: #fff; }
 .deck-status-badge.deck-status-unsupported { background: #c84a4a; color: #fff; }
+
+/* Three-tab compatibility modal: Deck / Machine / SteamOS (#273). Pure CSS
+   tabs -- radios are visually hidden and the :checked sibling shows its panel
+   and lights its tab, so the modal needs no JS. */
+.deck-tabs .dt-radio { position: absolute; opacity: 0; pointer-events: none; }
+.dt-tabbar { display: flex; gap: 8px; justify-content: center; margin: 0 0 14px; flex-wrap: wrap; }
+.dt-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  background: var(--s1); border: 1px solid var(--border2); color: var(--muted);
+  font-size: 0.78rem; font-weight: 700; user-select: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dt-tab:hover { border-color: var(--accent); color: var(--strong); }
+.dt-tab-glyph { flex: 0 0 auto; }
+.dt-tab-badge { flex: 0 0 auto; }
+.dt-panel { display: none; }
+/* Light the active tab + reveal its panel off the matching checked radio. */
+#dt-deck:checked    ~ .dt-tabbar .dt-tab[for="dt-deck"],
+#dt-machine:checked ~ .dt-tabbar .dt-tab[for="dt-machine"],
+#dt-steamos:checked ~ .dt-tabbar .dt-tab[for="dt-steamos"] {
+  background: var(--strong); color: var(--bg); border-color: var(--strong);
+}
+#dt-deck:checked    ~ .dt-panel-deck,
+#dt-machine:checked ~ .dt-panel-machine,
+#dt-steamos:checked ~ .dt-panel-steamos { display: block; }
+.dt-source { color: var(--muted); font-size: 0.72rem; margin: 0; font-style: italic; }
+@media (max-width: 480px) { .dt-tab-name { display: none; } }
 .deck-status-badge.deck-status-unknown {
   background: rgba(120,120,120,0.35);
   color: var(--muted);
