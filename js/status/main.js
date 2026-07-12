@@ -110,8 +110,18 @@ async function fetchStatusPayload() {
   return await res.json();
 }
 
+// esc() must escape both quote flavors because vendor cards embed a JSON blob
+// in a single-quoted `data-vendor='...'` attribute (#278 review). Cloudflare
+// ships a component named "Developer's Site" -- the apostrophe would terminate
+// the attribute early and JSON.parse fails silently, so nothing pops up. The
+// old escape only handled &, <, >, ".
 function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatRelative(iso) {
@@ -469,7 +479,12 @@ document.getElementById('status-vendor-list')?.addEventListener('click', (e) => 
     const svc = JSON.parse(card.dataset.vendor || '{}');
     if (svc && svc.name) openVendorModal(svc);
   } catch (err) {
-    console.debug('[status] failed to parse vendor payload', err);
+    // Warn (not debug) so a silent failure like the "Developer's Site"
+    // apostrophe bug (#278 review) surfaces in the console next time.
+    console.warn('[status] failed to parse vendor payload', {
+      error: String(err && err.message || err),
+      preview: String(card.dataset.vendor || '').slice(0, 200),
+    });
   }
 });
 document.getElementById('status-modal-close')?.addEventListener('click', closeServiceModal);

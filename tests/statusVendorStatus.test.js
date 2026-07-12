@@ -84,6 +84,15 @@ describe('status.html vendor infrastructure wiring', () => {
     expect(MAIN).toMatch(/window\.scrollTo\(\s*\{\s*top:\s*0/);
   });
 
+  test('esc() also escapes apostrophes so the single-quoted data-vendor attribute survives', () => {
+    // Regression: Cloudflare ships a component called "Developer's Site".
+    // The old esc() only handled &, <, >, ". The apostrophe terminated the
+    // single-quoted data-vendor='...' attribute early and JSON.parse blew
+    // up silently, so clicking the Cloudflare tile did nothing.
+    expect(MAIN).toContain("'&#39;'");
+    expect(MAIN).toMatch(/replace\([^)]*,\s*'&#39;'\)/);
+  });
+
   test('gh-pages-manifest.txt lists the new vendor-status module', () => {
     expect(MANIFEST).toContain('js/status/vendor-status.js');
   });
