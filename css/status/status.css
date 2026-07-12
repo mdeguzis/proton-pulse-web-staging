@@ -55,6 +55,17 @@
   gap: 12px;
 }
 
+/* Subhead above each status-list block. Same visual weight as the
+   announcements h2 so vendor vs. edge-fn groupings read as peers. */
+.status-section-heading {
+  font-size: 1.05rem;
+  margin: 20px 0 10px;
+  color: var(--text);
+}
+.status-section-heading:first-of-type {
+  margin-top: 8px;
+}
+
 .status-card {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -92,6 +103,14 @@
   border-radius: 50%;
   background: var(--muted);
   flex: 0 0 auto;
+}
+
+/* Vendor rows (#278) are anchors to the vendor status page rather than
+   buttons that open the modal, so reset the anchor defaults to match. */
+.status-card--vendor,
+.status-card--vendor:visited {
+  text-decoration: none;
+  color: inherit;
 }
 
 .status-card[data-state="operational"] .status-card-dot { background: #3ecf8e; }

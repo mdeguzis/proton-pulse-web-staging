@@ -5,6 +5,7 @@
 // live if the reader leaves it open.
 
 import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
+import { fetchVendorStatuses, VENDOR_REFRESH_MS } from './vendor-status.js?v=5b245225';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -284,6 +285,46 @@ function renderSparkline(series) {
     </div>`;
 }
 
+// Render one vendor row (GitHub Pages / Cloudflare). Same visual shape as
+// the Supabase cards but clicking anchors straight to the vendor's own
+// status page instead of opening the JSON modal, since the raw payload is
+// far less useful than "read the vendor status page directly".
+function renderVendorCard(svc) {
+  const state = svc.status || 'unknown';
+  const rawLabel = svc.raw_state
+    ? esc(String(svc.raw_state).replace(/_/g, ' '))
+    : (svc.error ? 'unreachable' : 'unknown');
+  const href = svc.vendor_status_url || '#';
+  return `
+    <a class="status-card status-card--vendor" data-state="${esc(state)}" href="${esc(href)}" target="_blank" rel="noopener" aria-label="${esc(svc.name)} on the vendor status page">
+      <div class="status-card-head">
+        <span class="status-card-dot"></span>
+        <span class="status-card-name">${esc(svc.name)}</span>
+        <span class="status-card-state">${statusLabel(state)}</span>
+      </div>
+      <div class="status-card-meta">
+        <span>${rawLabel}</span>
+        <span title="${esc(svc.checked_at || '')}">checked ${formatRelative(svc.checked_at)}</span>
+      </div>
+    </a>
+  `;
+}
+
+async function loadAndRenderVendor() {
+  const listEl = document.getElementById('status-vendor-list');
+  if (!listEl) return;
+  let cards;
+  try {
+    cards = await fetchVendorStatuses();
+  } catch (err) {
+    console.warn('[status] vendor list load failed', { error: String(err && err.message || err) });
+    listEl.innerHTML = '<div class="state-box">Vendor status feeds unreachable.</div>';
+    return;
+  }
+  listEl.innerHTML = cards.map(renderVendorCard).join('') ||
+    '<div class="state-box">No vendor rows.</div>';
+}
+
 // Click-to-open modal: shows the full stdout-like blob for one service.
 // The card element carries the raw service JSON on a data-service attribute
 // (set in renderService); we delegate the click on the list so the handler
@@ -367,6 +408,12 @@ document.addEventListener('keydown', (e) => {
 // opens a tile right away already sees the "Check now" control.
 detectSuperAdmin().finally(() => loadAndRender());
 setInterval(loadAndRender, REFRESH_MS);
+
+// Vendor rows (#278): GitHub Pages + Cloudflare overall. Refreshes on a
+// separate cadence because the upstream feeds themselves update on the
+// order of minutes and there is no reason to hammer them every 60 s.
+loadAndRenderVendor();
+setInterval(loadAndRenderVendor, VENDOR_REFRESH_MS);
 
 // Announcements: pulled directly from the public GitHub issues API for the
 // proton-pulse-web repo, filtered to the "incident" label. Open incidents
