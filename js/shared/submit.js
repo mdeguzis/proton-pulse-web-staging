@@ -667,16 +667,13 @@ export async function populateSubmitForm(el) {
           </div>
         </div>
       </div>
-      <div class="sf-row sf-row--fps-upload">
-        <label></label>
-        <div class="sf-fps-upload">
-          <label class="sf-fps-upload-btn" for="fpsCsvInput">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-14 9v2h14v-2H5z" style="transform:rotate(180deg);transform-origin:center"/></svg>
-            Upload MangoHud CSV
-          </label>
-          <input id="fpsCsvInput" name="fpsCsv" type="file" accept=".csv,text/csv" hidden>
-          <span class="sf-fps-upload-status" id="fpsCsvStatus"></span>
-        </div>
+      <div class="sf-row--fps-upload">
+        <label class="sf-fps-upload-btn" for="fpsCsvInput">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-14 9v2h14v-2H5z" style="transform:rotate(180deg);transform-origin:center"/></svg>
+          <span>Upload MangoHud CSV</span>
+        </label>
+        <input id="fpsCsvInput" name="fpsCsv" type="file" accept=".csv,text/csv" hidden>
+        <span class="sf-fps-upload-status" id="fpsCsvStatus"></span>
       </div>
       <div class="sf-row"><label>Launch Options</label><input name="launchOptions" placeholder="e.g. PROTON_USE_WINED3D=1 %command%"></div>
 
