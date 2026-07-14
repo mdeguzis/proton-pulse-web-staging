@@ -14,7 +14,7 @@ import { readActive as _readPillGroup, wireGroup as _wirePillGroup } from '../li
 import { renderHomeLibraryChart } from './home-library-chart.js?v=7ba60b85';
 import { getMyLibraryAppIds } from '../lib/user-library.js?v=1d8e72df';
 import { getMyWishlistAppIds } from '../lib/user-wishlist.js?v=9c88bc65';
-import { getSavedLookupLibraryAppIds, getSavedLookupWishlistAppIds, hasSavedLookup } from '../lib/saved-lookup.js?v=dfbf2fe7';
+import { getSavedLookupLibraryAppIds, getSavedLookupWishlistAppIds, hasSavedLookup } from '../lib/saved-lookup.js?v=7c45ae8b';
 import { loadDeckStatusMap } from '../api/deck-status.js?v=a8d355d8';
 import { readShowOwnerBadgesLocal, pullShowOwnerBadges } from '../../lib/user-prefs.js?v=5d9472de';
 import { pageNavHtml, wirePageNav } from '../lib/page-nav.js?v=2cdc55e4';

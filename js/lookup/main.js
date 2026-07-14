@@ -16,17 +16,15 @@ import { computeLibraryTierCounts } from '../app/components/home-library-chart.j
 import { loadSearchIndex, searchIndex } from '../app/components/search.js?v=598aaad1';
 import { RATING_COLORS, RATING_TEXT } from '../app/config.js?v=f9591262';
 import { esc } from '../app/utils.js?v=9a39c726';
+// localStorage keys the /lookup page reads + writes are defined in the
+// shared module so the inline "Library" panel + the nav fallback + this
+// page never drift on the key name.
+import { LS_INPUT_KEY, LS_STEAMID_KEY } from '../shared/lookup-storage.js?v=7b8989d7';
 
 const TIER_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
 const TIER_LABEL = {
   platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze', borked: 'Borked',
 };
-
-// localStorage keys the /lookup page reads + writes. Other pages (home.js
-// for My Library / My Wishlist nav) read the same keys so a saved lookup
-// substitutes for a signed-in Steam session.
-const LS_INPUT_KEY = 'pp:lookup-profile-input';
-const LS_STEAMID_KEY = 'pp:lookup-profile-steamid';
 
 const els = {
   form:      () => document.getElementById('lookup-form'),
