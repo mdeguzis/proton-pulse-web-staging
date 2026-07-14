@@ -650,8 +650,16 @@ async function loadSecurityIssues() {
     const issues = await res.json();
     const rows = (Array.isArray(issues) ? issues : []).filter(r => !r.pull_request);
     const openCount = rows.filter(r => r.state === 'open').length;
+    const checksHtml = `<div class="status-security-checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px">
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">CodeQL</strong> - static analysis active</div>
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">Dependabot</strong> - dependency scanning</div>
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">npm audit</strong> - CVE gating on PRs</div>
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">Rate limiting</strong> - all edge functions</div>
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">CSP</strong> - Content Security Policy</div>
+      <div class="state-box" style="border-left:3px solid #3aaa5b;padding:8px 12px;font-size:0.78rem"><strong style="color:#3aaa5b">RLS</strong> - Row-Level Security</div>
+    </div>`;
     if (!rows.length) {
-      listEl.innerHTML = '<div class="state-box">No known security issues. All clear.</div>';
+      listEl.innerHTML = checksHtml + '<div class="state-box" style="border-left:3px solid #3aaa5b">No known security issues. All clear.</div>';
       return;
     }
     rows.sort((a, b) => {
@@ -667,7 +675,7 @@ async function loadSecurityIssues() {
       <a href="https://github.com/mdeguzis/proton-pulse-web/security/dependabot" target="_blank" rel="noopener" style="color:var(--accent)">Dependabot alerts</a>
       <a href="https://github.com/mdeguzis/proton-pulse-web/wiki/Safety-and-Security" target="_blank" rel="noopener" style="color:var(--accent)">Safety wiki</a>
     </div>`;
-    listEl.innerHTML = summary + scannerLinks + rows.map(renderSecurityIssue).join('');
+    listEl.innerHTML = checksHtml + summary + scannerLinks + rows.map(renderSecurityIssue).join('');
   } catch (err) {
     listEl.innerHTML = `<div class="state-box">Could not load security status (${esc(err.message || err)}). Check <a href="https://github.com/${esc(ANNOUNCE_REPO)}/issues?q=is%3Aissue+label%3Asecurity" target="_blank" rel="noopener">security issues</a> directly.</div>`;
   }
