@@ -207,6 +207,13 @@
   flex-wrap: nowrap;
   margin-bottom: 16px;
 }
+/* CTAs adopt a calm Steam blue palette so they read the same in dark and
+   light mode (was blue -> dark blue on secondary and blue -> green on
+   primary, which fluoresced in light mode). Colors:
+     #316783   Steam navy button
+     #417a9b   Steam steel blue button
+     #4c8ab0   Steam blue hover
+   White text works on all three. */
 .cta-btn {
   display: inline-flex;
   align-items: center;
@@ -218,26 +225,27 @@
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #0b1622;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: linear-gradient(90deg, var(--accent), var(--accent-hi) 92%);
+  background: #417a9b;
   text-decoration: none;
-  transition: filter 0.15s, transform 0.05s, box-shadow 0.15s;
+  transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
   text-align: center;
 }
 .cta-btn:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 0 16px var(--accent-glow);
+  background: #4c8ab0;
+  box-shadow: 0 4px 14px rgba(65, 122, 155, 0.35);
   text-decoration: none; /* override global a:hover underline */
+  color: #ffffff;
 }
 .cta-btn:active { transform: translateY(1px); }
 .cta-primary {
-  background: linear-gradient(90deg, var(--accent-hi), var(--green-hi) 80%);
-  box-shadow: 0 0 20px var(--accent-glow);
+  background: #316783;
+  box-shadow: 0 4px 14px rgba(49, 103, 131, 0.35);
 }
-.cta-primary:hover { filter: brightness(1.06); }
+.cta-primary:hover { background: #3d7a99; box-shadow: 0 6px 18px rgba(49, 103, 131, 0.45); }
 /* On desktop the flex:1 buttons stretch the full container and read as huge
    banners. Cap the row to half width so the two CTAs stay a sensible size.
    Mobile keeps the full-width row for tap targets. */
