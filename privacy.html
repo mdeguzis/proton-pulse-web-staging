@@ -98,9 +98,40 @@
 <ul>
   <li><strong>Reports you submit</strong> (game tier, Proton version, hardware fingerprint, notes). Tied to your account so you can edit or withdraw them.</li>
   <li><strong>Votes you cast</strong> on other reports.</li>
-  <li><strong>Optional library / wishlist sync</strong> if you enable it in the Decky plugin. Stored so we can highlight games you actually own on your library view.</li>
   <li><strong>Anonymous browser telemetry</strong> (page views, timing) written to <code>site_events</code>. No third-party analytics, no ad pixels, no cross-site tracking.</li>
 </ul>
+
+<h3 id="optional-library-wishlist-sync">Library / wishlist sync</h3>
+<p>
+  Steam sign-in does <em>not</em> return your library or wishlist. To match reports against what you own, we fetch the lists ourselves. When this happens:
+</p>
+<ul>
+  <li><strong>Library</strong>: fetched automatically the first time you open the profile page after signing in (there is no cached row yet, so we pull one).</li>
+  <li><strong>Wishlist</strong>: fetched automatically the first time you activate the "On wishlist" filter chip on the browse page.</li>
+  <li>Beyond that first pull, we only re-fetch when you tap Refresh on the profile card.</li>
+</ul>
+<p>
+  Nothing here is secret: the same data your Steam profile page shows to the public web is what we call. Steam only returns anything at all when your profile visibility is set to <strong>Public</strong>. If it is Friends only or Private, Steam returns nothing and we cache nothing. If you want to opt out entirely, flip your Steam profile visibility to Friends only or Private and clear your cached row on the profile page.
+</p>
+<p>
+  When the fetch does fire, our
+  <a href="https://github.com/mdeguzis/proton-pulse-web/blob/main/supabase/functions/sync-steam-library/index.ts">sync-steam-library</a>
+  and
+  <a href="https://github.com/mdeguzis/proton-pulse-web/blob/main/supabase/functions/sync-steam-wishlist/index.ts">sync-steam-wishlist</a>
+  edge functions call
+  <code>api.steampowered.com/IPlayerService/GetOwnedGames</code>
+  and
+  <code>api.steampowered.com/IWishlistService/GetWishlist</code>
+  with our Steam Web API key and your Steam ID.
+</p>
+<p>
+  What we cache: the appid list, the count, and the sync timestamp, in
+  <code>user_steam_library</code> and <code>user_steam_wishlist</code>. That's it. No purchase history, no playtime beyond what you already send us in Pulse reports, no wishlist prices. The GDPR erase path wipes both tables.
+</p>
+<p>
+  Full technical breakdown, including how the sync is scheduled and which browse chips depend on it, lives in
+  <a href="https://github.com/mdeguzis/proton-pulse-web/wiki/Steam-Library-and-Drafts#how-library-and-wishlist-get-from-steam-to-us-privacy-relevant-summary" target="_blank" rel="noopener">the Steam Library wiki</a>.
+</p>
 
 <h3>Where it lives</h3>
 <p>

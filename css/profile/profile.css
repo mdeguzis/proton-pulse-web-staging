@@ -353,6 +353,24 @@
 }
 .profile-refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
 
+/* Public-profile requirement note above the Library / Wishlist fields. Steam
+   only returns library or wishlist data if the user's profile visibility is
+   Public; call that out plainly so an empty section is explainable at a glance. */
+.profile-note {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--s2);
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.profile-note strong { color: var(--text); }
+.profile-note a { color: var(--accent); text-decoration: none; }
+.profile-note a:hover { text-decoration: underline; }
+
 /* #152: page-number row for the My Reports table. Lives in the section
    title's right-aligned slot so the table itself stays uncluttered. */
 .profile-pager {

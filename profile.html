@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/shared/topbar.css?v=d13d8b13">
 <link rel="stylesheet" href="css/shared/site.css?v=619dee5a">
 <link rel="stylesheet" href="css/shared/cards.css?v=02cda53a">
-<link rel="stylesheet" href="css/profile/profile.css?v=0bd10e7b">
+<link rel="stylesheet" href="css/profile/profile.css?v=e60ff841">
 </head>
 <body>
 
@@ -78,6 +78,11 @@
             <a href="app.html?filter=mine" class="profile-refresh-btn" style="text-decoration:none;color:var(--accent);border-color:var(--accent)">View my games</a>
             <button type="button" class="profile-refresh-btn" id="library-refresh-btn">Refresh</button>
           </div>
+        </div>
+        <div class="profile-note">
+          Library and wishlist matching only works when your Steam profile visibility is set to <strong>Public</strong> on
+          <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener">steamcommunity.com/my/edit/settings</a>.
+          If it is Friends only or Private, Steam returns nothing and this section stays empty.
         </div>
         <div class="profile-field">
           <div class="profile-field-value" id="library-count" style="font-size:1.05rem"></div>
