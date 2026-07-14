@@ -661,7 +661,13 @@ async function loadSecurityIssues() {
     const summary = openCount > 0
       ? `<div class="state-box" style="border-left:3px solid #e5534b;margin-bottom:12px">${openCount} open security issue${openCount > 1 ? 's' : ''} being tracked. See <a href="https://github.com/mdeguzis/proton-pulse-web/wiki/Safety-and-Security" target="_blank" rel="noopener">Safety wiki</a> for full details.</div>`
       : `<div class="state-box" style="border-left:3px solid #3aaa5b;margin-bottom:12px">All known security issues resolved. See <a href="https://github.com/mdeguzis/proton-pulse-web/wiki/Pentest-2026-07-14" target="_blank" rel="noopener">latest pentest report</a>.</div>`;
-    listEl.innerHTML = summary + rows.map(renderSecurityIssue).join('');
+    const scannerLinks = `<div class="status-scanner-links" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;font-size:0.78rem">
+      <a href="https://github.com/mdeguzis/proton-pulse-web/actions/workflows/codeql.yml" target="_blank" rel="noopener" style="color:var(--accent)">CodeQL runs</a>
+      <a href="https://github.com/mdeguzis/proton-pulse-web/actions/workflows/security-scan.yml" target="_blank" rel="noopener" style="color:var(--accent)">npm audit runs</a>
+      <a href="https://github.com/mdeguzis/proton-pulse-web/security/dependabot" target="_blank" rel="noopener" style="color:var(--accent)">Dependabot alerts</a>
+      <a href="https://github.com/mdeguzis/proton-pulse-web/wiki/Safety-and-Security" target="_blank" rel="noopener" style="color:var(--accent)">Safety wiki</a>
+    </div>`;
+    listEl.innerHTML = summary + scannerLinks + rows.map(renderSecurityIssue).join('');
   } catch (err) {
     listEl.innerHTML = `<div class="state-box">Could not load security status (${esc(err.message || err)}). Check <a href="https://github.com/${esc(ANNOUNCE_REPO)}/issues?q=is%3Aissue+label%3Asecurity" target="_blank" rel="noopener">security issues</a> directly.</div>`;
   }
