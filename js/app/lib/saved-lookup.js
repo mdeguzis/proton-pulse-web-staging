@@ -12,7 +12,7 @@
 //
 // Read-only: this helper never writes to localStorage. Only /lookup writes.
 
-const LS_INPUT_KEY = 'pp:lookup-profile-input';
+import { LS_INPUT_KEY } from '../../shared/lookup-storage.js?v=7b8989d7';
 
 let _cache = null; // per-page in-memory cache so library + wishlist share one fetch
 

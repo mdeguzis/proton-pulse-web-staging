@@ -139,7 +139,10 @@ describe('deploy plumbing', () => {
       'lookup.html',
       'js/lookup/main.js',
       'js/app/lib/saved-lookup.js',
+      'js/shared/lookup-storage.js',
+      'js/shared/profile-lookup-inline.js',
       'css/lookup/lookup.css',
+      'css/shared/lookup-inline.css',
     ]) {
       expect(MANIFEST).toContain(f);
     }
@@ -158,9 +161,13 @@ describe('sign-in hint spread across the site', () => {
     expect(AUTH).toContain('href="lookup.html"');
   });
   test('profile.html signed-out state offers the lookup path', () => {
+    // Post-#323 followup: the inline "Library" panel mounts under the
+    // Login button, replacing the standalone hint link. The panel itself
+    // renders a "View full library breakdown" link to lookup.html, so
+    // the outbound path still exists -- it just comes from the shared
+    // mount template rather than inline profile.html markup.
     const PROFILE = read('profile.html');
-    expect(PROFILE).toContain('profile-unsigned-hint');
-    expect(PROFILE).toContain('href="lookup.html"');
+    expect(PROFILE).toContain('id="profile-lookup-inline-mount"');
   });
   test('submit.html auth-gate hint offers the lookup path', () => {
     const SUBMIT = read('submit.html');
@@ -191,9 +198,8 @@ describe('#323 localStorage persistence + Save button + nav fallback', () => {
     expect(LOOKUP_HTML_STR).toContain('help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC');
   });
 
-  test('lookup main defines the localStorage keys we share with the nav fallback', () => {
-    expect(LOOKUP_MAIN_STR).toMatch(/LS_INPUT_KEY\s*=\s*'pp:lookup-profile-input'/);
-    expect(LOOKUP_MAIN_STR).toMatch(/LS_STEAMID_KEY\s*=\s*'pp:lookup-profile-steamid'/);
+  test('lookup main imports the localStorage keys from the shared module (no duplicated string literals)', () => {
+    expect(LOOKUP_MAIN_STR).toMatch(/import \{ LS_INPUT_KEY, LS_STEAMID_KEY \} from '\.\.\/shared\/lookup-storage\.js/);
   });
 
   test('lookup main persists only when the Save button is clicked (Look up is transient)', () => {
@@ -223,8 +229,8 @@ describe('#323 localStorage persistence + Save button + nav fallback', () => {
     expect(SAVED_LOOKUP).toContain('getSavedLookupWishlistAppIds');
     expect(SAVED_LOOKUP).toContain('hasSavedLookup');
     expect(SAVED_LOOKUP).toMatch(/let _cache = null/);
-    // Same localStorage key as /lookup writes.
-    expect(SAVED_LOOKUP).toMatch(/LS_INPUT_KEY\s*=\s*'pp:lookup-profile-input'/);
+    // Key comes from the shared module; never duplicates the string literal.
+    expect(SAVED_LOOKUP).toMatch(/import \{ LS_INPUT_KEY \} from ['"]\.\.\/\.\.\/shared\/lookup-storage\.js/);
     // Reads only -- never writes to localStorage.
     expect(SAVED_LOOKUP).not.toMatch(/localStorage\.setItem/);
   });
@@ -235,5 +241,75 @@ describe('#323 localStorage persistence + Save button + nav fallback', () => {
     expect(HOME_JS).toContain('hasSavedLookup');
     // Fallback fires only when signed-in call returned empty AND a saved lookup exists.
     expect(HOME_JS).toMatch(/if \(isWishlist \? wishlistAppIds\.size === 0 : libraryAppIds\.size === 0\)[\s\S]{0,100}hasSavedLookup\(\)/);
+  });
+});
+
+describe('#323 followup: inline Library panel under Login button', () => {
+  const PROFILE_HTML = read('profile.html');
+  const PROFILE_MAIN = read('js/profile/main.js');
+  const INLINE = read('js/shared/profile-lookup-inline.js');
+  const STORAGE = read('js/shared/lookup-storage.js');
+  const INLINE_CSS = read('css/shared/lookup-inline.css');
+
+  test('profile.html signed-out block has a mount container directly under the Login button', () => {
+    // Mount container id must appear inside the signed-out div AFTER the
+    // Login button so ProtonDB-style ordering (sign-in first, alternative
+    // identifier below) is preserved.
+    const signedOut = PROFILE_HTML.match(/id="profile-signed-out"[\s\S]*?<\/div>\s*<\/div>/);
+    expect(signedOut).toBeTruthy();
+    expect(signedOut[0]).toContain('id="profile-login-btn"');
+    expect(signedOut[0]).toContain('id="profile-lookup-inline-mount"');
+    // Mount container appears AFTER the Login button in DOM order.
+    const btnPos = signedOut[0].indexOf('id="profile-login-btn"');
+    const mountPos = signedOut[0].indexOf('id="profile-lookup-inline-mount"');
+    expect(mountPos).toBeGreaterThan(btnPos);
+  });
+
+  test('profile.html includes the shared inline-lookup stylesheet', () => {
+    expect(PROFILE_HTML).toMatch(/href="css\/shared\/lookup-inline\.css/);
+  });
+
+  test('profile main mounts the inline lookup on showSignedOut', () => {
+    expect(PROFILE_MAIN).toContain('mountInlineProfileLookup');
+    expect(PROFILE_MAIN).toContain("'profile-lookup-inline-mount'");
+    expect(PROFILE_MAIN).toMatch(/import\(.*profile-lookup-inline\.js/);
+  });
+
+  test('inline mount uses the shared localStorage keys (never inlines the key string)', () => {
+    expect(INLINE).toMatch(/import \{[^}]*readSavedLookup[^}]*writeSavedLookup[^}]*clearSavedLookup[^}]*\} from ['"]\.\/lookup-storage\.js/);
+    expect(INLINE).not.toContain("'pp:lookup-profile-input'");
+    expect(INLINE).not.toContain("'pp:lookup-profile-steamid'");
+  });
+
+  test('inline mount hits the public-steam-profile edge fn and persists the resolved SteamID', () => {
+    expect(INLINE).toContain('/functions/v1/public-steam-profile');
+    expect(INLINE).toMatch(/writeSavedLookup\(input, body\.steamId/);
+  });
+
+  test('inline mount keeps the Steam help doc + privacy settings links prominent', () => {
+    expect(INLINE).toContain('help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC');
+    expect(INLINE).toContain('steamcommunity.com/my/edit/settings');
+  });
+
+  test('inline mount offers a "View full library breakdown" link back to /lookup', () => {
+    expect(INLINE).toMatch(/href="lookup\.html"/);
+  });
+
+  test('inline mount Clear button wipes the saved lookup', () => {
+    expect(INLINE).toMatch(/clearSavedLookup\(\)/);
+  });
+
+  test('shared lookup-storage module exports the three helpers other modules use', () => {
+    expect(STORAGE).toMatch(/export function readSavedLookup/);
+    expect(STORAGE).toMatch(/export function writeSavedLookup/);
+    expect(STORAGE).toMatch(/export function clearSavedLookup/);
+    expect(STORAGE).toMatch(/export const LS_INPUT_KEY = 'pp:lookup-profile-input'/);
+    expect(STORAGE).toMatch(/export const LS_STEAMID_KEY = 'pp:lookup-profile-steamid'/);
+  });
+
+  test('inline CSS ships all element classes the mount renders', () => {
+    for (const cls of ['.profile-lookup-inline', '.pli-title', '.pli-copy', '.pli-input', '.pli-save', '.pli-examples', '.pli-hint', '.pli-status', '.pli-actions', '.pli-clear']) {
+      expect(INLINE_CSS).toContain(cls);
+    }
   });
 });
