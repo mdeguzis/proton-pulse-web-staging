@@ -10,7 +10,10 @@ from unittest.mock import patch
 
 from scripts.pipeline.anti_cheat import (
     CACHE_FILENAME,
+    _backfill_from_search_index_titles,
+    _detect_vendors_from_text,
     _index_by_appid,
+    _normalize_title,
     enrich_search_index_with_anti_cheat,
     refresh_cache,
 )
@@ -145,3 +148,69 @@ def test_enricher_no_op_when_index_missing(tmp_path):
     # No search-index.json -> return without exploding.
     enrich_search_index_with_anti_cheat(tmp_path)
     assert not (tmp_path / "search-index.json").exists()
+
+
+# ---- _normalize_title -------------------------------------------------------
+
+
+def test_normalize_title_strips_punctuation_and_case():
+    # Non-alphanumerics collapse to nothing so "Halo: X" == "halo x".
+    assert _normalize_title("Halo: The Master Chief Collection") == _normalize_title("halo the master chief collection")
+    # Both sides run through the same normalizer, so identical whitespace is fine.
+    assert _normalize_title("Rainbow Six  Siege") == _normalize_title("rainbow six siege")
+
+
+# ---- _backfill_from_search_index_titles -------------------------------------
+
+
+def test_backfill_matches_upstream_row_missing_steam_id(tmp_path):
+    # Upstream row lacks storeIds.steam but the search-index has the game.
+    upstream = [
+        {"name": "Rainbow Six Siege", "storeIds": {}, "status": "Broken", "anticheats": ["BattlEye"]},
+    ]
+    entries = [["359550", "Rainbow Six Siege", "silver", 1, 0, "steam"]]
+    by_appid = {}
+    added = _backfill_from_search_index_titles(upstream, by_appid, entries)
+    assert added == 1
+    assert by_appid == {"359550": {"status": "broken", "vendors": ["BattlEye"]}}
+
+
+def test_backfill_does_not_overwrite_existing_appid_match():
+    # If an upstream row already tagged this appid, backfill should not touch it.
+    upstream = [{"name": "Foo", "storeIds": {}, "status": "Broken"}]
+    entries = [["1", "Foo", "gold", 0, 0, "steam"]]
+    by_appid = {"1": {"status": "supported", "vendors": ["VAC"]}}
+    added = _backfill_from_search_index_titles(upstream, by_appid, entries)
+    assert added == 0
+    assert by_appid["1"]["status"] == "supported"
+
+
+def test_backfill_skips_rows_that_already_have_steam_id():
+    # Upstream has a Steam id -> primary indexer already handled it.
+    upstream = [{"name": "Foo", "storeIds": {"steam": "1"}, "status": "Broken"}]
+    entries = [["1", "Foo", "gold", 0, 0, "steam"]]
+    by_appid = {}
+    added = _backfill_from_search_index_titles(upstream, by_appid, entries)
+    assert added == 0
+
+
+# ---- _detect_vendors_from_text ---------------------------------------------
+
+
+def test_detect_vendors_matches_known_needles():
+    text = "This game uses Easy Anti-Cheat and BattlEye."
+    assert set(_detect_vendors_from_text(text)) == {"Easy Anti-Cheat", "BattlEye"}
+
+
+def test_detect_vendors_case_insensitive():
+    assert "Vanguard" in _detect_vendors_from_text("Requires RIOT VANGUARD to play")
+
+
+def test_detect_vendors_returns_empty_when_no_match():
+    assert _detect_vendors_from_text("no anti-cheat mentioned here") == []
+
+
+def test_detect_vendors_handles_empty_and_none_inputs():
+    assert _detect_vendors_from_text() == []
+    assert _detect_vendors_from_text("") == []
+    assert _detect_vendors_from_text("", None) == []

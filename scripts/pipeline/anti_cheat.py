@@ -27,6 +27,39 @@ from pathlib import Path
 
 from .common import log
 
+# Steam appdetails is our secondary signal for games AreWeAntiCheatYet does
+# not track. Text search on drm_notice + about_the_game for these vendor
+# keywords produces a "Uses <vendor>" label (no Linux verdict). Order matters
+# only for the log line -- the first hit sticks per game.
+STEAM_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails?appids={appid}"
+_APPDETAILS_TIMEOUT = 6
+_APPDETAILS_DELAY = 0.3
+
+# Vendor -> case-insensitive substrings we look for in drm_notice + about text.
+# Keep the substrings on the tighter side so a game that just mentions
+# "we do NOT use Denuvo" does not get mislabeled -- prefer trademark
+# strings that only appear when the vendor is actually integrated.
+_APPDETAILS_VENDOR_PATTERNS: dict[str, tuple[str, ...]] = {
+    "Easy Anti-Cheat": ("easy anti-cheat", "eac (kernel)"),
+    "BattlEye":        ("battleye",),
+    "Vanguard":        ("riot vanguard",),
+    "PunkBuster":      ("punkbuster",),
+    "Denuvo":          ("denuvo anti-cheat", "denuvo anti-tamper"),
+    "Xigncode3":       ("xigncode",),
+    "nProtect":        ("nprotect gameguard",),
+    "Anti-Cheat Expert": ("anti-cheat expert",),
+    "Hyperion":        ("hyperion anti-cheat",),
+    "FairFight":       ("fairfight",),
+}
+
+# Wall-clock + per-run caps for the appdetails vendor scan. Same defense-in-
+# depth pattern release_years.py uses so a Steam 403-flood cannot stall
+# finalize. The scan queues at most PROBE_CAP fresh appids per run, then
+# stops -- the cache persists so subsequent runs pick up the tail.
+APPDETAILS_PROBE_CAP = 200
+APPDETAILS_WALL_CLOCK_BUDGET_SEC = 240
+APPDETAILS_CONSECUTIVE_FAILURE_LIMIT = 8
+
 # Canonical upstream. HEAD branch (main) is stable + the maintainers
 # publish `games.json` as the release artifact.
 UPSTREAM_URL = (
@@ -139,10 +172,173 @@ def refresh_cache(output_dir: Path, force: bool = False) -> dict[str, dict]:
         return cache["by_appid"]
 
     by_appid = _index_by_appid(upstream)
-    cache = {"fetched_at": now, "by_appid": by_appid}
+    # Preserve the raw upstream rows so subsequent runs can do the title-
+    # match backfill without re-fetching from the network. Also preserve
+    # any existing appdetails_scan cache the enricher grew last time.
+    cache = {
+        "fetched_at": now,
+        "by_appid": by_appid,
+        "upstream_snapshot": upstream,
+        "appdetails_scan": cache.get("appdetails_scan") or {},
+    }
     _save_cache(cache_path, cache)
     log(f"[anti-cheat] cached {len(by_appid)} apps with Steam ids")
     return by_appid
+
+
+def _normalize_title(title: str) -> str:
+    """Fold titles into a compare-friendly key: lowercased, punctuation stripped."""
+    import re as _re
+    return _re.sub(r"[^a-z0-9]+", "", (title or "").lower())
+
+
+def _backfill_from_search_index_titles(
+    upstream_rows: list, by_appid: dict[str, dict], entries: list,
+) -> int:
+    """Fill in Steam appids for AreWeAntiCheatYet rows that lack storeIds.steam
+    by matching upstream game names against the search-index titles we already have.
+
+    Returns the number of appids we added. Mutates by_appid in place. Only
+    considers upstream rows with valid status + no existing Steam id, so we
+    never overwrite the authoritative mapping.
+    """
+    if not upstream_rows or not entries:
+        return 0
+    # index search-index titles -> appid (Steam only, first-writer-wins so
+    # duplicate titles do not clobber a match).
+    title_to_appid: dict[str, str] = {}
+    for row in entries:
+        if not isinstance(row, list) or len(row) < 6:
+            continue
+        app_id = str(row[0])
+        if not app_id.isdigit():
+            continue  # skip GOG/Epic canonical ids
+        key = _normalize_title(row[1])
+        if key and key not in title_to_appid:
+            title_to_appid[key] = app_id
+
+    added = 0
+    for row in upstream_rows:
+        if not isinstance(row, dict):
+            continue
+        store_ids = row.get("storeIds") or {}
+        if isinstance(store_ids, dict) and store_ids.get("steam"):
+            continue  # already has a Steam id, primary indexer handled it
+        status = (row.get("status") or "").strip().lower()
+        if status not in _VALID_STATUSES:
+            continue
+        key = _normalize_title(row.get("name") or "")
+        if not key:
+            continue
+        app_id = title_to_appid.get(key)
+        if not app_id or app_id in by_appid:
+            continue
+        vendors = row.get("anticheats") or []
+        if not isinstance(vendors, list):
+            vendors = []
+        vendors = sorted({str(v).strip() for v in vendors if str(v).strip()})
+        by_appid[app_id] = {"status": status, "vendors": vendors}
+        added += 1
+    return added
+
+
+def _detect_vendors_from_text(*texts: str) -> list[str]:
+    """Return the list of vendor names whose substrings appear in the given text
+    fields. Empty list when nothing matches.
+    """
+    joined = " ".join(t.lower() for t in texts if t)
+    if not joined:
+        return []
+    found = []
+    for vendor, needles in _APPDETAILS_VENDOR_PATTERNS.items():
+        if any(n in joined for n in needles):
+            found.append(vendor)
+    return sorted(set(found))
+
+
+def _fetch_appdetails_snippets(app_id: str) -> tuple[str, str] | None:
+    """Return (drm_notice, about_the_game) for one Steam appid, or None on any
+    failure. Uses the public storefront endpoint -- Steam sends CORS headers so
+    a curl works the same as fetch().
+    """
+    url = STEAM_APPDETAILS_URL.format(appid=app_id)
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=_APPDETAILS_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    app_data = data.get(str(app_id), {})
+    if not isinstance(app_data, dict) or not app_data.get("success"):
+        return None
+    payload = app_data.get("data") or {}
+    if not isinstance(payload, dict):
+        return None
+    drm = str(payload.get("drm_notice") or "")
+    about = str(payload.get("about_the_game") or "")
+    return drm, about
+
+
+def _scan_appdetails_for_vendors(
+    entries: list, by_appid: dict[str, dict], cache: dict,
+) -> int:
+    """Scan Steam appdetails for anti-cheat vendor mentions on games that
+    AreWeAntiCheatYet does not cover. Writes only when we find at least one
+    vendor. Status is None (no Linux verdict) so the frontend can show
+    "Uses <vendor>" without falsely claiming a compat rating.
+
+    Uses the same appdetails cache the primary AreWeAntiCheatYet fetch already
+    persists so re-runs skip work. Respects PROBE_CAP + wall-clock budget +
+    consecutive-failure bail so a Steam rate-limit does not stall finalize.
+    """
+    scan_cache = cache.setdefault("appdetails_scan", {})
+    # Candidates: numeric Steam appids we do not already have a verdict for
+    # and that have not been probed yet.
+    candidates: list[str] = []
+    for row in entries:
+        if not isinstance(row, list) or len(row) < 6:
+            continue
+        app_id = str(row[0])
+        if not app_id.isdigit() or app_id in by_appid or app_id in scan_cache:
+            continue
+        candidates.append(app_id)
+    if not candidates:
+        return 0
+
+    to_probe = candidates[:APPDETAILS_PROBE_CAP]
+    log(
+        f"[anti-cheat] appdetails vendor scan: {len(candidates)} candidates, "
+        f"probing {len(to_probe)} (cap {APPDETAILS_PROBE_CAP})"
+    )
+
+    deadline = time.time() + APPDETAILS_WALL_CLOCK_BUDGET_SEC
+    consecutive_failures = 0
+    added = 0
+    for app_id in to_probe:
+        if time.time() > deadline:
+            log("[anti-cheat] appdetails vendor scan: wall-clock budget hit, stopping")
+            break
+        if consecutive_failures >= APPDETAILS_CONSECUTIVE_FAILURE_LIMIT:
+            log("[anti-cheat] appdetails vendor scan: transport failures, stopping")
+            break
+        snippets = _fetch_appdetails_snippets(app_id)
+        time.sleep(_APPDETAILS_DELAY)
+        if snippets is None:
+            consecutive_failures += 1
+            continue
+        consecutive_failures = 0
+        drm, about = snippets
+        vendors = _detect_vendors_from_text(drm, about)
+        # Cache the probe outcome either way so we do not re-hit Steam for
+        # this app until the cache is manually invalidated.
+        scan_cache[app_id] = {"vendors": vendors, "probed_at": int(time.time())}
+        if vendors:
+            by_appid[app_id] = {"status": None, "vendors": vendors}
+            added += 1
+    log(f"[anti-cheat] appdetails vendor scan: added {added} apps with detected vendors")
+    return added
 
 
 def enrich_search_index_with_anti_cheat(output_dir: Path) -> None:
@@ -168,6 +364,29 @@ def enrich_search_index_with_anti_cheat(output_dir: Path) -> None:
         return
 
     by_appid = refresh_cache(output_dir)
+
+    # #242 followup: broaden coverage beyond AreWeAntiCheatYet's ~698 Steam-
+    # tagged rows. Two extra passes, both cheap and both persistent.
+    cache_path = output_dir / CACHE_FILENAME
+    persistent_cache = _load_cache(cache_path)
+    upstream_snapshot = persistent_cache.get("upstream_snapshot") or []
+
+    # Pass A: title-match backfill for AreWeAntiCheatYet rows without a Steam id.
+    if upstream_snapshot:
+        backfilled = _backfill_from_search_index_titles(upstream_snapshot, by_appid, entries)
+        if backfilled:
+            log(f"[anti-cheat] title-match backfill: added {backfilled} apps")
+
+    # Pass B: Steam appdetails vendor scan for games AreWeAntiCheatYet does
+    # not cover at all. Status is None so the frontend can render "Uses
+    # <vendor>" without a Linux verdict.
+    scan_added = _scan_appdetails_for_vendors(entries, by_appid, persistent_cache)
+
+    # Persist the appdetails scan cache so future runs skip probed apps.
+    # Refresh_cache already wrote upstream to disk; we only need to save
+    # the additive scan_cache changes here.
+    persistent_cache["by_appid"] = by_appid
+    _save_cache(cache_path, persistent_cache)
 
     hits = 0
     for row in entries:

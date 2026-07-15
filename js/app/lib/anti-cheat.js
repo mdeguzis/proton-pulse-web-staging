@@ -48,7 +48,8 @@ export async function getAntiCheatForApp(appId) {
  * Bucket the AreWeAntiCheatYet vocabulary into three site-facing labels:
  *   - "works":   Supported (officially runs) or Running (unofficial success)
  *   - "broken":  Broken or Denied (dev refused to enable)
- *   - "unknown": Planned (promised but unverified) or missing
+ *   - "unknown": Planned, missing, or null (Steam appdetails scan detected
+ *                a vendor but AreWeAntiCheatYet has no Linux verdict yet)
  *
  * Callers use the bucket for filter chips + badge coloring so a future
  * upstream vocabulary change stays contained in one map.

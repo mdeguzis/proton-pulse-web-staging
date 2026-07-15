@@ -22,7 +22,7 @@ import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
 import { getMyLibraryAppIds } from '../lib/user-library.js?v=1d8e72df';
 import { getMyWishlistAppIds } from '../lib/user-wishlist.js?v=9c88bc65';
 import { computeBadgesForAppId } from '../../lib/card-badges.js?v=5b71af11';
-import { getAntiCheatForApp, bucketAntiCheatStatus, humanAntiCheatStatus } from '../lib/anti-cheat.js?v=5ea11249';
+import { getAntiCheatForApp, bucketAntiCheatStatus, humanAntiCheatStatus } from '../lib/anti-cheat.js?v=34f8a0a7';
 
 let _steamCatalogCache = null;
 async function _fetchSteamCatalog() {
@@ -383,17 +383,26 @@ async function _openMetadataModal(appId) {
   // biggest deal-breaker for Proton play. Only rendered when we have an
   // upstream entry -- absence is NOT "no anti-cheat", it is "no data".
   const antiCheatBlock = () => {
-    if (!antiCheat || !antiCheat.status) return '';
-    const bucket = bucketAntiCheatStatus(antiCheat.status);
-    const label = humanAntiCheatStatus(antiCheat.status);
+    if (!antiCheat) return '';
+    const status = antiCheat.status || null;
     const vendors = Array.isArray(antiCheat.vendors) && antiCheat.vendors.length
       ? antiCheat.vendors : [];
-    const badgeCls = bucket === 'works' ? 'gm-plat gm-plat--on'
-                    : bucket === 'broken' ? 'gm-plat gm-plat--off'
-                    : 'gm-plat';
+    if (!status && !vendors.length) return '';
     const vendorChips = vendors.length
       ? `<div class="gm-chips" style="margin-top:6px">${vendors.map(v => `<span class="gm-chip">${esc(v)}</span>`).join('')}</div>`
       : '';
+    if (!status) {
+      // Vendor-only path: detected from the Steam appdetails scan (#242
+      // followup). No Linux verdict yet, so just say what vendor(s) the
+      // store page mentions.
+      const src = '<div class="gm-mute" style="margin-top:4px; font-size:0.75rem">Detected from Steam store page. No Linux compatibility verdict yet.</div>';
+      return `<span class="gm-plat">Uses anti-cheat</span>${vendorChips}${src}`;
+    }
+    const bucket = bucketAntiCheatStatus(status);
+    const label = humanAntiCheatStatus(status);
+    const badgeCls = bucket === 'works' ? 'gm-plat gm-plat--on'
+                    : bucket === 'broken' ? 'gm-plat gm-plat--off'
+                    : 'gm-plat';
     const src = '<div class="gm-mute" style="margin-top:4px; font-size:0.75rem">Source: <a href="https://areweanticheatyet.com/" target="_blank" rel="noopener">AreWeAntiCheatYet</a></div>';
     return `<span class="${badgeCls}">${esc(label)}</span>${vendorChips}${src}`;
   };
