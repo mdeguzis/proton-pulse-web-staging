@@ -720,9 +720,11 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
         const tWTotal = reps.reduce((s, r) => s + r.recencyWeight, 0);
         return `<tr><td><strong style="color:${RATING_COLORS[t]}">${t.toUpperCase()}</strong></td><td style="text-align:right">${reps.length}</td><td style="text-align:right">${SCORE_MAP[t].toFixed(1)}</td><td style="text-align:right">${tWTotal.toFixed(2)}</td><td style="text-align:right">${tWSum.toFixed(2)}</td></tr>`;
       }).filter(Boolean).join('');
+      const TIER_TEXT = { platinum: '#0a0c10', gold: '#0a0c10', silver: '#0a0c10', bronze: '#0a0c10', borked: '#fff' };
       const threshChips = THRESHOLDS.map(t => {
         const active = overallTier === t.tier;
-        return `<span style="display:inline-block;padding:3px 8px;margin:2px 4px 2px 0;border-radius:4px;border:1px solid ${RATING_COLORS[t.tier]};font-size:0.76rem;font-family:var(--mono);${active ? 'background:rgba(255,255,255,0.08);color:var(--text)' : 'color:var(--muted)'}"><strong>${t.tier}</strong> &ge; ${t.min}</span>`;
+        const opacity = active ? '1' : '0.55';
+        return `<span style="display:inline-block;padding:4px 10px;margin:2px 4px 2px 0;border-radius:4px;font-size:0.76rem;font-family:var(--mono);font-weight:700;background:${RATING_COLORS[t.tier]};color:${TIER_TEXT[t.tier] || '#fff'};opacity:${opacity}${active ? ';outline:2px solid var(--text);outline-offset:1px' : ''}">${t.tier} &ge; ${t.min}</span>`;
       }).join('');
       const recencyChips = RECENCY.map(b => {
         const cnt = perRep.filter(r => r.recencyLabel === b.label).length;
