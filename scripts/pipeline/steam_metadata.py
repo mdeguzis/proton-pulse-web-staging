@@ -320,9 +320,13 @@ def run_steamcmd_app_info(app_id: int, timeout: int = 60) -> str:
         "+app_info_print", safe_app_id,
         "+quit",
     ]
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args - argv is a fixed list of literals; the only interpolated slot is safe_app_id which is coerced to str(int(...)) above
+    # argv is a fixed list of literals; the only interpolated slot is
+    # safe_app_id which is coerced via str(int(app_id)) above so it is
+    # provably digits-only before reaching subprocess. Semgrep places the
+    # finding on the argv line (cmd), so the nosemgrep needs to sit there.
     proc = subprocess.run(  # nosec B603
-        cmd, capture_output=True, text=True, timeout=timeout, check=False,
+        cmd,  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+        capture_output=True, text=True, timeout=timeout, check=False,
     )
     if proc.returncode != 0:
         log(f"steam-metadata: steamcmd exit={proc.returncode} app={app_id} stderr={proc.stderr[:200]}")
