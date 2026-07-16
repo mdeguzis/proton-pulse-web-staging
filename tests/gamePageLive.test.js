@@ -27,12 +27,12 @@ describe('game page: ProtonDB live-only handling', () => {
     expect(src).toContain('const totalReports = nativeReports.length + protonDbCount');
   });
 
-  test('tier falls back to live summary when mirror is empty (#219)', () => {
-    // liveOnly branch returns the live tier verbatim; the else branch prefers
-    // tierFromReports but falls back to the live summary tier if empty.
+  test('tier uses recency-weighted algorithm across all reports, falls back to live summary when empty', () => {
+    // combinedTier = pulseTierFromReports(allReportsForTier, ...) is the
+    // canonical source; liveOnly falls back to the live tier verbatim.
     expect(src).toContain("liveOnly");
     expect(src).toContain("String(liveSummary.tier || '').toLowerCase()");
-    expect(src).toContain("(tierFromReports(cdn) || String(liveSummary?.tier || '').toLowerCase())");
+    expect(src).toContain("const combinedTier = pulseTierFromReports(allReportsForTier,");
   });
 
   test('ProtonDB live summary is auto-fetched in the parallel Promise.all (#219)', () => {

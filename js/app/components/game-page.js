@@ -1,7 +1,7 @@
 // game-page (components) for the app page. Relocated from app.js.
 
 import { detectGpuArch } from '../../lib/gpu-arch-detector.js?v=b4fbb7ef';
-import { populateScoringTooltip, pulseTierFromReports, tierFromReports } from '../../shared/scoring.js?v=8051e115';
+import { populateScoringTooltip, pulseTierFromReports } from '../../shared/scoring.js?v=8051e115';
 import { computeCompatTrend, RECENT_DAYS, PRIOR_WINDOW_DAYS } from '../../lib/scoring/gameStats.js?v=1c1b7f9d';
 import { getWebClientId } from '../../shared/submit.js?v=49306cae';
 import { fetchAppDepotInfo, fetchAppMetadata, fetchAppNews, fetchDeckStatusForApp, fetchMinRequirements, fetchLinuxNativeSupport } from '../api/deck-status.js?v=a8d355d8';
@@ -692,12 +692,15 @@ export async function renderGamePage(appId) {
   // not just what we happen to have cached.
   const liveTotal = liveSummary ? (liveSummary.total || 0) : 0;
   const protonDbCount = Math.max(cdn.length, liveTotal);
-  // Tier: prefer the mirrored sample when we have cards to back it up,
-  // otherwise the live summary tier. Both use the same tier vocabulary.
+  // Unified tier across ALL reports (CDN + native) using the recency-weighted
+  // algorithm. This replaces the old "highest tier present" approach which was
+  // misleading (1 platinum + 6 gold + 4 borked ≠ platinum). The live summary
+  // tier is only used as a last resort when we have zero mirrored reports.
+  const allReportsForTier = [...cdn.map(r => ({ ...r, source: 'protondb' })), ...nativeReports];
+  const combinedTier = pulseTierFromReports(allReportsForTier, liveTotal > cdn.length ? liveTotal - cdn.length : 0);
   const protonDbTier = liveOnly
     ? String(liveSummary.tier || '').toLowerCase()
-    : (tierFromReports(cdn) || String(liveSummary?.tier || '').toLowerCase());
-  const pulseTier = pulseTierFromReports(nativeReports, protonDbCount);
+    : combinedTier.tier;
   document.title = `${title} - Proton Pulse`;
   if (typeof window.ppTrack === 'function') window.ppTrack('game_view', { app_id: String(appId), title });
 
@@ -851,23 +854,18 @@ export async function renderGamePage(appId) {
     if (pulseHasReports) pulseSummaryBits.push(`${nativeReports.length} report${nativeReports.length !== 1 ? 's' : ''}`);
     if (pulseHasConfigs) pulseSummaryBits.push(`${configs.length} config${configs.length !== 1 ? 's' : ''}`);
     // Combined tile - Pulse + ProtonDB roll into one homogeneous "Community"
-    // summary since the report list below mixes both sources too. pulseTier
-    // already accepts a protonDbCount that weights both sources into one
-    // overall rating + confidence, which is exactly what we want here
+    // summary since the report list below mixes both sources too. combinedTier
+    // weights ALL reports (CDN + native) through the same recency-weighted
+    // algorithm so 1 platinum + 6 gold + 4 borked → gold, not platinum.
     const totalReports = nativeReports.length + protonDbCount;
     const hasAnyReports = totalReports > 0;
-    // Use the combined-source tier when there are any reports; fall back to
-    // protondb tier if only protondb reports exist; "pending" when nothing
-    const overallTier = hasAnyReports
-      ? (pulseHasReports ? pulseTier.tier : protonDbTier)
-      : 'pending';
+    const overallTier = hasAnyReports ? combinedTier.tier : 'pending';
     const overallTileColor = hasAnyReports ? (RATING_COLORS[overallTier] || '#3a4a5a') : '#2a5a8c';
-    // Confidence percent is the single source of truth -- the same value the
-    // dial shows and confidence.html buckets. Prefer Pulse's computed
-    // confidencePct (weights both sources) when there are Pulse reports;
-    // otherwise a sample-size approximation against the ProtonDB count alone.
-    const overallConfidencePct = pulseHasReports && pulseTier.confidencePct
-      ? pulseTier.confidencePct
+    // Confidence percent from the combined-source calculation. The recency-
+    // weighted algorithm already factors in the ProtonDB live total so there
+    // is one canonical confidence value regardless of source mix.
+    const overallConfidencePct = hasAnyReports && combinedTier.confidencePct
+      ? combinedTier.confidencePct
       : (protonDbCount > 0 ? Math.min(95, Math.round(30 + Math.log2(Math.max(1, protonDbCount)) * 18)) : 0);
     // Bucket the summary label off the SAME percent thresholds confidence.html
     // uses (>=80 high, >=50 moderate, else low) so the dial %, this line, and

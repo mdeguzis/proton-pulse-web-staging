@@ -1,5 +1,6 @@
 // Entry module for game-stats.html. Migrated from game-stats.js.
 import { computeGameStats } from '../lib/scoring/gameStats.js?v=1c1b7f9d';
+import { pulseTierFromReports } from '../shared/scoring.js?v=8051e115';
 import { isPreviewHardware, loadMyHardware, renderPreviewHardwareBanner } from '../shared/hardware.js?v=6a1246aa';
 import { attachChartHover, attachClickToFilter, dispatchFilter, onFilterChange } from '../shared/chart-interactions.js?v=6b608095';
 import { loadSteamImg as _loadSteamImg } from '../app/lib/steam-img.js?v=ba0d7848';
@@ -584,33 +585,18 @@ import { appIdToDir } from '../lib/app-id.js?v=18a73fb7';
 
     const stats = computeGameStats(allReports, configs);
 
-    // Align confidence + tier with the game page by incorporating the live
-    // total. The game page uses MAX(mirrored, live) as the effective ProtonDB
-    // count so the stats page must do the same (#339 follow-up).
+    // Align tier + confidence with the game page: recency-weighted algorithm
+    // across ALL reports regardless of source. The live total fills in evidence
+    // for reports we haven't mirrored so confidence scales with ProtonDB's real
+    // breadth, but the tier itself is always derived from actual report ratings.
     const liveTotal = liveSummary?.total || 0;
-    const effectiveProtonDbCount = Math.max(cdnReports.length, liveTotal);
-    const totalReportsAligned = pulseReports.length + effectiveProtonDbCount;
-    // Same log-curve formula the game page uses when Pulse reports are absent
-    // or the live total dominates. When Pulse reports exist, use the heavier
-    // multi-factor formula but over the total evidence pool.
-    if (totalReportsAligned > allReports.length) {
-      const totalForPct = allReports.length + Math.round(effectiveProtonDbCount * 0.4);
-      stats.confidencePct = Math.min(95, Math.round(30 + Math.log2(Math.max(1, totalForPct)) * 18));
-    }
-    stats.totalReports = totalReportsAligned;
-    // Overall tier: same logic as game-page.js -- highest tier present in
-    // mirrored reports, or the live summary tier when we have no mirror.
-    const TIER_ORDER = ['platinum', 'gold', 'silver', 'bronze', 'borked'];
-    let overallTier = 'pending';
-    if (allReports.length > 0) {
-      for (const t of TIER_ORDER) {
-        if (allReports.some(r => r.rating === t)) { overallTier = t; break; }
-      }
-    } else if (liveSummary?.tier) {
-      overallTier = String(liveSummary.tier).toLowerCase();
-    }
-    stats.overallTier = overallTier;
-    // Confidence bucket label aligned with the game page thresholds
+    const liveExcess = liveTotal > cdnReports.length ? liveTotal - cdnReports.length : 0;
+    const combinedTier = pulseTierFromReports(allReports, liveExcess);
+    stats.overallTier = allReports.length > 0
+      ? combinedTier.tier
+      : (liveSummary?.tier ? String(liveSummary.tier).toLowerCase() : 'pending');
+    stats.confidencePct = combinedTier.confidencePct || stats.confidencePct;
+    stats.totalReports = allReports.length + Math.max(0, liveTotal - cdnReports.length);
     stats.confidenceBucket = stats.confidencePct >= 80 ? 'high'
       : stats.confidencePct >= 50 ? 'moderate' : 'low';
 
