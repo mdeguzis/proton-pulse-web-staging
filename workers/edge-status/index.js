@@ -173,7 +173,16 @@ export function mergeService(payload, service) {
     .filter((s) => s.name !== service.name)
     .concat([service])
     .sort((a, b) => FNS.indexOf(a.name) - FNS.indexOf(b.name));
-  return buildPayload(services, { run_url: (payload && payload.run_url) || '' });
+  const rebuilt = buildPayload(services, { run_url: (payload && payload.run_url) || '' });
+  // Carry through the sites[] array from the prior payload. buildPayload only
+  // knows about services, but a super-admin "Check now" for a single fn must
+  // not wipe the last site-probe results (they run on the 15-min cron, not on
+  // every manual check). Without this the status page would show a "first-
+  // deploy cache warm-up" message until the next cron fired.
+  if (payload && Array.isArray(payload.sites)) {
+    rebuilt.sites = payload.sites;
+  }
+  return rebuilt;
 }
 
 // Verify a Supabase access token belongs to a super_admin. Two hops, both
@@ -375,6 +384,17 @@ export function applyCertToSiteResult(siteResult, cert) {
   const merged = { ...siteResult, cert };
   const days = cert.days_remaining;
   const state = cert.state;
+  // Critical expiry ALWAYS wins over cert state so a bad_authz-plus-
+  // days_remaining<=3 case still flips the tile red (down + the actionable
+  // cert_expiring_* reason). Otherwise a stuck ACME state below would
+  // short-circuit before we ever check the countdown -- exactly the
+  // combination that produced the July outage. Only takes effect when
+  // days_remaining is a real number; nulls fall through to the state check.
+  if (typeof days === 'number' && days <= EXPIRY_CRIT_DAYS) {
+    merged.status = 'down';
+    merged.reason = merged.reason || `cert_expiring_${days}_days`;
+    return merged;
+  }
   // ACME still in a broken state? Surface it explicitly so an operator
   // sees the fix path even when the current cert has not expired yet.
   if (state && state !== 'approved') {
@@ -383,10 +403,8 @@ export function applyCertToSiteResult(siteResult, cert) {
     return merged;
   }
   if (typeof days !== 'number') return merged;
-  if (days <= EXPIRY_CRIT_DAYS) {
-    merged.status = 'down';
-    merged.reason = merged.reason || `cert_expiring_${days}_days`;
-  } else if (days <= EXPIRY_WARN_DAYS) {
+  // Critical case handled above; this branch is the warn-window fall-through.
+  if (days <= EXPIRY_WARN_DAYS) {
     merged.status = merged.status === 'operational' ? 'degraded' : merged.status;
     merged.reason = merged.reason || `cert_expiring_${days}_days`;
   }

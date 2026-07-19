@@ -33,23 +33,34 @@ jobs:
       # dispatch, use the input override (default: edge-status). Keeps the
       # workflow open to future workers under workers/<name>/ without
       # rewriting the deploy step per worker.
+      #
+      # All GitHub context data comes in via `env:` and is referenced as
+      # quoted shell variables ("$VAR"), never inlined via ${{ ... }} in
+      # the run: script. That is the pattern semgrep's
+      # yaml.github-actions.security.run-shell-injection rule requires --
+      # inline ${{ ... }} in run: blocks would allow a maliciously named
+      # branch or PR body to inject shell code into the runner.
       - name: Resolve worker list
         id: workers
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_WORKER: ${{ inputs.worker }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            printf 'names=%s\n' "${{ inputs.worker }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            printf 'names=%s\n' "$INPUT_WORKER" >> "$GITHUB_OUTPUT"
             echo "count=1" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Push event: use the git diff against the previous commit to find
           # which workers changed. Fallback: deploy everything under workers/
           # so a first-run / force-push does not skip.
-          before='${{ github.event.before }}'
-          if [ -z "${before}" ] || [ "${before}" = "0000000000000000000000000000000000000000" ]; then
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
             mapfile -t all < <(find workers -maxdepth 2 -name wrangler.toml -printf '%h\n' | sed 's#^workers/##')
           else
-            mapfile -t all < <(git diff --name-only "${before}" ${{ github.sha }} \
+            mapfile -t all < <(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" \
               | grep -E '^workers/[^/]+/' \
               | awk -F/ '{print $2}' \
               | sort -u)
@@ -67,9 +78,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_NAMES: ${{ steps.workers.outputs.names }}
         run: |
           set -euo pipefail
-          IFS=',' read -ra WORKERS <<< '${{ steps.workers.outputs.names }}'
+          IFS=',' read -ra WORKERS <<< "$WORKER_NAMES"
           for w in "${WORKERS[@]}"; do
             echo "::group::Deploying workers/$w"
             if [ ! -f "workers/$w/wrangler.toml" ]; then

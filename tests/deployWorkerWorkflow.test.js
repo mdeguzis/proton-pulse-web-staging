@@ -65,9 +65,24 @@ describe('deploy job wires wrangler correctly', () => {
     // Regression guard: a "diff-since-event.before" step must exist so the
     // job is a no-op when a push does not actually touch workers/**. This
     // is what keeps a green-field release from silently redeploying the
-    // worker for no reason.
-    expect(RAW).toContain('event.before');
+    // worker for no reason. Values come in via env: to satisfy semgrep's
+    // run-shell-injection rule (see next test).
+    expect(RAW).toContain('BEFORE_SHA: ${{ github.event.before }}');
     expect(RAW).toMatch(/git diff --name-only[\s\S]{0,120}workers/);
+  });
+
+  test('all github context data enters run: via env, never inline ${{ ... }}', () => {
+    // Regression guard for semgrep yaml.github-actions.security.run-shell-
+    // injection. Attacker-influenced GitHub context (branch names, PR
+    // bodies, dispatch inputs) must not land in shell strings. Grep every
+    // run: block; the only ${{ ... }} allowed is in env: assignments.
+    // Shell body ends when indentation drops back to step-level (starts
+    // with the "      - " six-space dash prefix) or file end.
+    const runBlocks = RAW.split(/\n\s*run:\s*\|\n/).slice(1);
+    for (const block of runBlocks) {
+      const body = block.split(/\n {0,6}(?=\S)/)[0];
+      expect(body).not.toContain('${{');
+    }
   });
 
   test('runs wrangler deploy per changed worker directory', () => {

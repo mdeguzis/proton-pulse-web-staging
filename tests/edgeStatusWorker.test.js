@@ -338,6 +338,51 @@ describe('applyCertToSiteResult (proactive cert-expiry check)', () => {
     expect(out.status).toBe('degraded');
     expect(out.reason).toBe('cert_state_bad_authz');
   });
+
+  test('critical expiry beats non-approved state (bad_authz + <=3 days -> down + cert_expiring)', () => {
+    // Regression guard for Codex review comment #1 on PR #356. The
+    // combination that produced the July outage is EXACTLY this:
+    // bad_authz with an imminent expiry. If cert_state ran first the
+    // tile would go merely yellow while the cert expires the same day.
+    const cert = { state: 'bad_authz', days_remaining: 1 };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('down');
+    expect(out.reason).toBe('cert_expiring_1_days');
+  });
+});
+
+describe('mergeService preserves site probes across a super-admin single-fn check', () => {
+  test('the "Check now" path for one fn does not wipe payload.sites', () => {
+    // Regression guard for Codex review comment #3 on PR #356. The
+    // super-admin "Check now" flow rebuilds the payload via buildPayload
+    // which only knows about services. Sites run on the 15-min cron so
+    // wiping them here means the frontend shows "first-deploy cache
+    // warm-up" until the next cron -- confusing during the same window
+    // the admin is trying to observe.
+    const base = {
+      services: [],
+      sites: [
+        { name: 'prod (www.proton-pulse.com)', status: 'operational', http_status: 200 },
+        { name: 'staging (mdeguzis.github.io)', status: 'operational', http_status: 200 },
+      ],
+    };
+    const svc = { name: FNS[0], status: 'operational', http_status: 204, latency_ms: 42 };
+    const out = mergeService(base, svc);
+    // Sites carried through unchanged...
+    expect(out.sites).toEqual(base.sites);
+    // ... AND the freshly probed fn is folded into the services array.
+    expect(out.services.find((s) => s.name === FNS[0])).toEqual(svc);
+  });
+
+  test('a base payload with no sites does not add an empty array (backward compat)', () => {
+    // Older KV payloads written by the pre-site-probe worker have no
+    // sites field at all. Do not fabricate an empty array -- the
+    // frontend already handles undefined and shows the warm-up message.
+    const base = { services: [] };
+    const svc = { name: FNS[0], status: 'operational', http_status: 204, latency_ms: 42 };
+    const out = mergeService(base, svc);
+    expect('sites' in out).toBe(false);
+  });
 });
 
 describe('fetchGithubPagesCert', () => {

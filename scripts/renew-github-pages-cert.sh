@@ -62,13 +62,51 @@ echo "${CURRENT}" | python3 -m json.tool
 
 STATE=$(echo "${CURRENT}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])')
 CNAME=$(echo "${CURRENT}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["cname"])')
+# Days remaining until the current cert expires. If the pages API did not
+# expose expires_at (very new cert, brand-new domain), leave the counter at
+# "unknown" so downstream branches fall through to the manual-check path.
+DAYS_REMAINING=$(echo "${CURRENT}" | python3 -c '
+import json, sys, datetime as dt
+d = json.load(sys.stdin)
+raw = d.get("expires_at") or ""
+if not raw:
+    print("")
+    sys.exit(0)
+try:
+    exp = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+except ValueError:
+    print("")
+    sys.exit(0)
+now = dt.datetime.now(dt.timezone.utc)
+print(int((exp - now).total_seconds() // 86400))
+')
+
+# WARN threshold mirrors workers/edge-status/index.js EXPIRY_WARN_DAYS. Kept
+# as a bare number here rather than sourced from anywhere -- the script is
+# meant to be runnable in isolation on a fresh clone.
+WARN_DAYS=14
 
 if [ "${STATE}" = "approved" ]; then
+  # Approved AND well clear of expiry: nothing to do, just make sure
+  # HTTPS is enforced and exit.
+  if [ -z "${DAYS_REMAINING}" ] || [ "${DAYS_REMAINING}" -gt "${WARN_DAYS}" ]; then
+    echo ""
+    echo "Certificate is approved with ${DAYS_REMAINING:-unknown} day(s) remaining."
+    echo "Ensuring https_enforced=true..."
+    gh api -X PUT "repos/${REPO}/pages" --input <(echo '{"https_enforced": true}') >/dev/null
+    echo "Done."
+    exit 0
+  fi
+  # Approved BUT within the warn window (<=14 days). The site card in
+  # status.html emits cert_expiring_N_days and points here, so refusing to
+  # do anything would contradict the guidance. GitHub normally renews ~30
+  # days out; being inside the warn window means auto-renewal did not run
+  # or has not completed yet. Fall through to the manual walkthrough --
+  # the Cloudflare grey-cloud + polling sequence is the same fix.
   echo ""
-  echo "Certificate is currently approved. Ensuring https_enforced=true..."
-  gh api -X PUT "repos/${REPO}/pages" --input <(echo '{"https_enforced": true}') >/dev/null
-  echo "Done."
-  exit 0
+  echo "Certificate is approved but only ${DAYS_REMAINING} day(s) remain (warn threshold ${WARN_DAYS})."
+  echo "GitHub normally auto-renews around 30 days out; if you're inside the warn window"
+  echo "something is blocking the renewal. Running the manual walkthrough below to unstick it."
 fi
 
 cat <<'EOF'
