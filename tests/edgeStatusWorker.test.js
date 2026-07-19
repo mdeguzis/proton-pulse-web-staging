@@ -8,8 +8,14 @@ import fs from 'fs';
 import path from 'path';
 import {
   FNS,
+  SITES,
   STATUS_KEY,
   classifyStatus,
+  classifySiteStatus,
+  applyCertToSiteResult,
+  fetchGithubPagesCert,
+  EXPIRY_WARN_DAYS,
+  EXPIRY_CRIT_DAYS,
   aggregateOverall,
   buildPayload,
   mergeService,
@@ -244,6 +250,208 @@ describe('worker exposes a history endpoint', () => {
   });
   test('every probe path updates history', () => {
     expect(SRC).toContain('updateHistory');
+  });
+});
+
+describe('classifySiteStatus', () => {
+  test('2xx is operational with no reason', () => {
+    expect(classifySiteStatus(200)).toEqual({ status: 'operational', reason: null });
+    expect(classifySiteStatus(204)).toEqual({ status: 'operational', reason: null });
+  });
+
+  test('Cloudflare 525 -> origin_ssl_handshake_failed', () => {
+    // Cloudflare 525 = SSL handshake with origin failed. Called out
+    // separately so support can point at the specific fix rather than
+    // treat it as a generic 5xx.
+    expect(classifySiteStatus(525)).toEqual({ status: 'down', reason: 'origin_ssl_handshake_failed' });
+  });
+
+  test('Cloudflare 526 -> origin_ssl_cert_invalid (the outage that motivated this)', () => {
+    // The whole reason this classifier exists: GH Pages Let's Encrypt cert
+    // expiring silently produced a 526 that the vendor-status page could
+    // not attribute. Explicit reason makes it obvious.
+    expect(classifySiteStatus(526)).toEqual({ status: 'down', reason: 'origin_ssl_cert_invalid' });
+  });
+
+  test('other 5xx are down with the raw http code preserved', () => {
+    expect(classifySiteStatus(500)).toEqual({ status: 'down', reason: 'http_500' });
+    expect(classifySiteStatus(502)).toEqual({ status: 'down', reason: 'http_502' });
+    expect(classifySiteStatus(503)).toEqual({ status: 'down', reason: 'http_503' });
+  });
+
+  test('4xx is degraded (site is reachable but wrong response)', () => {
+    // Unlike the edge-function classifier, a 401/403 on the SITE probe
+    // does not mean healthy -- version.json is public. So 4xx means the
+    // site is degraded, not OK.
+    expect(classifySiteStatus(404)).toEqual({ status: 'degraded', reason: 'http_404' });
+    expect(classifySiteStatus(403)).toEqual({ status: 'degraded', reason: 'http_403' });
+  });
+
+  test('0 = timeout / connection failure', () => {
+    expect(classifySiteStatus(0)).toEqual({ status: 'down', reason: 'unreachable' });
+  });
+});
+
+describe('applyCertToSiteResult (proactive cert-expiry check)', () => {
+  const OK = { status: 'operational', reason: null };
+
+  test('returns the site result unchanged when no cert data is provided', () => {
+    expect(applyCertToSiteResult(OK, null)).toEqual(OK);
+    expect(applyCertToSiteResult(OK, undefined)).toEqual(OK);
+  });
+
+  test('healthy cert far from expiry does not change the tile state', () => {
+    const cert = { state: 'approved', days_remaining: 60, expires_at: '2026-09-01' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('operational');
+    expect(out.cert).toBe(cert);
+  });
+
+  test('cert within warn window (<= 14 days) degrades a healthy tile to yellow', () => {
+    const cert = { state: 'approved', days_remaining: EXPIRY_WARN_DAYS, expires_at: '2026-07-30' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('degraded');
+    expect(out.reason).toBe(`cert_expiring_${EXPIRY_WARN_DAYS}_days`);
+  });
+
+  test('cert within crit window (<= 3 days) hard-flips the tile to down', () => {
+    const cert = { state: 'approved', days_remaining: EXPIRY_CRIT_DAYS, expires_at: '2026-07-19' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('down');
+    expect(out.reason).toBe(`cert_expiring_${EXPIRY_CRIT_DAYS}_days`);
+  });
+
+  test('an already-down tile stays down when cert is fine (down > cert-warn)', () => {
+    const down = { status: 'down', reason: 'origin_ssl_cert_invalid' };
+    const cert = { state: 'approved', days_remaining: 60 };
+    const out = applyCertToSiteResult(down, cert);
+    expect(out.status).toBe('down');
+    // Existing reason wins so we do not lose the actionable label.
+    expect(out.reason).toBe('origin_ssl_cert_invalid');
+  });
+
+  test('ACME state != "approved" degrades the tile even when expiry is far off', () => {
+    // The specific state that caused the outage this whole feature is
+    // about: bad_authz for weeks while the cert quietly expired.
+    const cert = { state: 'bad_authz', days_remaining: 40 };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('degraded');
+    expect(out.reason).toBe('cert_state_bad_authz');
+  });
+
+  test('critical expiry beats non-approved state (bad_authz + <=3 days -> down + cert_expiring)', () => {
+    // Regression guard for Codex review comment #1 on PR #356. The
+    // combination that produced the July outage is EXACTLY this:
+    // bad_authz with an imminent expiry. If cert_state ran first the
+    // tile would go merely yellow while the cert expires the same day.
+    const cert = { state: 'bad_authz', days_remaining: 1 };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('down');
+    expect(out.reason).toBe('cert_expiring_1_days');
+  });
+});
+
+describe('mergeService preserves site probes across a super-admin single-fn check', () => {
+  test('the "Check now" path for one fn does not wipe payload.sites', () => {
+    // Regression guard for Codex review comment #3 on PR #356. The
+    // super-admin "Check now" flow rebuilds the payload via buildPayload
+    // which only knows about services. Sites run on the 15-min cron so
+    // wiping them here means the frontend shows "first-deploy cache
+    // warm-up" until the next cron -- confusing during the same window
+    // the admin is trying to observe.
+    const base = {
+      services: [],
+      sites: [
+        { name: 'prod (www.proton-pulse.com)', status: 'operational', http_status: 200 },
+        { name: 'staging (mdeguzis.github.io)', status: 'operational', http_status: 200 },
+      ],
+    };
+    const svc = { name: FNS[0], status: 'operational', http_status: 204, latency_ms: 42 };
+    const out = mergeService(base, svc);
+    // Sites carried through unchanged...
+    expect(out.sites).toEqual(base.sites);
+    // ... AND the freshly probed fn is folded into the services array.
+    expect(out.services.find((s) => s.name === FNS[0])).toEqual(svc);
+  });
+
+  test('a base payload with no sites does not add an empty array (backward compat)', () => {
+    // Older KV payloads written by the pre-site-probe worker have no
+    // sites field at all. Do not fabricate an empty array -- the
+    // frontend already handles undefined and shows the warm-up message.
+    const base = { services: [] };
+    const svc = { name: FNS[0], status: 'operational', http_status: 204, latency_ms: 42 };
+    const out = mergeService(base, svc);
+    expect('sites' in out).toBe(false);
+  });
+});
+
+describe('fetchGithubPagesCert', () => {
+  const orig = global.fetch;
+  afterEach(() => { global.fetch = orig; });
+
+  test('returns null when repo is null (staging-style wildcard cert)', async () => {
+    // No fetch should even be attempted.
+    global.fetch = () => { throw new Error('fetch should not be called'); };
+    expect(await fetchGithubPagesCert({}, null)).toBeNull();
+  });
+
+  test('returns null when GitHub returns non-ok', async () => {
+    global.fetch = async () => ({ ok: false, status: 404 });
+    expect(await fetchGithubPagesCert({}, 'mdeguzis/proton-pulse-web')).toBeNull();
+  });
+
+  test('parses expires_at + days_remaining from the pages API response', async () => {
+    const now = new Date('2026-07-18T00:00:00Z').getTime();
+    const cert = {
+      state: 'approved',
+      description: 'certificate is approved',
+      expires_at: '2026-08-01T00:00:00Z',  // 14 days out from `now`
+      domains: ['www.proton-pulse.com'],
+    };
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ https_certificate: cert }),
+    });
+    const out = await fetchGithubPagesCert({}, 'mdeguzis/proton-pulse-web', now);
+    expect(out).not.toBeNull();
+    expect(out.expires_at).toBe(cert.expires_at);
+    expect(out.state).toBe('approved');
+    expect(out.days_remaining).toBe(14);
+  });
+
+  test('passes GITHUB_TOKEN via Authorization header when available', async () => {
+    let seenAuth = null;
+    global.fetch = async (url, opts) => {
+      seenAuth = opts?.headers?.Authorization ?? null;
+      return { ok: true, status: 200, json: async () => ({ https_certificate: { state: 'approved', expires_at: '2026-08-01T00:00:00Z' } }) };
+    };
+    await fetchGithubPagesCert({ GITHUB_TOKEN: 'ghp_test' }, 'mdeguzis/proton-pulse-web', Date.now());
+    expect(seenAuth).toBe('Bearer ghp_test');
+  });
+});
+
+describe('SITES list covers prod and staging', () => {
+  test('SITES contains both prod and staging entries', () => {
+    const names = SITES.map((s) => s.name);
+    expect(names.some((n) => n.includes('prod'))).toBe(true);
+    expect(names.some((n) => n.includes('staging'))).toBe(true);
+  });
+
+  test('each site has a real https URL + origin_hint for the status card', () => {
+    for (const site of SITES) {
+      expect(site.url).toMatch(/^https:\/\//);
+      expect(typeof site.origin_hint).toBe('string');
+      expect(site.origin_hint.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('the URL each site probes is small + known-deployed (version.json)', () => {
+    // version.json is written on every deploy so probing it exercises the
+    // full origin-to-CDN path without hitting a heavy asset.
+    for (const site of SITES) {
+      expect(site.url).toContain('/version.json');
+    }
   });
 });
 
