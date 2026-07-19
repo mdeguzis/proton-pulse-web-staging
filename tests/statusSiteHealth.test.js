@@ -65,4 +65,22 @@ describe('js/status/main.js renders site cards from payload.sites', () => {
     expect(STATUS_MAIN).toMatch(/origin_ssl_cert_invalid[\s\S]{0,200}Cloudflare 526/);
     expect(STATUS_MAIN).toMatch(/origin_ssl_handshake_failed[\s\S]{0,200}Cloudflare 525/);
   });
+
+  test('cert-expiring reason includes the days_remaining count + fix command', () => {
+    // Proactive: instead of "cert broke, everything's on fire", the
+    // 14-day-out warning must point the operator at the fix command
+    // BEFORE the outage happens.
+    expect(STATUS_MAIN).toMatch(/cert_expiring_[\s\S]{0,80}_days/);
+    expect(STATUS_MAIN).toContain('make renew-certificate');
+  });
+
+  test('renderSiteCard shows the cert expiry summary when payload.sites[i].cert is present', () => {
+    // "12 days remaining . expires 2026-08-01" style line under the
+    // primary meta row so an operator can eyeball how close to expiry
+    // the cert is without opening any dashboards.
+    expect(STATUS_MAIN).toContain('function certSummary(cert)');
+    expect(STATUS_MAIN).toContain('days remaining');
+    expect(STATUS_MAIN).toContain('cert.expires_at');
+    expect(STATUS_MAIN).toContain('certLine');
+  });
 });

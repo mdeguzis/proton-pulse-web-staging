@@ -12,6 +12,10 @@ import {
   STATUS_KEY,
   classifyStatus,
   classifySiteStatus,
+  applyCertToSiteResult,
+  fetchGithubPagesCert,
+  EXPIRY_WARN_DAYS,
+  EXPIRY_CRIT_DAYS,
   aggregateOverall,
   buildPayload,
   mergeService,
@@ -285,6 +289,100 @@ describe('classifySiteStatus', () => {
 
   test('0 = timeout / connection failure', () => {
     expect(classifySiteStatus(0)).toEqual({ status: 'down', reason: 'unreachable' });
+  });
+});
+
+describe('applyCertToSiteResult (proactive cert-expiry check)', () => {
+  const OK = { status: 'operational', reason: null };
+
+  test('returns the site result unchanged when no cert data is provided', () => {
+    expect(applyCertToSiteResult(OK, null)).toEqual(OK);
+    expect(applyCertToSiteResult(OK, undefined)).toEqual(OK);
+  });
+
+  test('healthy cert far from expiry does not change the tile state', () => {
+    const cert = { state: 'approved', days_remaining: 60, expires_at: '2026-09-01' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('operational');
+    expect(out.cert).toBe(cert);
+  });
+
+  test('cert within warn window (<= 14 days) degrades a healthy tile to yellow', () => {
+    const cert = { state: 'approved', days_remaining: EXPIRY_WARN_DAYS, expires_at: '2026-07-30' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('degraded');
+    expect(out.reason).toBe(`cert_expiring_${EXPIRY_WARN_DAYS}_days`);
+  });
+
+  test('cert within crit window (<= 3 days) hard-flips the tile to down', () => {
+    const cert = { state: 'approved', days_remaining: EXPIRY_CRIT_DAYS, expires_at: '2026-07-19' };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('down');
+    expect(out.reason).toBe(`cert_expiring_${EXPIRY_CRIT_DAYS}_days`);
+  });
+
+  test('an already-down tile stays down when cert is fine (down > cert-warn)', () => {
+    const down = { status: 'down', reason: 'origin_ssl_cert_invalid' };
+    const cert = { state: 'approved', days_remaining: 60 };
+    const out = applyCertToSiteResult(down, cert);
+    expect(out.status).toBe('down');
+    // Existing reason wins so we do not lose the actionable label.
+    expect(out.reason).toBe('origin_ssl_cert_invalid');
+  });
+
+  test('ACME state != "approved" degrades the tile even when expiry is far off', () => {
+    // The specific state that caused the outage this whole feature is
+    // about: bad_authz for weeks while the cert quietly expired.
+    const cert = { state: 'bad_authz', days_remaining: 40 };
+    const out = applyCertToSiteResult(OK, cert);
+    expect(out.status).toBe('degraded');
+    expect(out.reason).toBe('cert_state_bad_authz');
+  });
+});
+
+describe('fetchGithubPagesCert', () => {
+  const orig = global.fetch;
+  afterEach(() => { global.fetch = orig; });
+
+  test('returns null when repo is null (staging-style wildcard cert)', async () => {
+    // No fetch should even be attempted.
+    global.fetch = () => { throw new Error('fetch should not be called'); };
+    expect(await fetchGithubPagesCert({}, null)).toBeNull();
+  });
+
+  test('returns null when GitHub returns non-ok', async () => {
+    global.fetch = async () => ({ ok: false, status: 404 });
+    expect(await fetchGithubPagesCert({}, 'mdeguzis/proton-pulse-web')).toBeNull();
+  });
+
+  test('parses expires_at + days_remaining from the pages API response', async () => {
+    const now = new Date('2026-07-18T00:00:00Z').getTime();
+    const cert = {
+      state: 'approved',
+      description: 'certificate is approved',
+      expires_at: '2026-08-01T00:00:00Z',  // 14 days out from `now`
+      domains: ['www.proton-pulse.com'],
+    };
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ https_certificate: cert }),
+    });
+    const out = await fetchGithubPagesCert({}, 'mdeguzis/proton-pulse-web', now);
+    expect(out).not.toBeNull();
+    expect(out.expires_at).toBe(cert.expires_at);
+    expect(out.state).toBe('approved');
+    expect(out.days_remaining).toBe(14);
+  });
+
+  test('passes GITHUB_TOKEN via Authorization header when available', async () => {
+    let seenAuth = null;
+    global.fetch = async (url, opts) => {
+      seenAuth = opts?.headers?.Authorization ?? null;
+      return { ok: true, status: 200, json: async () => ({ https_certificate: { state: 'approved', expires_at: '2026-08-01T00:00:00Z' } }) };
+    };
+    await fetchGithubPagesCert({ GITHUB_TOKEN: 'ghp_test' }, 'mdeguzis/proton-pulse-web', Date.now());
+    expect(seenAuth).toBe('Bearer ghp_test');
   });
 });
 

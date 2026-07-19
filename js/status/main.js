@@ -244,9 +244,28 @@ function siteReasonLabel(reason) {
   if (reason === 'origin_ssl_cert_invalid') return 'Origin SSL certificate invalid (Cloudflare 526). Renew the Let\'s Encrypt cert on the origin.';
   if (reason === 'origin_ssl_handshake_failed') return 'Origin SSL handshake failed (Cloudflare 525).';
   if (reason === 'unreachable') return 'No response within timeout.';
+  const daysMatch = reason.match(/^cert_expiring_(\d+)_days$/);
+  if (daysMatch) return `Origin certificate expires in ${daysMatch[1]} day(s). Run \`make renew-certificate\` well before then.`;
+  const stateMatch = reason.match(/^cert_state_(.+)$/);
+  if (stateMatch) return `GitHub Pages cert state is "${stateMatch[1]}" (not approved). ACME renewal likely blocked -- run \`make renew-certificate\`.`;
   const m = reason.match(/^http_(\d+)$/);
   if (m) return `HTTP ${m[1]}`;
   return reason;
+}
+
+// One-line summary of the cert's expiry: "12 days remaining (expires 2026-08-01)".
+// Falls back to just the state when no expiry date is available.
+function certSummary(cert) {
+  if (!cert) return '';
+  const parts = [];
+  if (typeof cert.days_remaining === 'number') {
+    parts.push(`${cert.days_remaining} day${cert.days_remaining === 1 ? '' : 's'} remaining`);
+  }
+  if (cert.expires_at) {
+    parts.push(`expires ${cert.expires_at.slice(0, 10)}`);
+  }
+  if (parts.length === 0 && cert.state) parts.push(`state: ${cert.state}`);
+  return parts.join(' \u00b7 ');
 }
 
 function renderSiteCard(site) {
@@ -258,6 +277,7 @@ function renderSiteCard(site) {
   const hint = site.origin_hint
     ? `origin: ${site.origin_hint}`
     : '';
+  const certLine = certSummary(site.cert);
   return `
     <div class="status-card status-card--site" data-state="${esc(state)}">
       <div class="status-card-head">
@@ -269,6 +289,7 @@ function renderSiteCard(site) {
         <span>${esc(primary)}</span>
         <span title="${esc(site.checked_at || '')}">checked ${formatRelative(site.checked_at)}</span>
       </div>
+      ${certLine ? `<div class="status-card-meta status-card-meta--muted"><span>cert: ${esc(certLine)}</span></div>` : ''}
       ${hint ? `<div class="status-card-meta status-card-meta--muted"><span>${esc(hint)}</span></div>` : ''}
     </div>
   `;
