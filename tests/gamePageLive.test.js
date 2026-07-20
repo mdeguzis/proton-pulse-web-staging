@@ -54,8 +54,10 @@ describe('game page: ProtonDB live-only handling', () => {
     expect(src).not.toContain('${SB_URL}/rest/v1/report_moderation');
   });
 
-  test('stub submit link uses the ?app= param submit.html expects', () => {
-    expect(src).toContain('href="submit.html?app=${esc(String(appId))}');
+  test('submit links use the ?app= param submit.html expects', () => {
+    // The minimal stub was removed (#363); known no-report games now render the
+    // full page whose Submit Report button uses submitHref (submit.html?app=...).
+    expect(src).toContain('submit.html?app=${appId}');
     expect(src).not.toContain('submit.html?appId=');
   });
 });

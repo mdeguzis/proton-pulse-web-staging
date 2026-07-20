@@ -639,41 +639,21 @@ export async function renderGamePage(appId) {
     if (!stubTitle) {
       // #363: long-tail Steam games (e.g. Cat Chess / 4163030) live only in the
       // extended index, not the main search-index. Consult it so ANY known Steam
-      // game gets the stub page instead of the generic "not in our mirror" state.
+      // game resolves a title (and therefore gets the full page below).
       try {
         await loadExtendedSteamIndex();
         const extHit = (extendedSteamIndex || []).find(row => String(row[0]) === String(appId));
         stubTitle = extHit?.[1] || null;
       } catch (e) { console.debug('[game-page] extended index stub lookup failed', { appId, error: String(e && e.message || e) }); }
     }
-    if (stubTitle) {
-      // Known game with no reports yet -- show a stub page with a submit CTA.
-      const imgUrl = STEAM_IMG(appId);
-      const store = storeLabelFromAppId(appId);
-      el.innerHTML = `
-        <div class="stub-page">
-          <div class="stub-header">
-            <img class="stub-img" src="${esc(imgUrl)}" data-appid="${esc(String(appId))}" alt="" loading="lazy"
-              onerror="window.__steamImgLoad(this)">
-            <div class="stub-meta">
-              <h1 class="stub-title">${esc(stubTitle)}</h1>
-              <div class="stub-pills">
-                <span class="tier-badge tier-badge--pending">Not rated yet</span>
-                <span class="game-card-store-pill game-card-store-pill--${store.toLowerCase()}">${store}</span>
-              </div>
-            </div>
-          </div>
-          <div class="stub-body">
-            <p class="stub-message">No compatibility reports exist for this game yet. If you have played it on Steam Deck or Linux, your report helps other players know what to expect.</p>
-            <a class="submit-report-btn" href="submit.html?app=${esc(String(appId))}&title=${encodeURIComponent(stubTitle)}" style="display:inline-block;margin-top:4px">Submit the first report</a>
-          </div>
-          <div class="stub-live-check" style="margin-top:20px">
-            <button id="live-check-btn" class="live-check-pill">Check ProtonDB Live</button>
-            <span id="live-check-status" style="margin-left:10px;font-size:0.85rem;color:var(--muted)"></span>
-          </div>
-        </div>`;
-    } else {
-      // Truly unknown game -- generic mirror-miss state.
+    // #363: only a GENUINELY unknown appId (no title in any index) gets the
+    // minimal mirror-miss state. A KNOWN game with no reports yet falls through
+    // to the full render below, which shows the complete page -- header art,
+    // platform badges, Steam/SteamDB/ProtonDB/PCGamingWiki hub-links, and the
+    // action buttons -- with a "pending / No community data yet" rating panel
+    // and an empty reports state (the full render already degrades gracefully to
+    // overallTier='pending' when there are zero reports).
+    if (!stubTitle) {
       el.innerHTML = `
         <div class="state-box">
           <p style="margin:0 0 10px">This game (<strong>${esc(String(appId))}</strong>) is not in our cached ProtonDB mirror.</p>
@@ -681,23 +661,24 @@ export async function renderGamePage(appId) {
           <button id="live-check-btn" class="live-check-pill">Check ProtonDB Live</button>
           <span id="live-check-status" style="margin-left:10px;font-size:0.85rem;color:var(--muted)"></span>
         </div>`;
+      el.querySelector('#live-check-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const status = el.querySelector('#live-check-status');
+        btn.disabled = true;
+        btn.textContent = 'Checking...';
+        if (status) status.textContent = '';
+        const live = await fetchProtonDbLive(appId);
+        if (live.length) {
+          await renderGamePage(appId);
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Check ProtonDB Live';
+          if (status) status.textContent = 'Not found on ProtonDB either.';
+        }
+      });
+      return;
     }
-    el.querySelector('#live-check-btn')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      const status = el.querySelector('#live-check-status');
-      btn.disabled = true;
-      btn.textContent = 'Checking...';
-      if (status) status.textContent = '';
-      const live = await fetchProtonDbLive(appId);
-      if (live.length) {
-        await renderGamePage(appId);
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Check ProtonDB Live';
-        if (status) status.textContent = 'Not found on ProtonDB either.';
-      }
-    });
-    return;
+    // Known game, no reports yet: fall through to the full render.
   }
 
   // Resolve a human-readable title. Order, most specific first:
@@ -713,6 +694,15 @@ export async function renderGamePage(appId) {
   if (!resolvedTitle && /^\d+$/.test(String(appId))) {
     const catalog = await _fetchSteamCatalog();
     resolvedTitle = catalog?.[String(appId)] || null;
+  }
+  if (!resolvedTitle) {
+    // #363: a no-report game that fell through from the stub branch is only in
+    // the extended index. Resolve its real title from there (already loaded
+    // above) so the header shows "Cat Chess", not "App 4163030".
+    try {
+      await loadExtendedSteamIndex();
+      resolvedTitle = (extendedSteamIndex || []).find(row => String(row[0]) === String(appId))?.[1] || null;
+    } catch { /* keep the App <id> fallback */ }
   }
   const title = resolvedTitle || `App ${appId}`;
   // Steam returned success=false from appdetails for this app: it has been
