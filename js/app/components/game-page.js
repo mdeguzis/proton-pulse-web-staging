@@ -12,7 +12,7 @@ import { enhanceAuthorBlocks } from './author.js?v=3a8cb3c7';
 import { renderConfigCard } from './config-cards.js?v=c67740f8';
 import { DECK_STATUS_ICON_SVG, DECK_STATUS_LABELS, _DECK_LCD_RE, _DECK_OLED_RE, _STEAM_MACHINE_RE, renderDeckStatusButton, renderDeckStatusModalContent } from './deck-status.js?v=830efdfb';
 import { renderCard } from './report-card.js?v=1ee75a46';
-import { loadSearchIndex, searchIndex } from './search.js?v=598aaad1';
+import { loadSearchIndex, searchIndex, loadExtendedSteamIndex, extendedSteamIndex } from './search.js?v=598aaad1';
 import { showAdultAllowed, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 import { loadGameHides } from '../lib/game-hides.js?v=2d7d7afe';
 import { CDN, RATING_COLORS, RATING_TEXT, SB_KEY, SB_URL, SITE_ROOT, STEAM_IMG, dataFilesHref, storeLabelFromAppId } from '../config.js?v=f9591262';
@@ -635,6 +635,16 @@ export async function renderGamePage(appId) {
     if (!stubTitle) {
       const catalog = await _fetchSteamCatalog();
       stubTitle = catalog?.[String(appId)] || null;
+    }
+    if (!stubTitle) {
+      // #363: long-tail Steam games (e.g. Cat Chess / 4163030) live only in the
+      // extended index, not the main search-index. Consult it so ANY known Steam
+      // game gets the stub page instead of the generic "not in our mirror" state.
+      try {
+        await loadExtendedSteamIndex();
+        const extHit = (extendedSteamIndex || []).find(row => String(row[0]) === String(appId));
+        stubTitle = extHit?.[1] || null;
+      } catch (e) { console.debug('[game-page] extended index stub lookup failed', { appId, error: String(e && e.message || e) }); }
     }
     if (stubTitle) {
       // Known game with no reports yet -- show a stub page with a submit CTA.

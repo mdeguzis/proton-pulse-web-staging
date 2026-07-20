@@ -51,14 +51,29 @@ print_cert() {
   echo ""
 }
 
+# Overall verdict is driven by the EDGE cert -- the one visitors actually
+# validate. An expired ORIGIN cert does not change the verdict, because under
+# Full (non-strict) it never reaches visitors (that is the intended config).
+edge_na_epoch="$(date -u -d "$(jq -r '.edge.not_after // ""' "$TMP/cert-status.json")" +%s 2>/dev/null || echo 0)"
+if [ "$edge_na_epoch" -gt "$NOW_EPOCH" ]; then
+  edge_days=$(( (edge_na_epoch - NOW_EPOCH) / 86400 ))
+  VERDICT="OK -- the certificate visitors see is valid ($edge_days days left)"
+elif [ "$edge_na_epoch" -eq 0 ]; then
+  VERDICT="UNKNOWN -- could not read the edge cert"
+else
+  VERDICT="ACTION NEEDED -- the edge cert visitors see is expired"
+fi
+
 echo ""
 echo "TLS certificate check -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "============================================================"
 echo ""
+echo "Overall: $VERDICT"
+echo ""
 echo "Domain: $(jq -r '.domain' "$TMP/cert-status.json")"
 echo ""
 print_cert "Edge cert   (what browsers see, via Cloudflare)"  "Auto-renewed by Cloudflare." "$(jq -c '.edge' "$TMP/cert-status.json")"
-print_cert "Origin cert (GitHub Pages backend, behind CF)"    ""                           "$(jq -c '.origin' "$TMP/cert-status.json")"
+print_cert "Origin cert (GitHub Pages backend, behind CF)"    "Not visitor-facing under Full (non-strict); expected to stay expired." "$(jq -c '.origin' "$TMP/cert-status.json")"
 
 gh_state="$(jq -r 'if (.github_pages|type)=="object" then .github_pages.state else "" end' "$TMP/cert-status.json")"
 if [ -n "$gh_state" ]; then
