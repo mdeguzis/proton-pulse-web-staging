@@ -65,6 +65,14 @@ on:
         description: "Preview: run stages that read but skip commits + Supabase writes (best-effort per stage)"
         type: boolean
         default: false
+      deploy_target:
+        description: "Where to publish the built site. 'ghpages' (default) uses the existing gh-pages orphan deploy. 'cloudflare' syncs data/ to R2 and deploys the shell to Cloudflare Pages (#362). Pluggable + reversible."
+        required: false
+        default: "ghpages"
+        type: choice
+        options:
+          - ghpages
+          - cloudflare
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -461,8 +469,24 @@ jobs:
           path: .cache
           key: pipeline-cache-${{ runner.os }}-${{ github.workflow }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-final
 
+      # Cloudflare target (#362): sync data/ to R2 + deploy the shell to Pages.
+      # Runs instead of the gh-pages orphan deploy when deploy_target=cloudflare.
+      # Must come BEFORE the orphan step, which wipes the working tree. Staging
+      # runs target the staging Pages project; everything else targets prod.
+      - name: Deploy to Cloudflare (R2 + Pages)
+        if: inputs.deploy_target == 'cloudflare'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          PAGES_PROJECT: ${{ (inputs.staging_with_pipeline == true || inputs.staging_with_finalize == true) && 'proton-pulse-web-staging' || 'proton-pulse-web' }}
+          PAGES_BRANCH: ${{ (inputs.staging_with_pipeline == true || inputs.staging_with_finalize == true) && 'staging' || 'main' }}
+        run: |
+          bash scripts/publish-cloudflare.sh /tmp/protondb-output "$GITHUB_WORKSPACE"
+
       - name: Deploy to gh-pages (orphan, no history)
-        if: inputs.staging_with_pipeline != true && inputs.staging_with_finalize != true
+        if: inputs.staging_with_pipeline != true && inputs.staging_with_finalize != true && inputs.deploy_target != 'cloudflare'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -471,6 +495,10 @@ jobs:
           # tracked file, including scripts/preserve-steam-type-cache.sh
           # which the deploy step needs to run later. Introduced by #263.
           cp scripts/preserve-steam-type-cache.sh /tmp/preserve-steam-type-cache.sh
+          # Same reason: the cert monitor (#359) commits cert-status.json +
+          # cert-history.json to gh-pages between pipeline runs. The orphan
+          # rebuild would wipe them, losing the append-only burndown history.
+          cp scripts/preserve-cert-monitor.sh /tmp/preserve-cert-monitor.sh
           git checkout --orphan gh-pages-new
           git rm -rf .
           cp -r /tmp/protondb-output/data .
@@ -520,6 +548,11 @@ jobs:
           # and re-applies its types to the fresh search-index.json before
           # we commit. Silent no-op on first ever deploy.
           bash /tmp/preserve-steam-type-cache.sh "$(pwd)"
+          # Carry the cert monitor's files (#359) over from the old gh-pages so
+          # the orphan force-push does not drop the burndown history.
+          bash /tmp/preserve-cert-monitor.sh "$(pwd)"
+          [ -f cert-status.json ] && git add cert-status.json || true
+          [ -f cert-history.json ] && git add cert-history.json || true
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)
@@ -547,7 +580,7 @@ jobs:
       # either staging_with_pipeline (full pipeline, 30 min) or
       # staging_with_finalize (finalize + stats only, ~5 min) is on.
       - name: Deploy pipeline output to staging repo
-        if: inputs.staging_with_pipeline == true || inputs.staging_with_finalize == true
+        if: (inputs.staging_with_pipeline == true || inputs.staging_with_finalize == true) && inputs.deploy_target != 'cloudflare'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -829,6 +862,10 @@ jobs:
           # tracked file, including scripts/preserve-steam-type-cache.sh
           # which the deploy step needs to run later. Introduced by #263.
           cp scripts/preserve-steam-type-cache.sh /tmp/preserve-steam-type-cache.sh
+          # Same reason: the cert monitor (#359) commits cert-status.json +
+          # cert-history.json to gh-pages between pipeline runs. The orphan
+          # rebuild would wipe them, losing the append-only burndown history.
+          cp scripts/preserve-cert-monitor.sh /tmp/preserve-cert-monitor.sh
           git checkout --orphan gh-pages-new
           git rm -rf .
           cp -r /tmp/protondb-output/data .
@@ -875,6 +912,11 @@ jobs:
           printf '{"schemaVersion":1,"label":"Pulse reports","message":"%s","color":"informational"}\n' "$PULSE_COUNT" > badges/pulse-reports.json
           # Preserve steam-type-cache.json + column 11 across the force-push (#263).
           bash /tmp/preserve-steam-type-cache.sh "$(pwd)"
+          # Carry the cert monitor's files (#359) over from the old gh-pages so
+          # the orphan force-push does not drop the burndown history.
+          bash /tmp/preserve-cert-monitor.sh "$(pwd)"
+          [ -f cert-status.json ] && git add cert-status.json || true
+          [ -f cert-history.json ] && git add cert-history.json || true
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)
@@ -1068,6 +1110,10 @@ jobs:
           # tracked file, including scripts/preserve-steam-type-cache.sh
           # which the deploy step needs to run later. Introduced by #263.
           cp scripts/preserve-steam-type-cache.sh /tmp/preserve-steam-type-cache.sh
+          # Same reason: the cert monitor (#359) commits cert-status.json +
+          # cert-history.json to gh-pages between pipeline runs. The orphan
+          # rebuild would wipe them, losing the append-only burndown history.
+          cp scripts/preserve-cert-monitor.sh /tmp/preserve-cert-monitor.sh
           git checkout --orphan gh-pages-new
           git rm -rf .
           cp -r /tmp/protondb-output/data .
@@ -1114,6 +1160,11 @@ jobs:
           printf '{"schemaVersion":1,"label":"Pulse reports","message":"%s","color":"informational"}\n' "$PULSE_COUNT" > badges/pulse-reports.json
           # Preserve steam-type-cache.json + column 11 across the force-push (#263).
           bash /tmp/preserve-steam-type-cache.sh "$(pwd)"
+          # Carry the cert monitor's files (#359) over from the old gh-pages so
+          # the orphan force-push does not drop the burndown history.
+          bash /tmp/preserve-cert-monitor.sh "$(pwd)"
+          [ -f cert-status.json ] && git add cert-status.json || true
+          [ -f cert-history.json ] && git add cert-history.json || true
           git add data/ data-index.html coverage.html search-index.json scoring-info.json form-schema.json badges/
           # add optional pipeline outputs (skip silently if a fresh checkout
           # didn't have them yet, e.g. first run after introducing the file)

@@ -4,8 +4,13 @@
 // last-checked timestamp. Auto-refreshes every 60 s so the page stays
 // live if the reader leaves it open.
 
-import { dataUrl } from '../lib/data-url.js?v=3c2e7ac9';
+import { dataUrl } from '../lib/data-url.js?v=97f09986';
 import { fetchVendorStatuses, VENDOR_REFRESH_MS } from './vendor-status.js?v=f161798f';
+import {
+  certStateForCert, certStateLabel, certStateDot,
+  daysRemaining, totalDays, certBucket, bucketColor, daysBetween,
+  CERT_GREEN_MIN_DAYS, CERT_ORANGE_MIN_DAYS,
+} from '../lib/cert.js?v=d9dc31b3';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -238,34 +243,17 @@ function renderFromPayload(payload) {
 
 // Human-readable label for the specific site-probe reason strings the
 // worker emits. Keeps operator-facing copy tight and points at the fix
-// rather than the mechanic.
+// rather than the mechanic. The wiki page linked from 525/526 covers the
+// full recovery walkthrough so operators are not guessing at midnight.
+const CERT_RENEWAL_WIKI = 'https://github.com/mdeguzis/proton-pulse-web/wiki/GitHub-Pages-Cert-Renewal';
 function siteReasonLabel(reason) {
   if (!reason) return '';
-  if (reason === 'origin_ssl_cert_invalid') return 'Origin SSL certificate invalid (Cloudflare 526). Renew the Let\'s Encrypt cert on the origin.';
-  if (reason === 'origin_ssl_handshake_failed') return 'Origin SSL handshake failed (Cloudflare 525).';
+  if (reason === 'origin_ssl_cert_invalid') return 'Origin SSL certificate invalid (Cloudflare 526). See renewal walkthrough.';
+  if (reason === 'origin_ssl_handshake_failed') return 'Origin SSL handshake failed (Cloudflare 525). See renewal walkthrough.';
   if (reason === 'unreachable') return 'No response within timeout.';
-  const daysMatch = reason.match(/^cert_expiring_(\d+)_days$/);
-  if (daysMatch) return `Origin certificate expires in ${daysMatch[1]} day(s). Run \`make renew-certificate\` well before then.`;
-  const stateMatch = reason.match(/^cert_state_(.+)$/);
-  if (stateMatch) return `GitHub Pages cert state is "${stateMatch[1]}" (not approved). ACME renewal likely blocked -- run \`make renew-certificate\`.`;
   const m = reason.match(/^http_(\d+)$/);
   if (m) return `HTTP ${m[1]}`;
   return reason;
-}
-
-// One-line summary of the cert's expiry: "12 days remaining (expires 2026-08-01)".
-// Falls back to just the state when no expiry date is available.
-function certSummary(cert) {
-  if (!cert) return '';
-  const parts = [];
-  if (typeof cert.days_remaining === 'number') {
-    parts.push(`${cert.days_remaining} day${cert.days_remaining === 1 ? '' : 's'} remaining`);
-  }
-  if (cert.expires_at) {
-    parts.push(`expires ${cert.expires_at.slice(0, 10)}`);
-  }
-  if (parts.length === 0 && cert.state) parts.push(`state: ${cert.state}`);
-  return parts.join(' \u00b7 ');
 }
 
 function renderSiteCard(site) {
@@ -277,7 +265,7 @@ function renderSiteCard(site) {
   const hint = site.origin_hint
     ? `origin: ${site.origin_hint}`
     : '';
-  const certLine = certSummary(site.cert);
+  const isCertReason = site.reason === 'origin_ssl_cert_invalid' || site.reason === 'origin_ssl_handshake_failed';
   return `
     <div class="status-card status-card--site" data-state="${esc(state)}">
       <div class="status-card-head">
@@ -289,10 +277,161 @@ function renderSiteCard(site) {
         <span>${esc(primary)}</span>
         <span title="${esc(site.checked_at || '')}">checked ${formatRelative(site.checked_at)}</span>
       </div>
-      ${certLine ? `<div class="status-card-meta status-card-meta--muted"><span>cert: ${esc(certLine)}</span></div>` : ''}
+      ${isCertReason ? `<div class="status-card-meta status-card-meta--muted"><span>Renewal steps: <a href="${esc(CERT_RENEWAL_WIKI)}" target="_blank" rel="noopener">wiki</a></span></div>` : ''}
       ${hint ? `<div class="status-card-meta status-card-meta--muted"><span>${esc(hint)}</span></div>` : ''}
     </div>
   `;
+}
+
+// Pull a short issuer label out of a full issuer DN string like
+// "C=US, O=Let's Encrypt, CN=YE2" -> "Let's Encrypt". Prefers the O
+// (organization); falls back to CN, then the raw string.
+function issuerShort(issuer) {
+  if (!issuer) return '';
+  const o = issuer.match(/(?:^|,)\s*O=([^,]+)/);
+  if (o) return o[1].trim();
+  const cn = issuer.match(/(?:^|,)\s*CN=([^,]+)/);
+  if (cn) return cn[1].trim();
+  return issuer;
+}
+
+function certDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Burndown graph for the public status page: days-remaining (y) over check time
+// (x) for the given cert (`field` selects edge_not_after or origin_not_after in
+// each history point). Each renewal resets the line up to the full validity
+// window, so it reads as a sawtooth descending toward zero. Guide-lines mark the
+// 30d (green) and 14d (orange) boundaries. Pure inline SVG, no chart lib.
+function renderCertBurndown(history, field) {
+  const pts = (Array.isArray(history) ? history : [])
+    .map((h) => ({ t: Date.parse(h.checked_at), days: daysBetween(h.checked_at, h[field]) }))
+    .filter((p) => Number.isFinite(p.t) && p.days !== null);
+  if (pts.length < 2) {
+    return '<div class="status-graph-empty">Expiry history is still collecting. The monitor runs every 6 hours, so the burndown line fills in over the first day.</div>';
+  }
+  const W = 640, H = 180, PADX = 34, PADY = 14;
+  const ts = pts.map((p) => p.t), ys = pts.map((p) => p.days);
+  const t0 = ts[0], t1 = ts[ts.length - 1], tSpan = (t1 - t0) || 1;
+  const maxY = Math.max(...ys, CERT_GREEN_MIN_DAYS + 5), minY = Math.min(...ys, 0), ySpan = (maxY - minY) || 1;
+  const x = (t) => PADX + ((t - t0) / tSpan) * (W - PADX - PADY);
+  const y = (d) => PADY + (1 - (d - minY) / ySpan) * (H - 2 * PADY);
+  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.t).toFixed(1)},${y(p.days).toFixed(1)}`).join(' ');
+  const guide = (d, color, lbl) => (d <= maxY && d >= minY)
+    ? `<line x1="${PADX}" y1="${y(d).toFixed(1)}" x2="${W - PADY}" y2="${y(d).toFixed(1)}" stroke="${color}" stroke-width="1" stroke-dasharray="4 3" opacity="0.55" />
+       <text x="${W - PADY}" y="${(y(d) - 3).toFixed(1)}" text-anchor="end" font-size="10" fill="${color}">${esc(lbl)}</text>`
+    : '';
+  const zeroLine = (0 <= maxY && 0 >= minY)
+    ? `<line x1="${PADX}" y1="${y(0).toFixed(1)}" x2="${W - PADY}" y2="${y(0).toFixed(1)}" stroke="currentColor" stroke-width="1" opacity="0.3" />` : '';
+  const lastDays = ys[ys.length - 1];
+  const lineColor = bucketColor(certBucket(lastDays));
+  const startLabel = certDate(new Date(t0).toISOString());
+  const endLabel = certDate(new Date(t1).toISOString());
+  return `
+    <div class="status-graph">
+      <div class="status-graph-head">
+        <span>Days until expiry (${esc(pts.length)} checks)</span>
+        <span>latest: ${esc(lastDays < 0 ? 'expired' : `${lastDays}d`)}</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" class="status-graph-svg" preserveAspectRatio="none" role="img" aria-label="Certificate days remaining over time, latest ${esc(lastDays)} days">
+        <text x="3" y="${(y(maxY) + 4).toFixed(1)}" font-size="10" fill="currentColor" opacity="0.55">${esc(Math.round(maxY))}d</text>
+        <text x="3" y="${(y(minY) - 1).toFixed(1)}" font-size="10" fill="currentColor" opacity="0.55">${esc(Math.round(minY))}d</text>
+        ${zeroLine}
+        ${guide(CERT_GREEN_MIN_DAYS, bucketColor('green'), `${CERT_GREEN_MIN_DAYS}d`)}
+        ${guide(CERT_ORANGE_MIN_DAYS, bucketColor('orange'), `${CERT_ORANGE_MIN_DAYS}d`)}
+        <path d="${path}" fill="none" stroke="${lineColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </svg>
+      <div class="status-graph-foot"><span>${esc(startLabel)}</span><span>now</span></div>
+    </div>`;
+}
+
+// One-line summary of a cert: "Issued by Let's Encrypt · 57 days remaining".
+function certSummaryLine(cert) {
+  const state = certStateForCert(cert);
+  if (state === 'unreachable') return 'could not be read';
+  const issuer = issuerShort(cert && cert.issuer);
+  const days = daysRemaining(cert.not_after);
+  const daysText = days === null ? ''
+    : days < 0 ? `expired ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`
+    : `${days} day${days === 1 ? '' : 's'} remaining`;
+  return [issuer ? `Issued by ${issuer}` : 'TLS certificate', daysText].filter(Boolean).join(' · ');
+}
+
+// Public cert card, two-cert model (#359). The EDGE cert (what browsers actually
+// validate, auto-renewed by Cloudflare) drives the headline state. The ORIGIN
+// cert (GitHub Pages backend, behind Cloudflare) is shown as a muted operator
+// line -- with GitHub's own ACME state (e.g. bad_authz) when present -- because
+// while Cloudflare SSL is non-strict an expired origin cert does not reach
+// visitors. Burndown tracks the edge cert. Full-width card (.status-card--cert).
+function renderCertCard(status, history) {
+  const edge = status && status.edge;
+  const origin = status && status.origin;
+  const gh = status && status.github_pages;
+  const state = certStateForCert(edge);
+  const dot = certStateDot(state);
+  const label = certStateLabel(state);
+  const domain = (status && status.domain) ? status.domain : 'Site certificate';
+  const total = edge && edge.not_before && edge.not_after ? totalDays(edge.not_before, edge.not_after) : null;
+  const window = (edge && edge.not_before && edge.not_after)
+    ? `Valid ${certDate(edge.not_before)} → ${certDate(edge.not_after)}${total !== null ? ` (${total}-day window)` : ''}`
+    : '';
+
+  // Origin line: muted context, never the headline. Fold in GitHub's ACME state.
+  const originState = certStateForCert(origin);
+  const originExpiry = origin && origin.not_after ? certDate(origin.not_after) : '';
+  const ghNote = gh && gh.state && gh.state !== 'approved'
+    ? ` · GitHub: ${gh.state}` : '';
+  const originText = originState === 'unreachable'
+    ? 'GitHub Pages origin: not reachable'
+    : originState === 'valid'
+      ? `GitHub Pages origin: valid → ${originExpiry} (renews via GitHub)`
+      : `GitHub Pages origin: ${certStateLabel(originState).toLowerCase()}${originExpiry ? ` ${originExpiry}` : ''}${ghNote} — not visitor-facing while Cloudflare SSL is non-strict`;
+
+  return `
+    <div class="status-card status-card--site status-card--cert" data-state="${esc(dot)}">
+      <div class="status-card-head">
+        <span class="status-card-dot"></span>
+        <span class="status-card-name">${esc(domain)}</span>
+        <span class="status-card-state">${esc(label)}</span>
+      </div>
+      <div class="status-card-meta status-card-meta--muted">
+        <span>Served to visitors: ${esc(certSummaryLine(edge))}</span>
+        ${window ? `<span>${esc(window)}</span>` : ''}
+        <span>${esc(originText)}</span>
+        <span>How this works: <a href="${esc(CERT_RENEWAL_WIKI)}" target="_blank" rel="noopener">wiki</a></span>
+      </div>
+      ${renderCertBurndown(history, 'edge_not_after')}
+    </div>
+  `;
+}
+
+async function loadAndRenderCert() {
+  const listEl = document.getElementById('status-cert-list');
+  if (!listEl) return;
+  try {
+    const [statusRes, historyRes] = await Promise.all([
+      fetch(await dataUrl('cert-status.json'), { cache: 'no-store' }),
+      fetch(await dataUrl('cert-history.json'), { cache: 'no-store' }).catch(() => null),
+    ]);
+    if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
+    const status = await statusRes.json();
+    const history = historyRes && historyRes.ok ? await historyRes.json().catch(() => []) : [];
+    console.debug('[status] cert health loaded', {
+      source: 'gh-pages', file: 'cert-status.json',
+      edgeState: certStateForCert(status && status.edge),
+      originState: certStateForCert(status && status.origin),
+      githubPages: status && status.github_pages && status.github_pages.state,
+      historyPoints: Array.isArray(history) ? history.length : 0,
+    });
+    listEl.innerHTML = renderCertCard(status, history);
+  } catch (err) {
+    console.warn('[status] cert-status.json fetch failed', { source: 'gh-pages', file: 'cert-status.json', error: String(err && err.message || err) });
+    listEl.innerHTML = '<div class="state-box">Cert check has not run yet. Check back after the next monitor cycle.</div>';
+  }
 }
 
 async function loadAndRender() {
@@ -569,6 +708,11 @@ document.addEventListener('keydown', (e) => {
 // opens a tile right away already sees the "Check now" control.
 detectSuperAdmin().finally(() => loadAndRender());
 setInterval(loadAndRender, REFRESH_MS);
+
+// Origin cert health (#359): its own fetch of cert-status.json, refreshed on
+// the same cadence as the rest of the page.
+loadAndRenderCert();
+setInterval(loadAndRenderCert, REFRESH_MS);
 
 // Vendor rows (#278): GitHub Pages + Cloudflare overall. Refreshes on a
 // separate cadence because the upstream feeds themselves update on the

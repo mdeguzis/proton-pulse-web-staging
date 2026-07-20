@@ -66,21 +66,34 @@ describe('js/status/main.js renders site cards from payload.sites', () => {
     expect(STATUS_MAIN).toMatch(/origin_ssl_handshake_failed[\s\S]{0,200}Cloudflare 525/);
   });
 
-  test('cert-expiring reason includes the days_remaining count + fix command', () => {
-    // Proactive: instead of "cert broke, everything's on fire", the
-    // 14-day-out warning must point the operator at the fix command
-    // BEFORE the outage happens.
-    expect(STATUS_MAIN).toMatch(/cert_expiring_[\s\S]{0,80}_days/);
-    expect(STATUS_MAIN).toContain('make renew-certificate');
+  test('SSL-error tiles link to the wiki renewal walkthrough', () => {
+    // We do not try to proactively read cert expiry (would require a
+    // GitHub PAT on the worker, one more secret to rotate). Instead: when
+    // Cloudflare 525/526 fires on the fetch probe, the tile shows a
+    // "Renewal steps: wiki" link pointing at
+    // https://github.com/mdeguzis/proton-pulse-web/wiki/GitHub-Pages-Cert-Renewal
+    // so the operator sees the fix without hunting.
+    expect(STATUS_MAIN).toContain('GitHub-Pages-Cert-Renewal');
+    // Only wire the renewal link on cert-shaped reasons (525/526), not
+    // every non-200 response.
+    expect(STATUS_MAIN).toMatch(/origin_ssl_cert_invalid[\s\S]{0,200}origin_ssl_handshake_failed/);
   });
 
-  test('renderSiteCard shows the cert expiry summary when payload.sites[i].cert is present', () => {
-    // "12 days remaining . expires 2026-08-01" style line under the
-    // primary meta row so an operator can eyeball how close to expiry
-    // the cert is without opening any dashboards.
-    expect(STATUS_MAIN).toContain('function certSummary(cert)');
-    expect(STATUS_MAIN).toContain('days remaining');
-    expect(STATUS_MAIN).toContain('cert.expires_at');
-    expect(STATUS_MAIN).toContain('certLine');
+  test('site cards do NOT embed cert fields, and cert data uses the secret-free openssl file (#359)', () => {
+    // Regression guard: an earlier design fetched cert expiry from the
+    // GitHub Pages REST API with a PAT and dropped it onto payload.sites[i].cert
+    // (cert.expires_at / cert.days_remaining / cert.fetch_error). That PAT path
+    // is intentionally gone. Cert monitoring is now a separate card fed by
+    // cert-status.json, written by the openssl-based cert-monitor cron -- no PAT,
+    // no per-visitor GitHub API call. This test forces any return to the old
+    // sites[i].cert PAT shape to be a deliberate discussion.
+    expect(STATUS_MAIN).not.toMatch(/sites\[[^\]]*\]\.cert/);
+    expect(STATUS_MAIN).not.toMatch(/cert\.expires_at/);
+    expect(STATUS_MAIN).not.toMatch(/cert\.days_remaining/);
+    expect(STATUS_MAIN).not.toMatch(/cert\.fetch_error/);
+    // The cert card must source from the static openssl file, not a live GitHub
+    // API call from the browser.
+    expect(STATUS_MAIN).toContain('cert-status.json');
+    expect(STATUS_MAIN).not.toMatch(/api\.github\.com[^'"`]*\/pages/);
   });
 });

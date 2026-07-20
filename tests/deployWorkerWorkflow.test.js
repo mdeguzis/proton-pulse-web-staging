@@ -61,6 +61,18 @@ describe('deploy job wires wrangler correctly', () => {
     expect(steps.some((s) => s.startsWith('actions/setup-node'))).toBe(true);
   });
 
+  test('checkout fetches full history so git diff against event.before can resolve', () => {
+    // Regression guard: default fetch-depth is 1 (tip only), which makes
+    // `git diff $BEFORE_SHA $AFTER_SHA` in the Resolve step silently return
+    // empty on every real push and skip the deploy. Full history is cheap
+    // on this repo. If a future edit drops back to depth 1 this test
+    // catches it.
+    const checkout = DOC.jobs.deploy.steps.find((s) => (s.uses || '').startsWith('actions/checkout'));
+    expect(checkout).toBeTruthy();
+    expect(checkout.with).toBeTruthy();
+    expect(checkout.with['fetch-depth']).toBe(0);
+  });
+
   test('resolves the worker list from the git diff, not by deploying everything', () => {
     // Regression guard: a "diff-since-event.before" step must exist so the
     // job is a no-op when a push does not actually touch workers/**. This
@@ -95,5 +107,18 @@ describe('deploy job wires wrangler correctly', () => {
   test('passes both required Cloudflare secrets as env vars', () => {
     expect(RAW).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(RAW).toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
+  });
+
+  test('workflow does not sync any worker-side auth secrets from CI', () => {
+    // Regression guard: an earlier design pushed a GitHub PAT into the
+    // worker via `wrangler secret put GITHUB_TOKEN` so the cert probe
+    // could read the GitHub Pages REST API. That whole path is gone --
+    // the worker relies on the fetch probe alone (Cloudflare 525/526
+    // catches broken TLS) so no PAT is needed. If a future edit re-adds
+    // a secret-sync step, this test forces a discussion about whether a
+    // new secret is really required and what its blast radius is on leak.
+    expect(RAW).not.toContain('wrangler@latest secret put');
+    expect(RAW).not.toContain('wrangler secret put');
+    expect(RAW).not.toContain('WORKER_GH_TOKEN');
   });
 });

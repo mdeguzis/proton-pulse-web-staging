@@ -2,11 +2,11 @@
 
 import { estimateScore } from '../../shared/scoring.js?v=8051e115';
 import { fetchMatchingPulseConfigs, fetchMatchingPulseReportAppIds } from '../api/reports.js?v=003f23c0';
-import { renderGamePage } from './game-page.js?v=efbd6568';
+import { renderGamePage } from './game-page.js?v=73701d8d';
 import { STEAM_IMG, SITE_ROOT, USES_PROD_DATA, storeLabelFromAppId, fetchDataWithProdFallback } from '../config.js?v=f9591262';
 import { daysAgo, esc, withTimeout } from '../utils.js?v=9a39c726';
 import { renderGameCard } from '../lib/card.js?v=93448301';
-import { dataUrl } from '../../lib/data-url.js?v=3c2e7ac9';
+import { dataUrl } from '../../lib/data-url.js?v=97f09986';
 import { filterAdultEntries, isAdultEntry } from '../../lib/adult-filter.js?v=e4e9d845';
 
 // Search index + results UX -- factored out of app.js.
