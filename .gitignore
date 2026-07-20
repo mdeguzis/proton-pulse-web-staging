@@ -91,3 +91,4 @@ supabase/.temp/
 
 # Generated analysis output
 scripts/scoring_analysis_results.json
+.wrangler/
