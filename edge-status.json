@@ -1,0 +1,119 @@
+{
+  "updated_at": "2026-07-20T22:38:47Z",
+  "overall": "operational",
+  "run_url": "https://github.com/mdeguzis/proton-pulse-web/actions/runs/29784601250",
+  "services": [
+    {
+      "name": "image-refetch",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 279,
+      "checked_at": "2026-07-20T22:38:44Z"
+    },
+    {
+      "name": "plugin-link-complete",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 140,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "plugin-link-remove",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 156,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "plugin-link-start",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 181,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "plugin-link-status",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 145,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "plugin-link-unlink",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 151,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "plugin-links-list",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 132,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "protondb-summary",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 128,
+      "checked_at": "2026-07-20T22:38:45Z"
+    },
+    {
+      "name": "steam-appdetails",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 182,
+      "checked_at": "2026-07-20T22:38:46Z"
+    },
+    {
+      "name": "steam-callback",
+      "status": "operational",
+      "http_status": 401,
+      "latency_ms": 204,
+      "checked_at": "2026-07-20T22:38:46Z"
+    },
+    {
+      "name": "steam-depot-info",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 134,
+      "checked_at": "2026-07-20T22:38:46Z"
+    },
+    {
+      "name": "steam-explore",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 132,
+      "checked_at": "2026-07-20T22:38:46Z"
+    },
+    {
+      "name": "steam-library-lookup",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 133,
+      "checked_at": "2026-07-20T22:38:46Z"
+    },
+    {
+      "name": "steam-news",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 327,
+      "checked_at": "2026-07-20T22:38:47Z"
+    },
+    {
+      "name": "sync-steam-library",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 138,
+      "checked_at": "2026-07-20T22:38:47Z"
+    },
+    {
+      "name": "user-system-upload",
+      "status": "operational",
+      "http_status": 200,
+      "latency_ms": 124,
+      "checked_at": "2026-07-20T22:38:47Z"
+    }
+  ]
+}
