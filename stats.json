@@ -1,0 +1,181 @@
+{
+  "generated_at": "2026-08-12T01:23:38Z",
+  "total_reports": 12,
+  "total_games": 6,
+  "games_with_pulse": 6,
+  "by_source": {
+    "pulse": 12
+  },
+  "by_rating": {
+    "platinum": 8,
+    "borked": 2,
+    "gold": 2
+  },
+  "by_gpu_vendor": {
+    "amd": 10,
+    "nvidia": 2
+  },
+  "by_cpu_brand": {
+    "amd": 12
+  },
+  "by_os_family": {
+    "steamos": 10,
+    "arch": 1,
+    "nixos": 1
+  },
+  "by_store": {
+    "steam": 12
+  },
+  "by_proton_type": {
+    "ge-proton": 3,
+    "proton-experimental": 6,
+    "proton-stable": 3
+  },
+  "by_device_family": {
+    "steam-deck-lcd": 9,
+    "desktop": 3
+  },
+  "by_year": {
+    "2026": 12
+  },
+  "by_year_source": {
+    "2026": {
+      "pulse": 12
+    }
+  },
+  "by_rating_x_gpu_vendor": {
+    "amd": {
+      "platinum": 7,
+      "borked": 1,
+      "gold": 2
+    },
+    "nvidia": {
+      "platinum": 1,
+      "borked": 1
+    }
+  },
+  "by_rating_x_cpu_brand": {
+    "amd": {
+      "platinum": 8,
+      "borked": 2,
+      "gold": 2
+    }
+  },
+  "by_rating_x_os_family": {
+    "steamos": {
+      "platinum": 7,
+      "borked": 1,
+      "gold": 2
+    },
+    "arch": {
+      "platinum": 1
+    },
+    "nixos": {
+      "borked": 1
+    }
+  },
+  "by_rating_x_source": {
+    "pulse": {
+      "platinum": 8,
+      "borked": 2,
+      "gold": 2
+    }
+  },
+  "by_rating_x_store": {
+    "steam": {
+      "platinum": 8,
+      "borked": 2,
+      "gold": 2
+    }
+  },
+  "by_rating_x_device_family": {
+    "steam-deck-lcd": {
+      "platinum": 6,
+      "borked": 1,
+      "gold": 2
+    },
+    "desktop": {
+      "platinum": 2,
+      "borked": 1
+    }
+  },
+  "by_year_rating": {
+    "2026": {
+      "platinum": 8,
+      "borked": 2,
+      "gold": 2
+    }
+  },
+  "stale_borked_count": 0,
+  "stale_borked_cutoff_year": 2024,
+  "worth_retesting": [],
+  "top_games": [
+    [
+      "2358720",
+      "Black Myth: Wukong",
+      5
+    ],
+    [
+      "1145350",
+      "Hades II",
+      3
+    ],
+    [
+      "99999999",
+      "Half-Life 4: Gabe's Revenge",
+      1
+    ],
+    [
+      "2881370",
+      "Thank You For Your Application",
+      1
+    ],
+    [
+      "2483190",
+      "Forza Horizon 6",
+      1
+    ],
+    [
+      "731490",
+      "Crash Bandicoot\u2122 N. Sane Trilogy",
+      1
+    ]
+  ],
+  "framegen_total_responses": 6,
+  "framegen_yes_count": 2,
+  "framegen_yes_rate_pct": 33.3,
+  "by_device_x_framegen": {
+    "steam-deck-lcd": {
+      "no": 3,
+      "yes": 2
+    },
+    "desktop": {
+      "no": 1
+    }
+  },
+  "by_gpu_x_framegen": {
+    "amd": {
+      "no": 4,
+      "yes": 2
+    }
+  },
+  "by_vram_x_framegen": {
+    "unknown": {
+      "no": 3,
+      "yes": 2
+    },
+    "high": {
+      "no": 1
+    }
+  },
+  "by_rating_x_framegen": {
+    "platinum": {
+      "no": 4,
+      "yes": 1
+    },
+    "gold": {
+      "yes": 1
+    }
+  },
+  "top_games_needing_framegen": []
+}
