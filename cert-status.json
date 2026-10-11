@@ -1,7 +1,7 @@
 {
   "ok": true,
   "domain": "www.proton-pulse.com",
-  "checked_at": "2026-10-10T20:58:35Z",
+  "checked_at": "2026-10-11T03:15:12Z",
   "edge": {
     "reachable": true,
     "subject": "CN = www.proton-pulse.com",
