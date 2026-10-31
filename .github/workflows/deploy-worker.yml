@@ -33,7 +33,7 @@ jobs:
           # against $BEFORE_SHA specifically.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Wrangler 4.x requires Node >= 22 (older Node 20 hit
           # 'Wrangler requires at least Node.js v22.0.0' at deploy time
