@@ -59,7 +59,7 @@ jobs:
           # Full history so publish-cloudflare.sh can compute VERSION + SHA.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Wrangler 4.x requires >=22 -- match .github/workflows/deploy-worker.yml.
           node-version: '22'
