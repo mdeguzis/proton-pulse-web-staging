@@ -37,7 +37,7 @@ jobs:
       # Install deps so Syft sees the full dependency tree, not just the
       # root package.json declarations. Without this the SBOM misses
       # transitive packages we actually ship. Repo uses npm, not pnpm.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - run: npm ci
