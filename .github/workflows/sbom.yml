@@ -83,14 +83,14 @@ jobs:
       # Persist the SBOM alongside the workflow run so a tagged release
       # can attach it. Kept 90 days per default retention -- long enough
       # for a post-hoc "what did we ship?" audit.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sbom-cyclonedx
           path: sbom.cyclonedx.json
 
       # Also upload the SARIF so grype output can be reviewed offline.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: grype-sarif
